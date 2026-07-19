@@ -1,0 +1,19 @@
+{
+  "name": "@multa/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Словари ru/en и типобезопасный переводчик. Ключи area.screen.element.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
