@@ -1,0 +1,21 @@
+# Прод Caddy: статика SPA + reverse-proxy API. TLS терминирует Tailscale (serve), сюда — http :80.
+:80 {
+	encode gzip zstd
+
+	@api path /v1/*
+	handle @api {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
