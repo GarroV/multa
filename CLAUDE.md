@@ -25,7 +25,7 @@ pnpm + Turborepo; apps/web (Vite + React + TS + TanStack Router/Query + Tailwind
 ## Конвенции
 
 - TS strict, ESM everywhere. Zod-схемы на границах API.
-- Миграции — только через supabase/migrations, имена `NNNN_verb_noun.sql`.
+- Миграции — Drizzle: `schema.ts` (источник правды) → `drizzle-kit generate` → `apps/api/migrations`, имена `NNNN_verb_noun.sql` (флаг `--name`). Self-hosted Postgres, без BaaS (решение 2026-07-19).
 - Коммиты: conventional (`feat(core): cascade compression`), маленькие PR-ы по одной фиче спринта.
 - Ключи i18n: `area.screen.element` (`plan.rebalance.title`).
 - Компоненты: src/components/ui (дизайн-система) отдельно от фичевых.
@@ -44,4 +44,4 @@ pnpm + Turborepo; apps/web (Vite + React + TS + TanStack Router/Query + Tailwind
 
 ## Definition of Done спринта
 
-Типы зеленые, тесты зеленые, фича работает в деве на реальном Supabase, строки в ru+en, соответствие дизайн-токенам, DoD-пункт из 07-roadmap выполнен буквально.
+Типы зеленые, тесты зеленые, фича работает в деве на локальном docker-Postgres, строки в ru+en, соответствие дизайн-токенам, DoD-пункт из 07-roadmap выполнен буквально.

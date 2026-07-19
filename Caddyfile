@@ -1,0 +1,25 @@
+# Caddy — reverse proxy для Multa (профиль `full`).
+#
+# $0-доступ извне без домена — через Tailscale: `tailscale serve https / http://localhost:80`
+# даёт HTTPS на *.ts.net без открытия портов. Caddy тогда слушает :80 внутри.
+# Когда появится домен — заменить :80 на домен, Caddy сам возьмёт TLS (auto-HTTPS).
+
+:80 {
+	encode gzip zstd
+
+	# API под /v1/* (версионирование с первого дня, см. 03-architecture)
+	handle_path /v1/* {
+		reverse_proxy api:3000
+	}
+
+	# Всё остальное — статика веба (SPA); собранный apps/web монтируется сюда позже.
+	handle {
+		reverse_proxy api:3000
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

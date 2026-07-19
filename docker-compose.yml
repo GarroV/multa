@@ -1,0 +1,54 @@
+# Multa — self-hosted стек ($0-профиль). Postgres — база; api+caddy под профилем `full`.
+#
+# Разработка:  docker compose up -d           # только postgres; api/web запускаем `pnpm dev` на хосте
+# Прод/полный: docker compose --profile full up -d   # postgres + api + caddy (нужен apps/api/Dockerfile)
+#
+# Postgres наружу смотрит только в dev (порт 5432). В проде порт не публикуем —
+# доступ через Caddy; БД живёт только в docker-сети.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-multa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-multa_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-multa}
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+    ports:
+      - '5432:5432' # dev-доступ с хоста; в проде убрать
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-multa}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-multa}:${POSTGRES_PASSWORD:-multa_dev_password}@postgres:5432/${POSTGRES_DB:-multa}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - '3000'
+
+  caddy:
+    profiles: ['full']
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./.data/caddy:/data
+      - ./.data/caddy-config:/config
