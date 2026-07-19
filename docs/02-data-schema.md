@@ -5,10 +5,12 @@
 ```sql
 create table workspaces (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references users(id),
+  owner_id text not null references "user"(id) on delete cascade, -- better-auth: user.id text (не uuid)
   base_currency char(3) not null default 'RUB',
   timezone text not null default 'Europe/Belgrade',
   locale text not null default 'ru',
+  period_anchors jsonb,           -- онбординг шаг 2: PeriodConfig (@multa/core)
+  expected_income_minor bigint,   -- ожидаемый доход периода (base minor)
   created_at timestamptz not null default now()
 );
 
