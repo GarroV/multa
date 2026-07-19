@@ -31,6 +31,24 @@ export const en = {
   'plan.empty.subtitle': 'Route set once you add income and where it goes.',
   'plan.hero.canSpend': 'YOU CAN SPEND',
   'plan.hero.perDay': '/day',
+  'plan.today.periodLabel': 'THIS PERIOD',
+  'plan.today.until': 'until {date} · {days} days left',
+  'plan.today.expected': 'Expected this period',
+
+  // Auth
+  'auth.title': 'multa',
+  'auth.subtitle': 'Budget across borders.',
+  'auth.email': 'Email',
+  'auth.password': 'Password',
+  'auth.name': 'Name',
+  'auth.signIn': 'Sign in',
+  'auth.signUp': 'Create account',
+  'auth.toSignUp': 'No account? Create one',
+  'auth.toSignIn': 'Have an account? Sign in',
+
+  // Общее (доп.)
+  'common.loading': 'Loading…',
+  'common.save': 'Save',
 } as const;
 
 export type TranslationKey = keyof typeof en;

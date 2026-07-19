@@ -1,0 +1,141 @@
+@import 'tailwindcss';
+
+/* Neon Ledger — токены (docs/06-design-system). Dark-only в MVP. */
+:root {
+  color-scheme: dark;
+
+  --bg-void: #07090f;
+  --bg-panel: #0d1220;
+  --bg-raised: #131a2e;
+  --line: #1e2a45;
+
+  --text-hi: #eaf2ff;
+  --text-mid: #93a4c3;
+  --text-dim: #55648a;
+
+  --neon-cyan: #00e5ff;
+  --neon-magenta: #ff2e97;
+  --neon-lime: #b6ff2e;
+  --neon-amber: #ffb020;
+  --neon-violet: #8b5cf6;
+
+  --glow-cyan: 0 0 12px rgba(0, 229, 255, 0.35);
+  --radius: 12px;
+  --radius-lg: 20px;
+
+  --font-ui: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+  --font-brand: 'Space Grotesk', var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg-void);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.brand {
+  font-family: var(--font-brand);
+  letter-spacing: -0.01em;
+}
+.micro {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.dim {
+  color: var(--text-mid);
+}
+
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.btn {
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+}
+.btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--neon-cyan) 10%, transparent);
+  box-shadow: var(--glow-cyan);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-ghost {
+  border-color: var(--line);
+  color: var(--text-mid);
+}
+
+.chip {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  color: var(--text-mid);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  cursor: pointer;
+  font: inherit;
+  transition: all 0.15s;
+}
+.chip[aria-pressed='true'] {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.field {
+  width: 100%;
+  background: var(--bg-void);
+  border: 1px solid var(--line);
+  color: var(--text-hi);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font: inherit;
+}
+.field:focus {
+  outline: 2px solid var(--neon-cyan);
+  outline-offset: 2px;
+}
+
+.hero-number {
+  font-family: var(--font-mono);
+  font-size: clamp(48px, 8vw, 64px);
+  font-weight: 500;
+  color: var(--text-hi);
+  text-shadow: var(--glow-cyan);
+  line-height: 1;
+}
+
+.danger {
+  color: var(--neon-magenta);
+}
+a {
+  color: var(--neon-cyan);
+}

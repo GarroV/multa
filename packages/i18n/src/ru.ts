@@ -29,4 +29,22 @@ export const ru: Record<TranslationKey, string> = {
   'plan.empty.subtitle': 'Курс проложим, как добавишь доход и куда он идёт.',
   'plan.hero.canSpend': 'МОЖНО ТРАТИТЬ',
   'plan.hero.perDay': '/день',
+  'plan.today.periodLabel': 'ПЕРИОД',
+  'plan.today.until': 'до {date} · осталось дней: {days}',
+  'plan.today.expected': 'Ожидаемый доход периода',
+
+  // Auth
+  'auth.title': 'multa',
+  'auth.subtitle': 'Бюджет, который переезжает с тобой.',
+  'auth.email': 'Почта',
+  'auth.password': 'Пароль',
+  'auth.name': 'Имя',
+  'auth.signIn': 'Войти',
+  'auth.signUp': 'Создать аккаунт',
+  'auth.toSignUp': 'Нет аккаунта? Создать',
+  'auth.toSignIn': 'Уже есть аккаунт? Войти',
+
+  // Общее (доп.)
+  'common.loading': 'Загрузка…',
+  'common.save': 'Сохранить',
 };
