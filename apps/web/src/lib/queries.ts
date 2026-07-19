@@ -21,6 +21,7 @@ export interface PlanDto {
   daysLeft: number;
   baseCurrency: string;
   expectedIncomeMinor: string | null;
+  canSpendPerDayMinor: string;
   allocations: unknown[];
 }
 

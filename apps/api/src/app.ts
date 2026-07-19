@@ -121,12 +121,17 @@ app.get('/v1/plan/current', requireWorkspace, (c) => {
   const anchors = ws.periodAnchors as PeriodConfig;
   const now = today();
   const period = periodForDate(anchors, now);
+  const totalDays = daysInPeriod(period);
+  const income = ws.expectedIncomeMinor ?? 0n;
+  // Спринт 1: наивная «цифра дня» = доход ÷ дней периода. Спринт 2 уточнит каскадом.
+  const canSpendPerDayMinor = totalDays > 0 ? income / BigInt(totalDays) : 0n;
   return c.json({
     period,
-    daysInPeriod: daysInPeriod(period),
+    daysInPeriod: totalDays,
     daysLeft: daysLeftInPeriod(period, now),
     baseCurrency: ws.baseCurrency,
     expectedIncomeMinor: ws.expectedIncomeMinor != null ? String(ws.expectedIncomeMinor) : null,
+    canSpendPerDayMinor: String(canSpendPerDayMinor),
     allocations: [], // Спринт 2: каскад заполнит
   });
 });

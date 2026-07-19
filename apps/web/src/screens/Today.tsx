@@ -14,11 +14,23 @@ export function Today() {
   if (isLoading) return <Centered>{t('common.loading')}</Centered>;
   if (error || !plan) return <Centered><span className="dim">—</span></Centered>;
 
+  const perDay =
+    plan.canSpendPerDayMinor && plan.canSpendPerDayMinor !== '0'
+      ? formatMinor(plan.canSpendPerDayMinor, plan.baseCurrency, locale)
+      : null;
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 24, display: 'grid', gap: 24 }}>
       <div>
         <div className="micro">{t('plan.hero.canSpend')}</div>
-        <div className="hero-number">—</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 8 }}>
+          <span className="hero-number">{perDay ?? '—'}</span>
+          {perDay && (
+            <span className="mono dim" style={{ fontSize: 24 }}>
+              {plan.baseCurrency} {t('plan.hero.perDay')}
+            </span>
+          )}
+        </div>
         <div className="dim" style={{ marginTop: 8 }}>
           {t('plan.today.until', { date: plan.period.endsOn, days: plan.daysLeft })}
         </div>
