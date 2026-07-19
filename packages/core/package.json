@@ -9,7 +9,7 @@
     "./money": "./src/money.ts",
     "./periods": "./src/periods.ts",
     "./cascade": "./src/cascade.ts",
-    "./fx": "./src/fx/index.ts"
+    "./fx": "./src/fx.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
