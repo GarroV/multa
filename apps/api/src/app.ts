@@ -22,6 +22,7 @@ import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
+import { obligations } from './routes/obligations.ts';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -144,6 +145,9 @@ app.get('/v1/fx/rate', requireAuth, async (c) => {
   if (!snap) return c.json({ error: 'rate_unavailable' }, 404);
   return c.json(snap);
 });
+
+// CRUD обязательств (Спринт 2): /v1/debts, /v1/envelopes, /v1/goals, /v1/buckets
+app.route('/v1', obligations);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

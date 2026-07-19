@@ -26,3 +26,44 @@ export const rateQuerySchema = z.object({
   to: z.string().length(3),
   on: z.string().optional(),
 });
+
+// --- CRUD обязательств (Спринт 2). Деньги — minor units (строка/число → bigint). ---
+
+const minor = z.union([z.string(), z.number()]).transform((v) => BigInt(v));
+const ccy = z
+  .string()
+  .length(3)
+  .transform((s) => s.toUpperCase());
+
+export const debtCreateSchema = z.object({
+  name: z.string().min(1),
+  currency: ccy,
+  principalMinor: minor,
+  remainingMinor: minor,
+  paymentMinor: minor,
+  dueDate: z.string().optional(),
+  counterparty: z.string().optional(),
+});
+
+export const envelopeCreateSchema = z.object({
+  name: z.string().min(1),
+  currency: ccy,
+  ruleKind: z.enum(['fixed', 'percent']),
+  ruleValue: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  balanceMinor: minor.optional(),
+});
+
+export const goalCreateSchema = z.object({
+  name: z.string().min(1),
+  currency: ccy,
+  targetMinor: minor,
+  savedMinor: minor.optional(),
+  plannedPerPeriodMinor: minor.optional(),
+});
+
+export const bucketCreateSchema = z.object({
+  name: z.string().min(1),
+  fromCurrency: ccy,
+  toCurrency: ccy,
+  amountMinor: minor,
+});

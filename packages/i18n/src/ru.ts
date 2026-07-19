@@ -47,4 +47,40 @@ export const ru: Record<TranslationKey, string> = {
   // Общее (доп.)
   'common.loading': 'Загрузка…',
   'common.save': 'Сохранить',
+  'common.add': 'Добавить',
+  'common.delete': 'Удалить',
+  'common.name': 'Название',
+  'common.amount': 'Сумма',
+  'common.currency': 'Валюта',
+  'common.empty': 'Пока пусто',
+  'common.saved': 'Сохранено',
+
+  // Навигация
+  'nav.today': 'Сегодня',
+  'nav.plan': 'План',
+  'nav.exchange': 'Размен',
+  'nav.obligations': 'Обязательства',
+  'nav.settings': 'Настройки',
+
+  // Обязательства
+  'obl.title': 'Обязательства',
+  'obl.debts': 'Долги',
+  'obl.envelopes': 'Конверты',
+  'obl.goals': 'Цели',
+  'obl.buckets': 'Валютные корзины',
+  'obl.payment': 'Платёж / период',
+  'obl.target': 'Цель',
+  'obl.rule.fixed': 'фикс',
+  'obl.rule.percent': 'процент',
+  'obl.from': 'Из',
+  'obl.to': 'В',
+
+  // Настройки
+  'settings.title': 'Настройки',
+  'settings.currency': 'Базовая валюта',
+  'settings.income': 'Ожидаемый доход за период',
+  'settings.anchors': 'Даты выплат',
+
+  // Заглушки
+  'placeholder.soon': 'Скоро — Спринт 2',
 };

@@ -49,6 +49,42 @@ export const en = {
   // Общее (доп.)
   'common.loading': 'Loading…',
   'common.save': 'Save',
+  'common.add': 'Add',
+  'common.delete': 'Delete',
+  'common.name': 'Name',
+  'common.amount': 'Amount',
+  'common.currency': 'Currency',
+  'common.empty': 'Nothing yet',
+  'common.saved': 'Saved',
+
+  // Навигация
+  'nav.today': 'Today',
+  'nav.plan': 'Plan',
+  'nav.exchange': 'Exchange',
+  'nav.obligations': 'Obligations',
+  'nav.settings': 'Settings',
+
+  // Обязательства
+  'obl.title': 'Obligations',
+  'obl.debts': 'Debts',
+  'obl.envelopes': 'Envelopes',
+  'obl.goals': 'Goals',
+  'obl.buckets': 'Currency baskets',
+  'obl.payment': 'Payment / period',
+  'obl.target': 'Target',
+  'obl.rule.fixed': 'fixed',
+  'obl.rule.percent': 'percent',
+  'obl.from': 'From',
+  'obl.to': 'To',
+
+  // Настройки
+  'settings.title': 'Settings',
+  'settings.currency': 'Base currency',
+  'settings.income': 'Expected income per period',
+  'settings.anchors': 'Payout dates',
+
+  // Заглушки
+  'placeholder.soon': 'Coming — Sprint 2',
 } as const;
 
 export type TranslationKey = keyof typeof en;
