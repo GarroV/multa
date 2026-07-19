@@ -1,0 +1,114 @@
+# Multa — Архитектура
+
+## Стек (решение)
+
+Монорепо pnpm workspaces + Turborepo:
+
+```
+multa/
+  apps/
+    web/        — Vite + React 18 + TypeScript + TanStack (Router, Query) + Tailwind
+    api/        — Node 22 + Hono + Drizzle + better-auth. Docker, свой сервер
+    bot/        — grammY, webhook. Фаза 2
+  packages/
+    core/       — чистый TS без зависимостей: money, fx, cascade, periods, forecast, parser
+    api-client/ — типизированный клиент + zod-схемы (общие для web/bot)
+    i18n/       — словари ru/en, типобезопасные ключи
+  docs/         — этот пакет документации
+  docker-compose.yml — postgres, api, caddy
+```
+
+- **Хостинг: свой сервер (решение основателя), Docker Compose**: Postgres 16 + apps/api (Node 22 + Hono) + Caddy (TLS/reverse proxy) + том для файлов чеков (или MinIO, если захочется S3-совместимости). Никакого BaaS-аккаунта.
+- **Доступ к данным: только через API.** Клиент никогда не ходит в БД напрямую. Изоляция workspace — middleware в API (каждый запрос скоупится по workspace_id владельца токена); опционально RLS в Postgres как вторая линия обороны.
+- **ORM/миграции**: Drizzle (SQL-first, отличная работа с bigint/numeric).
+- **Auth**: better-auth (TS, self-hosted): email magic link + Google OAuth. Telegram Login добавляется в фазе бота (маппинг tg_user_id → user).
+- **Cron**: pg_cron в Postgres или node-cron в API-процессе (fx-пайплайн, сверка балансов, дайджесты).
+- **Веб**: SPA + PWA (manifest, service worker, очередь офлайн-мутаций: записал расход без сети → синк). SSR не нужен; лендинг — отдельная статика.
+- **i18n**: ru/en с первого коммита. Ключи типа `plan.rebalance.title`, никакого хардкода строк в компонентах.
+
+## packages/core — сердце системы (максимум тестов здесь)
+
+- `money.ts` — Money в integer minor units, exponents по ISO 4217 (JPY=0, BHD=3), convert() с RateSnapshot. Float в деньгах запрещен.
+- `cascade.ts` — распределение выплаты по приоритету (debts → buckets → envelopes → categories → goals) и обратное сжатие при нехватке. Чистая функция: (income, plan, history) → allocation | suggestions.
+- `periods.ts` — генерация PayPeriods из якорей («10 и 25», «каждые 2 недели»), привязка транзакции к периоду.
+- `burnRate.ts` — темп расхода категории, прогноз даты исчерпания, порог сигнала.
+- `forecast.ts` — cash-flow на N месяцев: recurring + debts (с датами закрытия) + buckets + goals.
+- `parser.ts` — свободный текст/транскрипт голоса → {amount, currency?, categoryHint?, itemName?, date}. Сначала regex-эвристика, LLM — фоллбек на сервере. Требования (acceptance-кейсы, обязательные тесты):
+  - «250 еда» → 250, дефолт-валюта, Еда
+  - «кофе 4.5 eur вчера» → 4.50 EUR, вчера, itemName «кофе»
+  - «кофе капучино 0,3 400 динар» → 400 RSD, itemName «кофе капучино 0,3» — **не перепутать объем/количество с суммой** (эвристика: сумма — число рядом с валютой или последнее «денежное» число; 0,3 при слове-объеме — атрибут позиции)
+  - «хлеб 200 молоко 150 такси 900» → три транзакции
+  - валюта словами и склонениями: «динар/динара/дин», «евро», «рублей/руб», «лари», «бат»
+  - числа: запятая и точка как десятичный разделитель, «1.5к»/«полторы тысячи» → 1500
+  - неуверенность → не «не понял», а догадка с подтверждением: «400 RSD в Еду?» [да] [изменить]
+  - itemName сохраняется в note/raw_input — из голосовых накапливается та же детализация, что из чековых позиций.
+- `spread.ts` — фактический курс из пары сумм, спред к официальному.
+
+## FX-пайплайн
+
+1. pg_cron (ежедневно 06:00 UTC): ЦБ РФ `XML_daily.asp` (windows-1251! курс «на завтра»), Frankfurter (ЕЦБ) → upsert в `fx_rates`.
+2. `getRate(base, quote, date)`: fx_rates → ленивая дотяжка из API (исторические курсы вечны — кешируем навсегда) → выходные: последний рабочий день → нет данных: просим ручной ввод, помечаем source='manual'.
+3. Кроссы вычисляются, не хранятся.
+
+## AI-слой (только API, без своих моделей)
+
+| Задача | Путь | Модель/метод | Стоимость |
+|---|---|---|---|
+| Чек РФ | QR → API проверки чеков ФНС | без AI | free |
+| Чек Сербия | QR → suf.purs.gov.rs | без AI | free |
+| Чек прочее | фото → vision structured output | Gemini Flash / Claude Haiku | ~$0.001–0.01/чек |
+| Текст «250 еда» | regex → LLM-фоллбек | Haiku | ~$0.0003/зап. |
+| Голос | Whisper API → текстовый пайплайн | whisper | ~$0.006/мин |
+| Категоризация позиций | LLM few-shot историей юзера | Haiku | копейки |
+
+Правила: confidence < порога → сумма в «Общее» одним тапом; в LLM не отправлять user_id и лишний контекст; выключатель AI в настройках; лимит бесплатных распознаваний = граница Free/Pro.
+
+## Безопасность
+
+- Изоляция workspace в API-middleware на каждом запросе; опционально RLS как вторая линия.
+- Сессии better-auth: короткоживущие токены, refresh httpOnly. Webhook бота — secret_token + rate limit.
+- Экспорт CSV/JSON и удаление аккаунта — с MVP (доверие + GDPR).
+- Sentry без PII. Секреты в env. **Бэкапы: pg_dump ежедневно + копия вне сервера (rclone в облако), restore проверяется раз в месяц** — на своем железе это на нас.
+- БД не смотрит в интернет: Postgres только в docker-сети, наружу — один Caddy.
+
+## Инфраструктура и стоимость
+
+- Свой сервер: стоимость железа/электричества; софт $0. AI-затраты $5–50/мес по мере роста.
+- Публичный доступ: домен + Caddy (auto-TLS). Если сервер дома — Cloudflare Tunnel, чтобы не открывать порты.
+- План Б при росте: тот же docker-compose переезжает на VPS (Hetzner €5–10) без изменений кода.
+
+## Наблюдаемость
+
+Sentry (web+api), структурные логи Hono, аудит plan_revisions как продуктовая метрика (сколько пересборок принято — ключевой KPI полезности).
+
+## Профиль запуска: нулевая стоимость (решение основателя, действует для MVP)
+
+Ни одного платного сервиса и хостинга на старте. Конкретно:
+
+| Потребность | Решение за $0 | Платный аналог — когда-нибудь потом |
+|---|---|---|
+| Хостинг | свой сервер, docker-compose | VPS Hetzner |
+| Доступ к вебу с телефона/извне | **Tailscale** (бесплатный план, `tailscale serve` дает HTTPS без домена и без открытых портов) | домен + Caddy |
+| Telegram-бот | **long polling** (grammY) — не нужен ни домен, ни публичный URL, ни webhook | webhook за доменом |
+| Auth | better-auth: логин+пароль (+TOTP) для себя; Telegram Login. **Без email-провайдера вообще** — magic links не нужны, пока пользователь один | Resend/Postmark |
+| Парсер ввода | только regex-эвристика из packages/core (покрывает «250 еда», «кофе 4.5 eur») | LLM-фоллбек |
+| AI чеков | **в MVP**: QR-путь (ФНС РФ / suf.purs.gov.rs) бесплатный первым; фоллбек — OpenAI API основателя (gpt-4o-mini vision, structured output; ~$0.001–0.01/чек). Внимание: нужен ключ platform.openai.com — подписка ChatGPT Plus API не дает | Gemini/Anthropic как альтернативы |
+| AI голоса | после MVP: Whisper API (тот же ключ OpenAI) или whisper.cpp на своем сервере | — |
+| Курсы валют | ЦБ РФ + Frankfurter (ЕЦБ) — бесплатны без ключей | openexchangerates |
+| Мониторинг | Uptime Kuma (self-hosted) + docker-логи; Sentry заменяет self-hosted GlitchTip или просто пока без него | Sentry SaaS |
+| CI, репозиторий | GitHub Free + Actions free tier | — |
+| Бэкапы | pg_dump кроном + копия на второй диск/в TG-канал себе (шифрованный архив) | S3 |
+
+Единственная неизбежная трата в будущем — домен (~$10/год), и он не нужен, пока нет сторонних пользователей: Tailscale закрывает личный доступ, long polling закрывает бота.
+
+## Production-блоки («взрослый» контур)
+
+- **apps/admin** — админка (см. 09-admin.md): отдельный поддомен, admin_users + TOTP, аудит-лог.
+- **Биллинг** — Stripe + Telegram Stars + comp из админки (см. 08-billing.md); entitlements-middleware в API.
+- **Транзакционные письма** — managed-провайдер (Resend/Postmark, ~$0–20/мес): magic links, чеки оплаты, напоминания past_due, GDPR-экспорт. Self-hosted SMTP не берем — deliverability не наша война. Шаблоны в ru/en.
+- **Окружения**: dev (docker-compose локально) → staging (тот же compose, отдельная БД) → prod. CI: GitHub Actions — typecheck, тесты, build, деплой по SSH (docker compose pull && up -d). Миграции — в CD-шаге, с бэкапом перед прогоном.
+- **Rate limiting**: на auth-эндпоинты и AI-эндпоинты (per-user и per-IP), в API-middleware; Caddy — базовый лимит на всё.
+- **Мониторинг**: Uptime Kuma (self-hosted) на публичные эндпоинты + healthcheck fx-пайплайна (свежесть курсов < 36ч); алерты в TG основателю.
+- **Продуктовая аналитика**: своя таблица событий (event, workspace_id, props, ts) + дашборд в админке. PostHog self-hosted — если станет мало. Никаких сторонних трекеров на клиенте — это часть privacy-обещания.
+- **Статус-страница**: простая (Uptime Kuma public page) — status.multa.*.
+- **Версионирование API**: /v1/* с первого дня; bot и web ходят только через версионированные пути.

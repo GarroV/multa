@@ -1,0 +1,24 @@
+{
+  "name": "@multa/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Чистое доменное ядро Multa: money, periods, cascade, fx, burnRate, forecast, parser. Без внешних зависимостей.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./money": "./src/money.ts",
+    "./periods": "./src/periods.ts",
+    "./cascade": "./src/cascade.ts",
+    "./fx": "./src/fx/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

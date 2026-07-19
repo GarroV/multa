@@ -1,0 +1,30 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# env / secrets — никогда не коммитим (см. CLAUDE.md §Профиль нулевой стоимости)
+.env
+.env.*
+!.env.example
+
+# приватные данные основателя (см. CLAUDE.md §Референс-данные)
+reference-data/
+
+# локальные тома postgres/caddy
+.data/
+
+# editor / os
+.DS_Store
+.vscode/
+.idea/
+
+# логи и покрытие
+*.log
+npm-debug.log*
+coverage/

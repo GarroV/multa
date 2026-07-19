@@ -1,0 +1,329 @@
+# Multa — Схема данных (Postgres / Supabase)
+
+Правила: деньги — `bigint` minor units; курсы — `numeric(20,10)`; валюты — `char(3)` ISO 4217; изоляция workspace — в API-middleware (RLS опционально как вторая линия). Все таблицы: `id uuid pk default gen_random_uuid()`, `created_at`, `updated_at`. Таблицы пользователей/сессий создает better-auth (users, sessions, accounts...).
+
+```sql
+create table workspaces (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references users(id),
+  base_currency char(3) not null default 'RUB',
+  timezone text not null default 'Europe/Belgrade',
+  locale text not null default 'ru',
+  created_at timestamptz not null default now()
+);
+
+create table workspace_members (   -- закладка под семейный режим (v2); в MVP только owner
+  workspace_id uuid not null references workspaces on delete cascade,
+  user_id uuid not null references users(id),
+  role text not null default 'member' check (role in ('owner','member')),
+  joined_at timestamptz not null default now(),
+  primary key (workspace_id, user_id)
+);
+-- транзакции уже несут авторство: add column created_by uuid references users(id)
+
+create table accounts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  name text not null,
+  currency char(3) not null,
+  kind text not null check (kind in ('cash','card','savings','other')),
+  balance_minor bigint not null default 0,
+  archived boolean not null default false
+);
+
+create table categories (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  parent_id uuid references categories on delete set null, -- 2 уровня max (проверка в API)
+  name text not null,
+  icon text,
+  is_system boolean not null default false, -- 'Общее'
+  protected boolean not null default false, -- не предлагается в автопересборке (пример: Ребенок)
+  sort int not null default 0,
+  archived boolean not null default false
+);
+
+create table pay_periods (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  starts_on date not null,
+  ends_on date not null,
+  expected_income_minor bigint not null default 0, -- в базовой валюте
+  status text not null default 'planned' check (status in ('planned','active','closed')),
+  unique (workspace_id, starts_on)
+);
+
+create table debts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  name text not null,                -- 'Озон', 'Сбер', 'Долг Мише'
+  currency char(3) not null,
+  principal_minor bigint not null,   -- исходная сумма
+  remaining_minor bigint not null,
+  payment_minor bigint not null,     -- платеж за период
+  due_date date,                     -- расчетная дата закрытия
+  counterparty text,
+  agreed_rate numeric(20,10),        -- договорный курс для p2p-долгов
+  closed_at timestamptz
+);
+
+create table envelopes (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  name text not null,                -- 'Инвестиции'
+  currency char(3) not null,
+  rule_kind text not null check (rule_kind in ('fixed','percent')),
+  rule_value numeric(12,4) not null, -- сумма minor (fixed) или % от выплаты
+  balance_minor bigint not null default 0
+);
+
+create table goals (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  name text not null,                -- 'Мотоцикл'
+  currency char(3) not null,
+  target_minor bigint not null,
+  saved_minor bigint not null default 0,
+  planned_per_period_minor bigint not null default 0,
+  achieved_at timestamptz
+);
+
+create table currency_buckets (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  name text not null,                -- 'EUR на аренду'
+  from_currency char(3) not null,    -- RUB
+  to_currency char(3) not null,      -- EUR
+  amount_minor bigint not null,      -- сколько from-валюты закладываем на период
+  active boolean not null default true
+);
+
+create table planned_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  period_id uuid not null references pay_periods on delete cascade,
+  target_kind text not null check (target_kind in ('category','debt','envelope','goal','bucket')),
+  target_id uuid not null,
+  planned_minor bigint not null,     -- в базовой валюте
+  execution_status text not null default 'pending'
+    check (execution_status in ('pending','confirmed','partial','skipped','n_a')), -- n_a для категорий
+  executed_minor bigint not null default 0,  -- подтвержденная сумма (для partial)
+  auto boolean not null default false,       -- автоплатеж: подтверждается сам в дату
+  unique (period_id, target_kind, target_id)
+);
+-- транзакция подтверждения ссылается на строку плана:
+-- alter table transactions add column planned_item_id uuid references planned_items;
+
+create table plan_revisions (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  period_id uuid not null references pay_periods on delete cascade,
+  reason text not null check (reason in ('overspend','manual','income_change','auto_suggest')),
+  moves jsonb not null,  -- [{from:{kind,id}, to:{kind,id}, amount_minor}]
+  accepted boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table transactions (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  account_id uuid references accounts,
+  period_id uuid references pay_periods,
+  kind text not null check (kind in ('expense','income','transfer_out','transfer_in','exchange')),
+  target_kind text check (target_kind in ('category','debt','envelope','goal')),
+  target_id uuid,
+  amount_minor bigint not null,
+  currency char(3) not null,
+  base_amount_minor bigint not null,   -- снапшот конвертации
+  rate numeric(20,10) not null,
+  rate_source text not null,           -- 'cbr'|'ecb'|'frankfurter'|'manual'
+  rate_date date not null,
+  occurred_on date not null,
+  source text not null default 'manual' check (source in ('manual','text','voice','receipt','recurring','import')),
+  note text,
+  raw_input text,                      -- исходный текст/строка чека
+  receipt_id uuid references receipts,
+  transfer_pair_id uuid                -- связь двух ног перевода/обмена
+);
+
+create table receipts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  status text not null default 'pending' check (status in ('pending','parsed','fallback','failed')),
+  method text check (method in ('qr_fns','qr_rs','vision')),
+  merchant text,
+  total_minor bigint,
+  currency char(3),
+  purchased_at timestamptz,
+  items jsonb,        -- [{name, qty, price_minor, category_id, confidence}]
+  image_path text,    -- storage
+  qr_payload text
+);
+
+create table exchange_ops (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  bucket_id uuid references currency_buckets,
+  from_account uuid not null references accounts,
+  to_account uuid not null references accounts,
+  from_minor bigint not null,
+  to_minor bigint not null,
+  actual_rate numeric(20,10) not null,     -- вычислен из сумм
+  official_rate numeric(20,10) not null,   -- снапшот на дату
+  official_source text not null,
+  spread_pct numeric(8,4) not null,        -- (actual/official - 1) * 100
+  occurred_on date not null
+);
+
+create table recurring_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  kind text not null check (kind in ('income','expense','envelope','goal','debt')),
+  target_id uuid,
+  name text not null,
+  amount_minor bigint not null,
+  currency char(3) not null,
+  schedule jsonb not null,   -- {anchors:[10,25]} | {rrule:'FREQ=MONTHLY;BYMONTHDAY=1'}
+  next_on date,
+  escalation jsonb,          -- {percent: 10, from: '2026-06-01'} — аренда растет
+  active boolean not null default true
+);
+
+create table import_batches (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  account_id uuid references accounts,
+  filename text not null,
+  bank_template text,                -- 'sber' | 'intesa_rs' | 'custom:...'
+  column_mapping jsonb not null,
+  rows_total int not null default 0,
+  rows_imported int not null default 0,
+  rows_duplicated int not null default 0,
+  status text not null default 'review' check (status in ('review','committed','rolled_back')),
+  created_at timestamptz not null default now()
+);
+-- transactions: add column import_batch_id uuid references import_batches
+
+create table fx_rates (
+  source text not null,      -- 'cbr' | 'ecb' | 'frankfurter'
+  base char(3) not null,
+  quote char(3) not null,
+  on_date date not null,
+  rate numeric(20,10) not null,
+  primary key (source, base, quote, on_date)
+); -- глобальная, без RLS (публичные данные), запись только сервисной ролью
+```
+
+## Billing (см. 08-billing.md)
+
+```sql
+create table plans (
+  id text primary key,              -- 'free' | 'pro' | 'lifetime'
+  name jsonb not null,              -- {ru, en}
+  entitlements jsonb not null,      -- {max_currencies, max_accounts, ai_ops_month, exchange_planner, forecast_months, family}
+  active boolean not null default true
+);
+
+create table plan_prices (
+  id uuid primary key default gen_random_uuid(),
+  plan_id text not null references plans,
+  provider text not null check (provider in ('stripe','tg_stars','manual')),
+  region text not null default 'default',   -- PPP-корзина
+  currency char(3) not null,
+  amount_minor bigint not null,
+  period text not null check (period in ('month','year','lifetime')),
+  external_id text                           -- stripe price id
+);
+
+create table subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  plan_id text not null references plans,
+  status text not null check (status in ('trialing','active','past_due','canceled','expired','lifetime')),
+  provider text not null,
+  external_id text,                          -- stripe subscription id
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  granted_by uuid,                           -- admin comp
+  created_at timestamptz not null default now()
+);
+
+create table payments (
+  id uuid primary key default gen_random_uuid(),
+  subscription_id uuid references subscriptions,
+  provider text not null, external_id text,
+  amount_minor bigint not null, currency char(3) not null,
+  status text not null check (status in ('paid','refunded','failed','disputed')),
+  paid_at timestamptz, raw jsonb
+);
+
+create table ai_usage (
+  workspace_id uuid not null references workspaces on delete cascade,
+  month date not null,                       -- первое число месяца
+  ops int not null default 0,                -- vision + llm + whisper вызовы
+  cost_usd_micros bigint not null default 0,
+  primary key (workspace_id, month)
+);
+```
+
+## Admin (см. 09-admin.md)
+
+```sql
+create table admin_users (
+  user_id uuid primary key references users(id),
+  role text not null check (role in ('owner','admin','support')),
+  totp_enabled boolean not null default false
+);
+
+create table audit_log (              -- append-only, без update/delete
+  id bigserial primary key,
+  actor_id uuid not null,
+  actor_role text not null,
+  action text not null,               -- 'subscription.grant', 'user.block', 'support_access.enter'...
+  object_type text not null, object_id text not null,
+  reason text, meta jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table feature_flags (
+  key text primary key,
+  description text,
+  rules jsonb not null default '{}', -- {workspaces:[...], percent: 10}
+  active boolean not null default false
+);
+
+create table support_access (         -- явное согласие на диагностический доступ
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces,
+  granted_by_user boolean not null default false,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+```
+
+## Legal (см. 10-legal.md)
+
+```sql
+create table legal_documents (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('terms','privacy','cookies','subprocessors')),
+  locale text not null, version int not null,
+  body_md text not null, published_at timestamptz,
+  unique (kind, locale, version)
+);
+
+create table legal_acceptances (
+  user_id uuid not null references users(id),
+  kind text not null, version int not null,
+  accepted_at timestamptz not null default now(),
+  primary key (user_id, kind, version)
+);
+```
+
+## Замечания для имплементации
+
+- **Изоляция**: API-middleware резолвит workspace по токену и скоупит каждый запрос; ни один хендлер не принимает workspace_id от клиента.
+- **fx-пайплайн**: cron (pg_cron или node-cron) ежедневно тянет ЦБ РФ (XML_daily, кодировка windows-1251, курс публикуется накануне «на завтра»), ЕЦБ/Frankfurter. Запрос курса на дату: своя таблица → лениво дотянуть из API → фоллбек на последний рабочий день (выходные) → 'manual'.
+- **Кросс-курсы**: хранить исходные котировки к базе источника (ЦБ: всё к RUB), кросс вычислять: `USD→RSD = (RUB/USD)/(RUB/RSD)`.
+- Баланс счета — денормализация; пересчитывается триггером/сервисом из транзакций, сверка — фоновым джобом.
+- ETA цели: `ceil((target - saved) / planned_per_period)` периодов → месяцы и «зарплаты».
