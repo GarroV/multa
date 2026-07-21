@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { anchorsSchema, createWorkspaceSchema, paydaySchema, rateQuerySchema } from './validation.ts';
+import { z } from 'zod';
+import { anchorsSchema, createWorkspaceSchema, debtCreateSchema, paydaySchema, rateQuerySchema } from './validation.ts';
+
+const debtBody = (paymentMinor: unknown) => ({
+  name: 'Озон',
+  currency: 'RUB',
+  principalMinor: '20000000',
+  remainingMinor: '20000000',
+  paymentMinor,
+});
 
 describe('createWorkspaceSchema', () => {
   it('принимает валюту из 3 букв', () => {
@@ -37,6 +46,23 @@ describe('paydaySchema', () => {
       expectedIncomeMinor: '19000000',
     });
     expect(parsed.expectedIncomeMinor).toBe(19000000n);
+  });
+});
+
+describe('minor units (деньги на границе)', () => {
+  it('принимает целую строку и число, отдаёт bigint', () => {
+    expect(debtCreateSchema.parse(debtBody('2000000')).paymentMinor).toBe(2000000n);
+    expect(debtCreateSchema.parse(debtBody(2000000)).paymentMinor).toBe(2000000n);
+  });
+  it('мусор/дробное отвергаются как ZodError (400), а не роняют сырой BigInt-throw (500)', () => {
+    for (const bad of ['abc', '1.5', '', '1 000', 1.5]) {
+      const res = debtCreateSchema.safeParse(debtBody(bad));
+      expect(res.success).toBe(false); // safeParse ловит именно ZodError, сырой throw бы пролетел
+    }
+    expect(() => debtCreateSchema.parse(debtBody('abc'))).toThrow(z.ZodError);
+  });
+  it('paydaySchema так же валидирует expectedIncomeMinor', () => {
+    expect(paydaySchema.safeParse({ anchors: { kind: 'monthly-days', days: [10] }, expectedIncomeMinor: 'oops' }).success).toBe(false);
   });
 });
 

@@ -15,14 +15,43 @@ export interface MeDto {
   workspace: WorkspaceDto | null;
 }
 
+export type PlanTargetKind = 'debt' | 'bucket' | 'envelope' | 'category' | 'goal';
+
+export interface PlanAllocation {
+  targetKind: PlanTargetKind;
+  targetId: string;
+  name: string;
+  sourceCurrency: string;
+  sourceMinor: string;
+  toCurrency?: string;
+  plannedMinor: string; // желаемое (до сжатия), base
+  allocatedMinor: string; // после сжатия, base
+  shortfallMinor: string;
+}
+
+export interface PlanUnresolved {
+  targetKind: PlanTargetKind;
+  targetId: string;
+  name: string;
+  sourceCurrency: string;
+  sourceMinor: string;
+  reason: 'rate_unavailable';
+}
+
 export interface PlanDto {
   period: { startsOn: string; endsOn: string };
   daysInPeriod: number;
   daysLeft: number;
   baseCurrency: string;
-  expectedIncomeMinor: string | null;
+  incomeMinor: string;
+  totalPlannedMinor: string;
+  totalAllocatedMinor: string;
+  compressedMinor: string;
+  freeMinor: string;
+  toExchangeMinor: string;
   canSpendPerDayMinor: string;
-  allocations: unknown[];
+  allocations: PlanAllocation[];
+  unresolved: PlanUnresolved[];
 }
 
 export function useMe() {

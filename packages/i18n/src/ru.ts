@@ -33,6 +33,26 @@ export const ru: Record<TranslationKey, string> = {
   'plan.today.until': 'до {date} · осталось дней: {days}',
   'plan.today.expected': 'Ожидаемый доход периода',
 
+  // План периода — автосборка каскадом (Спринт 2)
+  'plan.groups.debt': 'Долги',
+  'plan.groups.bucket': 'К размену',
+  'plan.groups.envelope': 'Конверты',
+  'plan.groups.category': 'Категории',
+  'plan.groups.goal': 'Цели',
+  'plan.summary.income': 'Доход периода',
+  'plan.summary.committed': 'Расписано',
+  'plan.summary.free': 'Свободно к концу периода',
+  'plan.summary.perDay': 'На жизнь, в день',
+  'plan.summary.toExchange': 'К размену',
+  'plan.compressed.note': 'На всё сразу не хватает — срезано {amount} {ccy}. Первыми уступают цели, потом конверты, потом категории; долги и корзины остаются целыми.',
+  'plan.row.trimmed': 'срезано {amount}',
+  'plan.categories.hint': 'Бюджеты категорий добавим следующим шагом — пока цифра дня это то, что остаётся после обязательств.',
+  'plan.unresolved.title': 'Курс недоступен',
+  'plan.unresolved.hint': 'Пока курс не подтянется, эти строки вне раскладки.',
+  'plan.unresolved.affectsHero': 'У части обязательств нет курса — цифра дня их не учитывает и может быть завышена.',
+  'plan.empty.noPlan': 'Пока раскладывать нечего — задай доход и добавь обязательства.',
+  'plan.today.viewFull': 'Весь план →',
+
   // Auth
   'auth.title': 'multa',
   'auth.subtitle': 'Бюджет, который переезжает с тобой.',
@@ -54,6 +74,8 @@ export const ru: Record<TranslationKey, string> = {
   'common.currency': 'Валюта',
   'common.empty': 'Пока пусто',
   'common.saved': 'Сохранено',
+  'common.error': 'Что-то пошло не так',
+  'common.retry': 'Повторить',
 
   // Навигация
   'nav.today': 'Сегодня',

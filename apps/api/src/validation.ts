@@ -2,6 +2,15 @@ import { z } from 'zod';
 
 /** Zod-схемы границ API (железное правило: валидация на границе). */
 
+/**
+ * Деньги — целые minor units (строка/число → bigint). Невалидный ввод отвергается
+ * как ZodError (→ 400), а не роняет BigInt() сырым исключением (→ 500).
+ */
+const minor = z
+  .union([z.string(), z.number()])
+  .refine((v) => /^-?\d+$/.test(String(v).trim()), 'ожидается целое число (minor units)')
+  .transform((v) => BigInt(String(v).trim()));
+
 export const createWorkspaceSchema = z.object({
   baseCurrency: z.string().length(3),
   timezone: z.string().optional(),
@@ -18,7 +27,7 @@ export const anchorsSchema = z.discriminatedUnion('kind', [
 
 export const paydaySchema = z.object({
   anchors: anchorsSchema,
-  expectedIncomeMinor: z.union([z.string(), z.number()]).transform((v) => BigInt(v)),
+  expectedIncomeMinor: minor,
 });
 
 export const rateQuerySchema = z.object({
@@ -27,9 +36,8 @@ export const rateQuerySchema = z.object({
   on: z.string().optional(),
 });
 
-// --- CRUD обязательств (Спринт 2). Деньги — minor units (строка/число → bigint). ---
+// --- CRUD обязательств (Спринт 2). Деньги — minor units (см. `minor` выше). ---
 
-const minor = z.union([z.string(), z.number()]).transform((v) => BigInt(v));
 const ccy = z
   .string()
   .length(3)

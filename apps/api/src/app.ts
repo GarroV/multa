@@ -1,9 +1,3 @@
-import {
-  daysInPeriod,
-  daysLeftInPeriod,
-  periodForDate,
-  type PeriodConfig,
-} from '@multa/core';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -22,6 +16,7 @@ import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
+import { getCurrentPlan } from './plan/assemble.ts';
 import { obligations } from './routes/obligations.ts';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -114,27 +109,19 @@ app.post('/v1/onboarding/payday', requireWorkspace, async (c) => {
   return c.json({ workspace: serializeWorkspace(updated[0]!) });
 });
 
-// --- План текущего периода (в Спринте 1 — пустой) ---
+// --- План текущего периода: автосборка каскадом (Спринт 2) ---
 
-app.get('/v1/plan/current', requireWorkspace, (c) => {
+app.get('/v1/plan/current', requireWorkspace, async (c) => {
   const ws = c.get('workspace')!;
-  if (!ws.periodAnchors) return c.json({ error: 'onboarding_incomplete' }, 409);
-  const anchors = ws.periodAnchors as PeriodConfig;
-  const now = today();
-  const period = periodForDate(anchors, now);
-  const totalDays = daysInPeriod(period);
-  const income = ws.expectedIncomeMinor ?? 0n;
-  // Спринт 1: наивная «цифра дня» = доход ÷ дней периода. Спринт 2 уточнит каскадом.
-  const canSpendPerDayMinor = totalDays > 0 ? income / BigInt(totalDays) : 0n;
-  return c.json({
-    period,
-    daysInPeriod: totalDays,
-    daysLeft: daysLeftInPeriod(period, now),
-    baseCurrency: ws.baseCurrency,
-    expectedIncomeMinor: ws.expectedIncomeMinor != null ? String(ws.expectedIncomeMinor) : null,
-    canSpendPerDayMinor: String(canSpendPerDayMinor),
-    allocations: [], // Спринт 2: каскад заполнит
-  });
+  try {
+    const plan = await getCurrentPlan(ws, today());
+    return c.json(plan);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'onboarding_incomplete') {
+      return c.json({ error: 'onboarding_incomplete' }, 409);
+    }
+    throw err;
+  }
 });
 
 // --- FX ---

@@ -35,6 +35,26 @@ export const en = {
   'plan.today.until': 'until {date} · {days} days left',
   'plan.today.expected': 'Expected this period',
 
+  // План периода — автосборка каскадом (Спринт 2)
+  'plan.groups.debt': 'Debts',
+  'plan.groups.bucket': 'To exchange',
+  'plan.groups.envelope': 'Envelopes',
+  'plan.groups.category': 'Categories',
+  'plan.groups.goal': 'Goals',
+  'plan.summary.income': 'Income this period',
+  'plan.summary.committed': 'Committed',
+  'plan.summary.free': 'Free at period end',
+  'plan.summary.perDay': 'To live on, per day',
+  'plan.summary.toExchange': 'To exchange',
+  'plan.compressed.note': "Not enough for everything — trimmed {amount} {ccy}. Goals give first, then envelopes, then categories; debts and baskets stay whole.",
+  'plan.row.trimmed': 'trimmed {amount}',
+  'plan.categories.hint': 'Category budgets arrive next — for now the daily figure is what is left after commitments.',
+  'plan.unresolved.title': 'Rate unavailable',
+  'plan.unresolved.hint': 'These lines stay out of the split until rates refresh.',
+  'plan.unresolved.affectsHero': 'Some obligations have no rate yet — the daily figure leaves them out and may read too high.',
+  'plan.empty.noPlan': 'Nothing to route yet — set income and add obligations.',
+  'plan.today.viewFull': 'Full plan →',
+
   // Auth
   'auth.title': 'multa',
   'auth.subtitle': 'Budget across borders.',
@@ -56,6 +76,8 @@ export const en = {
   'common.currency': 'Currency',
   'common.empty': 'Nothing yet',
   'common.saved': 'Saved',
+  'common.error': 'Something went wrong',
+  'common.retry': 'Retry',
 
   // Навигация
   'nav.today': 'Today',

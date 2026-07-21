@@ -18,8 +18,9 @@ function toMinor(v: string, ccy: string): string {
 }
 
 function DelButton({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
   return (
-    <button className="btn btn-ghost" style={{ padding: '4px 10px' }} onClick={onClick} title="delete">
+    <button className="btn btn-ghost" style={{ padding: '4px 10px' }} onClick={onClick} title={t('common.delete')}>
       ✕
     </button>
   );
@@ -82,8 +83,10 @@ function EnvelopesSection({ base }: { base: string }) {
   const [ruleValue, setRuleValue] = useState('');
   const add = () => {
     if (!name || !ruleValue) return;
+    // fixed: rule_value хранится в minor-единицах валюты (02-data-schema); percent — «%» как есть.
+    const value = ruleKind === 'fixed' ? toMinor(ruleValue, ccy) : ruleValue;
     create.mutate(
-      { name, currency: ccy, ruleKind, ruleValue },
+      { name, currency: ccy, ruleKind, ruleValue: value },
       { onSuccess: () => { setName(''); setRuleValue(''); } },
     );
   };
@@ -93,7 +96,7 @@ function EnvelopesSection({ base }: { base: string }) {
       {data.length === 0 && <div className="dim" style={{ marginTop: 12 }}>{t('common.empty')}</div>}
       {data.map((e) => (
         <div key={e.id} className="list-item">
-          <span>{e.name} <span className="dim">· {e.ruleKind === 'percent' ? `${e.ruleValue}%` : `${formatMinor(e.balanceMinor, e.currency, locale)} ${e.currency}`}</span></span>
+          <span>{e.name} <span className="dim">· {e.ruleKind === 'percent' ? `${Number(e.ruleValue)}%` : `${formatMinor(e.ruleValue.split('.')[0] ?? '0', e.currency, locale)} ${e.currency}`}</span></span>
           <DelButton onClick={() => del.mutate(e.id)} />
         </div>
       ))}

@@ -202,3 +202,66 @@ a {
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
+.list-item:last-child {
+  border-bottom: none;
+}
+
+/* План периода — раскладка каскада */
+.plan-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.plan-summary > div {
+  background: var(--bg-panel);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.plan-summary .stat {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  color: var(--text-hi);
+}
+.plan-summary .stat.accent {
+  color: var(--neon-cyan);
+}
+.plan-summary .stat.warn {
+  color: var(--neon-amber);
+}
+.plan-group + .plan-group {
+  margin-top: 20px;
+}
+.plan-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.badge-trim {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--neon-amber);
+  border: 1px solid color-mix(in oklab, var(--neon-amber) 45%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.note-band {
+  border-left: 2px solid var(--neon-amber);
+  padding: 10px 14px;
+  background: color-mix(in oklab, var(--neon-amber) 8%, transparent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-mid);
+  font-size: 14px;
+}
+.note-band.info {
+  border-left-color: var(--neon-violet);
+  background: color-mix(in oklab, var(--neon-violet) 10%, transparent);
+}
