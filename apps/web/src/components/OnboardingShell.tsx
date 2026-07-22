@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-const TOTAL_STEPS = 2;
+const TOTAL_STEPS = 4;
 
 export function OnboardingShell({ step, children }: { step: number; children: ReactNode }) {
   return (

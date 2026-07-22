@@ -24,6 +24,13 @@ export const ru: Record<TranslationKey, string> = {
   'onboarding.payday.preset.custom': 'Свои даты',
   'onboarding.payday.expectedAmount': 'Примерно сколько каждая выплата?',
 
+  // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
+  'onboarding.debts.title': 'Платишь кредиты или рассрочки?',
+  'onboarding.debts.subtitle': 'Добавь — план первым делом отложит каждый платёж. Можно пропустить.',
+  'onboarding.buckets.title': 'Тратишь в другой валюте?',
+  'onboarding.buckets.subtitle': 'Корзина размена: сколько дохода откладывать в другой валюте (аренда, жизнь). Можно пропустить.',
+  'onboarding.finish': 'К моему плану',
+
   // Дашборд — пустой план периода
   'plan.empty.title': 'План пока чистый лист',
   'plan.empty.subtitle': 'Курс проложим, как добавишь доход и куда он идёт.',

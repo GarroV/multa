@@ -7,7 +7,9 @@ import { router } from './router.tsx';
 import './styles.css';
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 5_000 } },
+  // Мутации инвалидируют свои запросы сами; фокус-рефетч не нужен и мог бы «перекинуть»
+  // гейт онбординга в приложение до завершения шагов 3-4 (periodAnchors уже записаны после шага 2).
+  defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: false } },
 });
 
 const rootEl = document.getElementById('root');

@@ -2,8 +2,8 @@ import { AppShell } from './AppShell.tsx';
 import { useI18n } from './lib/i18n.tsx';
 import { useMe } from './lib/queries.ts';
 import { Login } from './screens/Login.tsx';
+import { Onboarding } from './screens/Onboarding.tsx';
 import { OnboardingCurrency } from './screens/OnboardingCurrency.tsx';
-import { OnboardingPayday } from './screens/OnboardingPayday.tsx';
 
 /** Root-компонент: гейт по состоянию сессии → auth / онбординг / оболочка приложения. */
 export function App() {
@@ -19,6 +19,6 @@ export function App() {
   }
   if (!me?.user) return <Login />;
   if (!me.workspace) return <OnboardingCurrency />;
-  if (!me.workspace.periodAnchors) return <OnboardingPayday workspace={me.workspace} />;
+  if (!me.workspace.periodAnchors) return <Onboarding workspace={me.workspace} />;
   return <AppShell />;
 }

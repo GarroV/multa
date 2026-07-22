@@ -26,6 +26,13 @@ export const en = {
   'onboarding.payday.preset.custom': 'Custom',
   'onboarding.payday.expectedAmount': 'Roughly how much each payout?',
 
+  // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
+  'onboarding.debts.title': 'Any loans or installments?',
+  'onboarding.debts.subtitle': 'Add them and the plan reserves each payment first. Skippable.',
+  'onboarding.buckets.title': 'Spending in another currency?',
+  'onboarding.buckets.subtitle': 'A swap basket: how much of your income to set aside in another currency (rent, life). Skippable.',
+  'onboarding.finish': 'See my plan',
+
   // Дашборд — пустой план периода
   'plan.empty.title': 'Your plan is a blank page',
   'plan.empty.subtitle': 'Route set once you add income and where it goes.',
