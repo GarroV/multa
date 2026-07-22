@@ -50,6 +50,8 @@ function CategoryRow({
   };
 
   const trimmed = budget && BigInt(budget.shortfallMinor) > 0n;
+  // Ошибка любой мутации строки не должна выглядеть как успех (тихий сбой) — подсвечиваем.
+  const rowError = setBudget.isError || clearBudget.isError || patch.isError || del.isError;
 
   return (
     <div className="list-item">
@@ -69,6 +71,7 @@ function CategoryRow({
             {t('plan.row.trimmed', { amount: `${formatMinor(budget!.shortfallMinor, base, locale)} ${base}` })}
           </span>
         )}
+        {rowError && <span className="danger" title={t('common.error')} style={{ fontSize: 13 }}>⚠ {t('common.retry')}</span>}
       </span>
       <span className="row" style={{ gap: 8 }}>
         <input
@@ -127,6 +130,7 @@ export function CategoryEditor({ allocations, base, locale }: { allocations: Pla
         />
         <button className="btn" disabled={create.isPending} onClick={add}>{t('common.add')}</button>
       </div>
+      {create.isError && <div className="dim danger" style={{ marginTop: 8, fontSize: 13 }}>⚠ {t('common.error')}</div>}
     </div>
   );
 }

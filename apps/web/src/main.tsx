@@ -7,9 +7,10 @@ import { router } from './router.tsx';
 import './styles.css';
 
 const queryClient = new QueryClient({
-  // Мутации инвалидируют свои запросы сами; фокус-рефетч не нужен и мог бы «перекинуть»
-  // гейт онбординга в приложение до завершения шагов 3-4 (periodAnchors уже записаны после шага 2).
-  defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: false } },
+  // Мутации инвалидируют свои запросы сами; авто-рефетч (фокус/реконнект) не нужен и мог бы
+  // «перекинуть» гейт онбординга в приложение до завершения шагов 3-4 (periodAnchors уже
+  // записаны после шага 2, но 'me' намеренно не инвалидируется до финиша).
+  defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: false, refetchOnReconnect: false } },
 });
 
 const rootEl = document.getElementById('root');

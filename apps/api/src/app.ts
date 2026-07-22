@@ -38,7 +38,7 @@ function serializeWorkspace(ws: Workspace) {
 const corsOptions = {
   origin: env.WEB_ORIGIN,
   allowHeaders: ['Content-Type', 'Authorization'],
-  allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
 };
 

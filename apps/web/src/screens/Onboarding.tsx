@@ -5,7 +5,7 @@ import { OnboardingShell } from '../components/OnboardingShell.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { PAYDAY_PRESETS } from '../lib/paydayPresets.ts';
-import { useCreateEntity, useEntities, type Bucket, type Debt, type WorkspaceDto } from '../lib/queries.ts';
+import { useCreateEntity, useEntities, type Bucket, type Debt, type MeDto, type WorkspaceDto } from '../lib/queries.ts';
 
 /** major → minor или null (не подставляем 0 молча). */
 function toMinor(value: string, ccy: string): string | null {
@@ -24,14 +24,12 @@ function PaydayStep({ base, onDone }: { base: string; onDone: () => void }) {
   const { t } = useI18n();
   const [presetIdx, setPresetIdx] = useState(0);
   const [income, setIncome] = useState('');
+  const incomeMinor = toMinor(income, base); // null → доход не введён/невалиден
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (minor: string) =>
       api('/v1/onboarding/payday', {
         method: 'POST',
-        body: JSON.stringify({
-          anchors: PAYDAY_PRESETS[presetIdx]!.anchors(),
-          expectedIncomeMinor: toMinor(income, base) ?? '0',
-        }),
+        body: JSON.stringify({ anchors: PAYDAY_PRESETS[presetIdx]!.anchors(), expectedIncomeMinor: minor }),
       }),
     onSuccess: onDone, // НЕ инвалидируем 'me' — иначе гейт откроет приложение до шагов 3-4
   });
@@ -54,8 +52,12 @@ function PaydayStep({ base, onDone }: { base: string; onDone: () => void }) {
         </label>
         <input className="field mono" inputMode="decimal" placeholder="0" value={income} onChange={(e) => setIncome(e.target.value.replace(',', '.'))} />
       </div>
+      {mutation.isError && <div className="note-band">{t('common.error')}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn" disabled={mutation.isPending} onClick={() => mutation.mutate()}>{t('common.next')}</button>
+        {/* Доход обязателен: без валидного значения не пускаем дальше (иначе план собрался бы на нуле). */}
+        <button className="btn" disabled={mutation.isPending || incomeMinor === null} onClick={() => incomeMinor && mutation.mutate(incomeMinor)}>
+          {t('common.next')}
+        </button>
       </div>
     </OnboardingShell>
   );
@@ -113,7 +115,7 @@ function DebtsStep({ base, onNext }: { base: string; onNext: () => void }) {
 
 // --- Шаг 4: валютные корзины (пропускаемо) ---
 
-function BucketsStep({ base, onFinish, finishing }: { base: string; onFinish: () => void; finishing: boolean }) {
+function BucketsStep({ base, onFinish, finishing, error }: { base: string; onFinish: () => void; finishing: boolean; error: boolean }) {
   const { t } = useI18n();
   const { data: buckets = [] } = useEntities<Bucket>('buckets');
   const create = useCreateEntity('buckets');
@@ -151,6 +153,7 @@ function BucketsStep({ base, onFinish, finishing }: { base: string; onFinish: ()
         <input className="field mono" style={{ flex: 1, minWidth: 90 }} inputMode="decimal" placeholder={`${t('common.amount')} · ${base}`} value={amount} onChange={(e) => setAmount(e.target.value.replace(',', '.'))} />
         <button className="btn" disabled={create.isPending} onClick={add}>{t('common.add')}</button>
       </div>
+      {error && <div className="note-band">{t('common.error')}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <button className="btn btn-ghost" disabled={finishing} onClick={onFinish}>{t('common.skip')}</button>
         <button className="btn" disabled={finishing} onClick={onFinish}>{t('onboarding.finish')}</button>
@@ -172,11 +175,13 @@ export function Onboarding({ workspace }: { workspace: WorkspaceDto }) {
   const finish = useMutation({
     mutationFn: async () => {
       await qc.invalidateQueries({ queryKey: ['plan'] });
-      await qc.invalidateQueries({ queryKey: ['me'] }); // последним: гейт App → AppShell (ага-план)
+      // Явный fetch (не invalidate): гейт App детерминированно → AppShell, а ошибка всплывает в isError.
+      const me = await api<MeDto>('/v1/me');
+      qc.setQueryData(['me'], me);
     },
   });
 
   if (step === 2) return <PaydayStep base={base} onDone={() => setStep(3)} />;
   if (step === 3) return <DebtsStep base={base} onNext={() => setStep(4)} />;
-  return <BucketsStep base={base} onFinish={() => finish.mutate()} finishing={finish.isPending} />;
+  return <BucketsStep base={base} onFinish={() => finish.mutate()} finishing={finish.isPending} error={finish.isError} />;
 }

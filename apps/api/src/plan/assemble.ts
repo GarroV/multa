@@ -67,9 +67,10 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
 }
 
 /**
- * Перенос: если у периода ещё нет строк категорий, копируем бюджеты категорий из
- * самого свежего предыдущего периода (архивные категории не переносятся). Так план
- * «собирается сам» из периода в период, не заставляя заново вбивать бюджеты.
+ * Перенос бюджетов категорий из самого свежего предыдущего периода (архивные не переносятся).
+ * Вызывается ТОЛЬКО при рождении периода (см. ensurePeriodRow.created) — поэтому очистка
+ * бюджетов в существующем периоде сохраняется, а новый период «собирается сам».
+ * Внутренняя проверка have.length — защита от гонки (страховка, не основной гейт).
  */
 async function carryOverCategories(ws: Workspace, periodId: string, startsOn: string): Promise<void> {
   const have = await db
@@ -223,8 +224,16 @@ async function resolveObligations(
   return { resolved, unresolved };
 }
 
-/** Идемпотентно гарантирует строку pay_periods, возвращает её id. */
-async function ensurePeriodRow(ws: Workspace, period: PayPeriod, incomeMinor: bigint): Promise<string> {
+/**
+ * Идемпотентно гарантирует строку pay_periods. `created=true` только для свежей вставки
+ * (xmax=0), false при ON CONFLICT UPDATE — по нему решаем, делать ли перенос категорий
+ * (перенос — ровно один раз, при рождении периода; иначе очистка бюджетов не сохранялась бы).
+ */
+async function ensurePeriodRow(
+  ws: Workspace,
+  period: PayPeriod,
+  incomeMinor: bigint,
+): Promise<{ id: string; created: boolean }> {
   const inserted = await db
     .insert(payPeriods)
     .values({ workspaceId: ws.id, startsOn: period.startsOn, endsOn: period.endsOn, expectedIncomeMinor: incomeMinor })
@@ -233,8 +242,8 @@ async function ensurePeriodRow(ws: Workspace, period: PayPeriod, incomeMinor: bi
       // endsOn/доход могли измениться (правка якорей/дохода) — синхронизируем.
       set: { endsOn: period.endsOn, expectedIncomeMinor: incomeMinor },
     })
-    .returning({ id: payPeriods.id });
-  return inserted[0]!.id;
+    .returning({ id: payPeriods.id, created: sql<boolean>`(xmax = 0)` });
+  return { id: inserted[0]!.id, created: inserted[0]!.created };
 }
 
 /** Пишет planned_items для периода: обновляет управляемые, удаляет исчезнувшие обязательства. */
@@ -295,8 +304,9 @@ export interface PlanDto {
 /** Собирает и сохраняет план одного периода, возвращает DTO. */
 async function assembleForPeriod(ws: Workspace, period: PayPeriod, asOf: string): Promise<PlanDto> {
   const incomeMinor = ws.expectedIncomeMinor ?? 0n;
-  const periodId = await ensurePeriodRow(ws, period, incomeMinor);
-  await carryOverCategories(ws, periodId, period.startsOn);
+  const { id: periodId, created } = await ensurePeriodRow(ws, period, incomeMinor);
+  // Перенос — только при рождении периода: очистку бюджетов в существующем периоде не затираем.
+  if (created) await carryOverCategories(ws, periodId, period.startsOn);
   // План — проекция «на момент сборки»: конвертируем по курсу на asOf (сегодня), а не на
   // дату старта периода. Иммутабельный снапшот курса важен для транзакций-фактов, не для плана.
   const { resolved, unresolved } = await resolveObligations(ws, incomeMinor, asOf);
@@ -398,7 +408,7 @@ export async function setCategoryBudget(
   if (!owned[0]) throw new Error('category_not_found');
 
   const period = currentPeriod(ws, asOf);
-  const periodId = await ensurePeriodRow(ws, period, ws.expectedIncomeMinor ?? 0n);
+  const { id: periodId } = await ensurePeriodRow(ws, period, ws.expectedIncomeMinor ?? 0n);
 
   if (plannedMinor <= 0n) {
     await db
