@@ -75,3 +75,23 @@ export const bucketCreateSchema = z.object({
   toCurrency: ccy,
   amountMinor: minor,
 });
+
+// --- Категории (Спринт 2). Бюджет категории на период — в base-валюте. ---
+
+export const categoryCreateSchema = z.object({
+  name: z.string().min(1),
+  icon: z.string().optional(),
+  protected: z.boolean().optional(),
+});
+
+export const categoryPatchSchema = z.object({
+  name: z.string().min(1).optional(),
+  icon: z.string().optional(),
+  protected: z.boolean().optional(),
+  sort: z.number().int().optional(),
+});
+
+/** Бюджет категории на текущий период (base-валюта, целые minor, не отрицательный). */
+export const categoryBudgetSchema = z.object({
+  plannedMinor: minor.refine((v) => v >= 0n, 'бюджет не может быть отрицательным'),
+});

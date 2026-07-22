@@ -1,11 +1,13 @@
 import type { TranslationKey } from '@multa/i18n';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { CategoryEditor } from '../components/CategoryEditor.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePlan, type PlanAllocation, type PlanDto, type PlanTargetKind } from '../lib/queries.ts';
 
-const GROUP_ORDER: PlanTargetKind[] = ['debt', 'bucket', 'envelope', 'category', 'goal'];
+// Категории редактируются отдельным блоком (CategoryEditor); в read-only лентах — только обязательства.
+const GROUP_ORDER: PlanTargetKind[] = ['debt', 'bucket', 'envelope', 'goal'];
 const GROUP_LABEL: Record<PlanTargetKind, TranslationKey> = {
   debt: 'plan.groups.debt',
   bucket: 'plan.groups.bucket',
@@ -110,6 +112,8 @@ function PlanBody({ plan }: { plan: PlanDto }) {
         </div>
       )}
 
+      <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
+
       {groups.map((g) => {
         const groupTotal = g.rows.reduce((acc, r) => acc + BigInt(r.allocatedMinor), 0n);
         return (
@@ -137,8 +141,6 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           <div className="dim" style={{ fontSize: 13 }}>{t('plan.unresolved.hint')}</div>
         </div>
       )}
-
-      <div className="note-band info">{t('plan.categories.hint')}</div>
     </div>
   );
 }

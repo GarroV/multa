@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
 import { ZodError } from 'zod';
 import {
+  categoryBudgetSchema,
   createWorkspaceSchema,
   patchWorkspaceSchema,
   paydaySchema,
@@ -16,7 +17,8 @@ import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
-import { getCurrentPlan } from './plan/assemble.ts';
+import { getCurrentPlan, setCategoryBudget } from './plan/assemble.ts';
+import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { obligations } from './routes/obligations.ts';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -80,7 +82,10 @@ app.post('/v1/workspace', requireAuth, async (c) => {
       locale: body.locale ?? 'ru',
     })
     .returning();
-  return c.json({ workspace: serializeWorkspace(inserted[0]!) }, 201);
+  const ws = inserted[0]!;
+  // Пресет-категории для первого плана (04-web-ux); бюджеты пользователь задаст на «Плане».
+  await seedPresetCategories(ws.id, ws.locale);
+  return c.json({ workspace: serializeWorkspace(ws) }, 201);
 });
 
 app.patch('/v1/workspace', requireWorkspace, async (c) => {
@@ -124,6 +129,28 @@ app.get('/v1/plan/current', requireWorkspace, async (c) => {
   }
 });
 
+// Бюджет категории на текущий период. PUT ставит, DELETE снимает; оба возвращают пересобранный план.
+async function handleCategoryBudget(c: Context<{ Variables: AppVariables }>, plannedMinor: bigint) {
+  const ws = c.get('workspace')!;
+  const id = c.req.param('id');
+  if (!id) return c.json({ error: 'not_found' }, 404);
+  try {
+    const plan = await setCategoryBudget(ws, today(), id, plannedMinor);
+    return c.json(plan);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'category_not_found') return c.json({ error: 'not_found' }, 404);
+    if (err instanceof Error && err.message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
+    throw err;
+  }
+}
+
+app.put('/v1/plan/current/categories/:id', requireWorkspace, async (c) => {
+  const body = categoryBudgetSchema.parse(await c.req.json());
+  return handleCategoryBudget(c, body.plannedMinor);
+});
+
+app.delete('/v1/plan/current/categories/:id', requireWorkspace, (c) => handleCategoryBudget(c, 0n));
+
 // --- FX ---
 
 app.get('/v1/fx/rate', requireAuth, async (c) => {
@@ -135,6 +162,9 @@ app.get('/v1/fx/rate', requireAuth, async (c) => {
 
 // CRUD обязательств (Спринт 2): /v1/debts, /v1/envelopes, /v1/goals, /v1/buckets
 app.route('/v1', obligations);
+
+// CRUD категорий (Спринт 2): /v1/categories
+app.route('/v1', categoriesRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

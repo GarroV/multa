@@ -117,6 +117,15 @@ export interface Bucket {
   active: boolean;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  icon: string | null;
+  isSystem: boolean;
+  protected: boolean;
+  sort: number;
+}
+
 export type EntityName = 'debts' | 'envelopes' | 'goals' | 'buckets';
 
 export function useEntities<T>(name: EntityName) {
@@ -136,5 +145,64 @@ export function useDeleteEntity(name: EntityName) {
   return useMutation({
     mutationFn: (id: string) => api(`/v1/${name}/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [name] }),
+  });
+}
+
+// --- Категории (Спринт 2) ---
+
+export function useCategories() {
+  return useQuery({ queryKey: ['categories'], retry: false, queryFn: () => api<Category[]>('/v1/categories') });
+}
+
+export function useCreateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; protected?: boolean }) =>
+      api<Category>('/v1/categories', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['categories'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
+export function usePatchCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; name?: string; protected?: boolean; sort?: number }) =>
+      api<Category>(`/v1/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['categories'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api(`/v1/categories/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['categories'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
+/** Бюджет категории на текущий период. Ответ — свежий план, кладём в кэш сразу. */
+export function useSetCategoryBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, plannedMinor }: { id: string; plannedMinor: string }) =>
+      api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'PUT', body: JSON.stringify({ plannedMinor }) }),
+    onSuccess: (plan) => qc.setQueryData(['plan'], plan),
+  });
+}
+
+export function useClearCategoryBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'DELETE' }),
+    onSuccess: (plan) => qc.setQueryData(['plan'], plan),
   });
 }
