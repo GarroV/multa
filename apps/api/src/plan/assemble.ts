@@ -13,6 +13,7 @@
 
 import {
   assemblePlan,
+  categorySpending,
   convert,
   daysInPeriod,
   daysLeftInPeriod,
@@ -21,6 +22,8 @@ import {
   incomeEventsIn,
   money,
   percentOfMinor,
+  periodForDate,
+  summarizeFact,
   type IncomeSource,
   type PayPeriod,
   type PeriodConfig,
@@ -30,7 +33,16 @@ import {
 } from '@multa/core';
 import { and, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
-import { categories, currencyBuckets, debts, envelopes, goals, payPeriods, plannedItems } from '../db/schema/domain.ts';
+import {
+  categories,
+  currencyBuckets,
+  debts,
+  envelopes,
+  goals,
+  payPeriods,
+  plannedItems,
+  transactions,
+} from '../db/schema/domain.ts';
 import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { getRate } from '../fx/service.ts';
@@ -317,6 +329,47 @@ async function incomeForPeriod(
   };
 }
 
+/**
+ * Факт периода: расходы, приведённые к base на момент траты (снапшот в транзакции).
+ * «Жизнь» — расходы по категориям и без категории («крупный мазок»); исполнение
+ * обязательств (долги/корзины/цели) в неё не входит — это не повседневные траты.
+ */
+interface PeriodSpending {
+  readonly byCategory: ReadonlyMap<string, bigint>;
+  readonly livingMinor: bigint;
+}
+
+async function loadPeriodSpending(ws: Workspace, periodId: string): Promise<PeriodSpending> {
+  const rows = await db
+    .select({
+      targetKind: transactions.targetKind,
+      targetId: transactions.targetId,
+      total: sql<string>`sum(${transactions.baseAmountMinor})`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.workspaceId, ws.id),
+        eq(transactions.periodId, periodId),
+        eq(transactions.kind, 'expense'),
+      ),
+    )
+    .groupBy(transactions.targetKind, transactions.targetId);
+
+  const byCategory = new Map<string, bigint>();
+  let livingMinor = 0n;
+  for (const row of rows) {
+    const total = BigInt(row.total ?? '0');
+    if (row.targetKind === 'category' && row.targetId) {
+      byCategory.set(row.targetId, (byCategory.get(row.targetId) ?? 0n) + total);
+      livingMinor += total;
+    } else if (row.targetKind == null) {
+      livingMinor += total; // трата без категории тоже съедает деньги на жизнь
+    }
+  }
+  return { byCategory, livingMinor };
+}
+
 export interface PlanAllocationDto {
   targetKind: TargetKind;
   targetId: string;
@@ -327,6 +380,9 @@ export interface PlanAllocationDto {
   plannedMinor: string; // желаемое (до сжатия), base
   allocatedMinor: string; // после сжатия, base
   shortfallMinor: string;
+  spentMinor: string; // факт периода, base (для категорий; у обязательств пока 0)
+  remainingMinor: string; // allocated − spent, может быть отрицательным
+  overspentMinor: string;
 }
 
 export interface PlanDto {
@@ -340,7 +396,13 @@ export interface PlanDto {
   compressedMinor: string;
   freeMinor: string;
   toExchangeMinor: string;
+  /** Дневной темп с учётом факта: остаток на жизнь ÷ daysLeft. */
   canSpendPerDayMinor: string;
+  /** План на жизнь = категории + свободный остаток. */
+  livingMinor: string;
+  spentLivingMinor: string;
+  remainingLivingMinor: string;
+  overspentMinor: string;
   allocations: PlanAllocationDto[];
   unresolved: UnresolvedItem[];
   /** Разбивка ожидаемого дохода периода по источникам (дашборд, чеклист дня выплаты). */
@@ -377,8 +439,13 @@ async function assembleForPeriod(
   for (const r of resolved) desc.set(`${r.targetKind}:${r.targetId}`, { name: r.name, sourceCurrency: r.sourceCurrency, sourceMinor: r.sourceMinor, ...(r.toCurrency ? { toCurrency: r.toCurrency } : {}) });
   for (const c of cats) desc.set(`category:${c.targetId}`, { name: c.name, sourceCurrency: ws.baseCurrency, sourceMinor: c.baseMinor });
 
+  const spending = await loadPeriodSpending(ws, periodId);
+  const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
+
   const allocations: PlanAllocationDto[] = result.allocations.map((a) => {
     const src = desc.get(`${a.targetKind}:${a.targetId}`)!;
+    const spent = a.targetKind === 'category' ? (spending.byCategory.get(a.targetId) ?? 0n) : 0n;
+    const cat = categorySpending(a.allocatedMinor, spent);
     return {
       targetKind: a.targetKind,
       targetId: a.targetId,
@@ -389,8 +456,39 @@ async function assembleForPeriod(
       plannedMinor: a.plannedMinor.toString(),
       allocatedMinor: a.allocatedMinor.toString(),
       shortfallMinor: a.shortfallMinor.toString(),
+      spentMinor: cat.spentMinor.toString(),
+      remainingMinor: cat.remainingMinor.toString(),
+      overspentMinor: cat.overspentMinor.toString(),
     };
   });
+
+  // Категории, где трата есть, а бюджета нет: без этих строк факт молча исчезал бы из UI
+  // (в каскад они не попадают, потому что planned = 0). Отдаём их как чистый перерасход.
+  const spentWithoutBudget = [...spending.byCategory.keys()].filter(
+    (id) => !result.allocations.some((a) => a.targetKind === 'category' && a.targetId === id),
+  );
+  if (spentWithoutBudget.length > 0) {
+    const rows = await db
+      .select({ id: categories.id, name: categories.name })
+      .from(categories)
+      .where(and(eq(categories.workspaceId, ws.id), inArray(categories.id, spentWithoutBudget)));
+    for (const row of rows) {
+      const cat = categorySpending(0n, spending.byCategory.get(row.id) ?? 0n);
+      allocations.push({
+        targetKind: 'category',
+        targetId: row.id,
+        name: row.name,
+        sourceCurrency: ws.baseCurrency,
+        sourceMinor: '0',
+        plannedMinor: '0',
+        allocatedMinor: '0',
+        shortfallMinor: '0',
+        spentMinor: cat.spentMinor.toString(),
+        remainingMinor: cat.remainingMinor.toString(),
+        overspentMinor: cat.overspentMinor.toString(),
+      });
+    }
+  }
 
   // Пишем только обязательства (allocated); категории не трогаем — их бюджет задаёт пользователь.
   await persistPlannedItems(
@@ -412,11 +510,33 @@ async function assembleForPeriod(
     compressedMinor: result.compressedMinor.toString(),
     freeMinor: result.freeMinor.toString(),
     toExchangeMinor: summary.toExchangeMinor.toString(),
-    canSpendPerDayMinor: summary.canSpendPerDayMinor.toString(),
+    canSpendPerDayMinor: fact.canSpendPerDayMinor.toString(),
+    livingMinor: summary.livingMinor.toString(),
+    spentLivingMinor: fact.spentLivingMinor.toString(),
+    remainingLivingMinor: fact.remainingLivingMinor.toString(),
+    overspentMinor: fact.overspentMinor.toString(),
     allocations,
     unresolved,
     income: { events: income.events, unresolved: income.unresolved },
   };
+}
+
+/**
+ * Гарантирует строку периода, в который попадает дата (нужно для привязки факта к периоду).
+ * Доход периода берётся из источников — та же цифра, что и в плане, поэтому строка периода
+ * не «портится» нулём, если трату внесли раньше первого открытия плана.
+ * Бросает `onboarding_incomplete`, если ритм выплат ещё не задан.
+ */
+export async function ensurePeriodForDate(
+  ws: Workspace,
+  on: string,
+): Promise<{ periodId: string; period: PayPeriod }> {
+  if (!ws.periodAnchors) throw new Error('onboarding_incomplete');
+  const period = periodForDate(ws.periodAnchors as PeriodConfig, on);
+  const sources = await listSources(ws.id);
+  const { incomeMinor } = await incomeForPeriod(ws, sources, period, on);
+  const { id } = await ensurePeriodRow(ws, period, incomeMinor);
+  return { periodId: id, period };
 }
 
 /** Текущий период по ритму воркспейса. Бросает при незавершённом онбординге/неопределимом периоде. */

@@ -58,6 +58,9 @@ export interface PlanAllocation {
   plannedMinor: string; // желаемое (до сжатия), base
   allocatedMinor: string; // после сжатия, base
   shortfallMinor: string;
+  spentMinor: string; // факт периода, base
+  remainingMinor: string; // allocated − spent, может быть отрицательным
+  overspentMinor: string;
 }
 
 export interface PlanUnresolved {
@@ -81,6 +84,10 @@ export interface PlanDto {
   freeMinor: string;
   toExchangeMinor: string;
   canSpendPerDayMinor: string;
+  livingMinor: string;
+  spentLivingMinor: string;
+  remainingLivingMinor: string;
+  overspentMinor: string;
   allocations: PlanAllocation[];
   unresolved: PlanUnresolved[];
   /** Разбивка дохода периода по источникам. */
@@ -297,6 +304,53 @@ export function useCreateIncomeSource() {
   });
 }
 
+// --- Факт трат (Спринт 3) ---
+
+export interface Transaction {
+  id: string;
+  kind: string;
+  categoryId: string | null;
+  amountMinor: string;
+  currency: string;
+  baseAmountMinor: string;
+  rate: string;
+  rateSource: string;
+  rateDate: string;
+  occurredOn: string;
+  source: string;
+  note: string | null;
+}
+
+export interface TransactionsDto {
+  period: { from: string; to: string };
+  transactions: Transaction[];
+}
+
+/** Траты текущего периода (границы считает сервер по якорям выплат). */
+export function useTransactions() {
+  return useQuery({ queryKey: ['transactions'], retry: false, queryFn: () => api<TransactionsDto>('/v1/transactions') });
+}
+
+export interface SpendInput {
+  amountMinor: string;
+  currency: string;
+  categoryId?: string;
+  occurredOn?: string;
+  note?: string;
+}
+
+/** Факт меняет и список трат, и план (остаток, цифра дня) — инвалидируем оба. */
+function useTransactionMutation<TVars>(mutationFn: (vars: TVars) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
 export function useDeleteIncomeSource() {
   const qc = useQueryClient();
   return useMutation({
@@ -306,4 +360,14 @@ export function useDeleteIncomeSource() {
       void qc.invalidateQueries({ queryKey: ['plan'] });
     },
   });
+}
+
+export function useCreateSpend() {
+  return useTransactionMutation<SpendInput>((body) =>
+    api<Transaction>('/v1/transactions', { method: 'POST', body: JSON.stringify(body) }),
+  );
+}
+
+export function useDeleteSpend() {
+  return useTransactionMutation<string>((id) => api(`/v1/transactions/${id}`, { method: 'DELETE' }));
 }

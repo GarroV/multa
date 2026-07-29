@@ -145,6 +145,27 @@ export const en = {
   'settings.rhythm': 'Planning rhythm',
   'settings.sources': 'Income sources',
 
+  // Факт трат (Спринт 3)
+  'spend.open': 'Log a spend',
+  'spend.title': 'What did you spend?',
+  'spend.subtitle': 'Broad strokes are fine — no need for exact cents.',
+  'spend.amount': 'How much',
+  'spend.category': 'Where',
+  'spend.noCategory': 'No category',
+  'spend.date': 'When',
+  'spend.submit': 'Log it',
+  'spend.recent': 'Spends this period',
+  'spend.empty': 'No spends in this period yet',
+  'spend.rateUnavailable': 'No rate for that date — pick another date or currency.',
+  'spend.badAmount': 'Amount as a number, e.g. 1250 or 12.50',
+  'spend.spentOfPlan': 'spent {spent} of {plan}',
+  'plan.summary.spent': 'Spent',
+  'plan.summary.remaining': 'Left to live on',
+  'plan.overspent.note': 'You are {amount} over plan — the daily pace is at zero. You can move budget from another category.',
+  'cat.spent': 'spent {amount}',
+  'cat.remaining': '{amount} left',
+  'cat.overspent': 'over by {amount}',
+
   // Заглушки
   'placeholder.soon': 'Coming — Sprint 2',
 } as const;

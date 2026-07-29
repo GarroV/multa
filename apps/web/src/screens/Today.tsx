@@ -18,6 +18,12 @@ function Dashboard({ plan }: { plan: PlanDto }) {
   const buckets = plan.allocations.filter((a) => a.targetKind === 'bucket');
   const hasPlan = plan.allocations.length > 0;
 
+  const living = BigInt(plan.livingMinor);
+  const spent = BigInt(plan.spentLivingMinor);
+  const overspent = BigInt(plan.overspentMinor) > 0n;
+  // Доля потраченного для полосы: при перерасходе полоса заполнена целиком.
+  const spentShare = living > 0n ? Math.min(100, Number((spent * 100n) / living)) : 0;
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 24, display: 'grid', gap: 24 }}>
       <div>
@@ -37,6 +43,30 @@ function Dashboard({ plan }: { plan: PlanDto }) {
 
       {plan.unresolved.length > 0 && (
         <div className="note-band">{t('plan.unresolved.affectsHero')}</div>
+      )}
+
+      {BigInt(plan.livingMinor) > 0n && (
+        <div className="card" style={{ display: 'grid', gap: 10 }}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <span className="micro">{t('plan.summary.spent')}</span>
+            <span className="mono dim" style={{ fontSize: 13 }}>
+              {t('spend.spentOfPlan', { spent: fmt(plan.spentLivingMinor), plan: fmt(plan.livingMinor) })}
+            </span>
+          </div>
+          <div className={`fact-bar${overspent ? ' over' : ''}`}>
+            <span style={{ width: `${spentShare}%` }} />
+          </div>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <span className="dim">{t('plan.summary.remaining')}</span>
+            <span className="mono" style={overspent ? { color: 'var(--neon-amber)' } : undefined}>
+              {fmt(plan.remainingLivingMinor)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {overspent && (
+        <div className="note-band">{t('plan.overspent.note', { amount: fmt(plan.overspentMinor) })}</div>
       )}
 
       {!hasPlan && (

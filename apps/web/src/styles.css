@@ -265,3 +265,44 @@ a {
   border-left-color: var(--neon-violet);
   background: color-mix(in oklab, var(--neon-violet) 10%, transparent);
 }
+
+/* Панель ввода факта: перекрывает экран, но оставляет контекст видимым по краям. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: start center;
+  padding: 5vh 16px;
+  overflow-y: auto;
+  background: color-mix(in oklab, var(--bg-void) 78%, transparent);
+  backdrop-filter: blur(6px);
+}
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px color-mix(in oklab, var(--bg-void) 70%, transparent);
+}
+.fact-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--text-dim) 30%, transparent);
+  overflow: hidden;
+}
+.fact-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--neon-cyan);
+  box-shadow: var(--glow-cyan);
+}
+.fact-bar.over > span {
+  background: var(--neon-amber);
+  box-shadow: none;
+}
