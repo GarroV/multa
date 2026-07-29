@@ -9,10 +9,28 @@ create table workspaces (
   base_currency char(3) not null default 'RUB',
   timezone text not null default 'Europe/Belgrade',
   locale text not null default 'ru',
-  period_anchors jsonb,           -- онбординг шаг 2: PeriodConfig (@multa/core)
-  expected_income_minor bigint,   -- ожидаемый доход периода (base minor)
+  period_anchors jsonb,           -- ритм планирования: PeriodConfig (@multa/core), задаёт ГРАНИЦЫ периодов
+  payday_weekend_rule text not null default 'before'
+    check (payday_weekend_rule in ('as-is','before','after')),  -- перенос выплаты с выходного; влияет на границы
   created_at timestamptz not null default now()
 );
+-- Ожидаемый доход периода здесь НЕ живёт: он считается по income_sources и хранится в pay_periods.
+
+create table income_sources (      -- только деньги: сколько и когда приходит (правило «ритм ≠ деньги»)
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  label text not null,             -- «Аванс», «Зарплата», «Подработка»
+  currency char(3) not null,       -- фриланс в USD — не обязательно базовая
+  schedule jsonb not null,         -- IncomeSchedule: monthly-days | every-weeks | one-off | irregular
+  amount jsonb not null,           -- IncomeAmount: absolute{amountMinor} | percent{percent, ofMinor}; суммы — строки-целые
+  stability text not null default 'fixed' check (stability in ('fixed','variable')),
+  active boolean not null default true,
+  starts_on date,                  -- источник появился (новая работа)
+  ends_on date,                    -- источник кончился (уволился) — это знает прогноз
+  sort integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create index income_sources_ws_idx on income_sources (workspace_id, sort);
 
 create table workspace_members (   -- закладка под семейный режим (v2); в MVP только owner
   workspace_id uuid not null references workspaces on delete cascade,
@@ -177,10 +195,10 @@ create table exchange_ops (
   occurred_on date not null
 );
 
-create table recurring_items (
+create table recurring_items (     -- расходы и взносы; доходы живут в income_sources (одна правда о доходах)
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces on delete cascade,
-  kind text not null check (kind in ('income','expense','envelope','goal','debt')),
+  kind text not null check (kind in ('expense','envelope','goal','debt')),
   target_id uuid,
   name text not null,
   amount_minor bigint not null,
