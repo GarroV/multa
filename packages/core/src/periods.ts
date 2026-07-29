@@ -12,9 +12,12 @@ export interface PayPeriod {
   readonly endsOn: string;
 }
 
+/** Правило переноса выплаты, попавшей на выходной. В РФ и Сербии обычно платят раньше. */
+export type WeekendRule = 'as-is' | 'before' | 'after';
+
 export type PeriodConfig =
-  | { kind: 'monthly-days'; days: number[] } // «10 и 25»
-  | { kind: 'every-weeks'; weeks: number; startsOn: string } // «каждые N недель» от даты
+  | { kind: 'monthly-days'; days: number[]; weekendRule?: WeekendRule } // «10 и 25»
+  | { kind: 'every-weeks'; weeks: number; startsOn: string; weekendRule?: WeekendRule } // «каждые N недель» от даты
   | { kind: 'custom'; dates: string[] }; // явные даты выплат
 
 const MS_PER_DAY = 86_400_000;
@@ -41,22 +44,48 @@ function diffDays(fromIso: string, toIso: string): number {
   return Math.round((toUTC(toIso) - toUTC(fromIso)) / MS_PER_DAY);
 }
 
-/** Список дат выплат для monthly-days, начиная за месяц до `around`, длиной ~count+3 месяца. */
-function monthlyPaydays(days: number[], around: string, count: number): string[] {
-  const sorted = [...new Set(days)].sort((a, b) => a - b);
-  const start = new Date(toUTC(around));
+/** Сдвиг ISO-даты на n дней (n может быть отрицательным). */
+export function addDays(iso: string, n: number): string {
+  return fromUTC(toUTC(iso) + n * MS_PER_DAY);
+}
+
+/**
+ * Дата выплаты с учётом правила выходных: 'before' — предшествующая пятница,
+ * 'after' — следующий понедельник. Влияет на границы периодов, поэтому применяется
+ * до сборки периодов, а не при отображении.
+ */
+export function shiftForWeekend(iso: string, rule: WeekendRule = 'as-is'): string {
+  if (rule === 'as-is') return iso;
+  const weekday = new Date(toUTC(iso)).getUTCDay(); // 0 = вс, 6 = сб
+  if (weekday !== 0 && weekday !== 6) return iso;
+  const delta = rule === 'before' ? (weekday === 6 ? -1 : -2) : weekday === 6 ? 2 : 1;
+  return addDays(iso, delta);
+}
+
+/** Сортировка + дедуп: сдвиг по выходным и кламп коротких месяцев могут дать одну дату из двух. */
+function normalizeDates(dates: readonly string[]): string[] {
+  const sorted = [...dates].sort();
+  return sorted.filter((d, i) => i === 0 || d !== sorted[i - 1]);
+}
+
+/** Даты «дней месяца» внутри окна [fromIso, toIso] с клампом к длине месяца. Отсортированы, без дублей. */
+export function monthlyDatesBetween(
+  days: readonly number[],
+  fromIso: string,
+  toIso: string,
+): string[] {
+  const sortedDays = [...new Set(days)].sort((a, b) => a - b);
+  const start = new Date(toUTC(fromIso));
+  const end = new Date(toUTC(toIso));
   let year = start.getUTCFullYear();
-  let month = start.getUTCMonth() + 1 - 1; // на месяц назад
-  if (month < 1) {
-    month = 12;
-    year -= 1;
-  }
-  const monthsToGen = count + 3;
-  const raw: string[] = [];
-  for (let i = 0; i < monthsToGen; i++) {
+  let month = start.getUTCMonth() + 1;
+  const lastYear = end.getUTCFullYear();
+  const lastMonth = end.getUTCMonth() + 1;
+  const out: string[] = [];
+  while (year * 12 + month <= lastYear * 12 + lastMonth) {
     const dim = daysInMonth(year, month);
-    for (const day of sorted) {
-      raw.push(fromUTC(Date.UTC(year, month - 1, Math.min(day, dim))));
+    for (const day of sortedDays) {
+      out.push(fromUTC(Date.UTC(year, month - 1, Math.min(day, dim))));
     }
     month += 1;
     if (month > 12) {
@@ -64,8 +93,34 @@ function monthlyPaydays(days: number[], around: string, count: number): string[]
       year += 1;
     }
   }
-  // Кламп мог создать соседние дубликаты (напр. якоря 30 и 31 в феврале).
-  return raw.filter((p, idx) => idx === 0 || p !== raw[idx - 1]);
+  return normalizeDates(out).filter((d) => d >= fromIso && d <= toIso);
+}
+
+/** Даты цикла «каждые N недель» от якорной даты внутри окна [fromIso, toIso]. Дат до якоря не бывает. */
+export function everyWeeksDatesBetween(
+  weeks: number,
+  anchorStart: string,
+  fromIso: string,
+  toIso: string,
+): string[] {
+  const stepDays = weeks * 7;
+  const out: string[] = [];
+  let current = anchorStart;
+  // Прыжок к началу окна, чтобы не шагать по одному циклу от далёкого якоря.
+  const gap = diffDays(anchorStart, fromIso);
+  if (gap > 0) current = addDays(anchorStart, Math.floor(gap / stepDays) * stepDays);
+  while (current <= toIso) {
+    if (current >= fromIso) out.push(current);
+    current = addDays(current, stepDays);
+  }
+  return out;
+}
+
+/** Список дат выплат для monthly-days, начиная за месяц до `around`, длиной ~count+3 месяца. */
+function monthlyPaydays(days: number[], around: string, count: number): string[] {
+  const from = addDays(around, -62); // месяц назад с запасом на любую длину месяца
+  const to = addDays(around, 31 * (count + 3));
+  return monthlyDatesBetween(days, from, to);
 }
 
 function everyWeeksPaydays(weeks: number, anchorStart: string, around: string, count: number): string[] {
@@ -98,15 +153,32 @@ function buildFrom(paydays: string[], from: string, count: number): PayPeriod[] 
   return periods;
 }
 
+/** Сдвигает даты выплат по правилу выходных и нормализует (сдвиг может склеить две даты в одну). */
+function withWeekendRule(paydays: string[], rule: WeekendRule | undefined): string[] {
+  if (!rule || rule === 'as-is') return paydays;
+  return normalizeDates(paydays.map((d) => shiftForWeekend(d, rule)));
+}
+
 /** Генерит `count` периодов начиная с периода, содержащего `from`. */
 export function generatePeriods(config: PeriodConfig, from: string, count: number): PayPeriod[] {
   switch (config.kind) {
     case 'monthly-days':
-      return buildFrom(monthlyPaydays(config.days, from, count), from, count);
+      return buildFrom(
+        withWeekendRule(monthlyPaydays(config.days, from, count), config.weekendRule),
+        from,
+        count,
+      );
     case 'every-weeks':
-      return buildFrom(everyWeeksPaydays(config.weeks, config.startsOn, from, count), from, count);
+      return buildFrom(
+        withWeekendRule(
+          everyWeeksPaydays(config.weeks, config.startsOn, from, count),
+          config.weekendRule,
+        ),
+        from,
+        count,
+      );
     case 'custom':
-      return buildFrom([...config.dates].sort(), from, count);
+      return buildFrom(normalizeDates(config.dates), from, count);
   }
 }
 
