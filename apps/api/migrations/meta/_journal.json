@@ -8,6 +8,20 @@
       "when": 1784472209445,
       "tag": "0000_init_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785364358913,
+      "tag": "0001_add_income_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785364372099,
+      "tag": "0002_payday_weekend_rule",
+      "breakpoints": true
     }
   ]
 }

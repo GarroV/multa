@@ -1,0 +1,2 @@
+ALTER TABLE "workspaces" ADD COLUMN "payday_weekend_rule" text DEFAULT 'before' NOT NULL;--> statement-breakpoint
+ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_weekend_rule_ck" CHECK ("workspaces"."payday_weekend_rule" in ('as-is','before','after'));

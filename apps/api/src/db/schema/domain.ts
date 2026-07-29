@@ -5,6 +5,7 @@ import {
   char,
   check,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -22,19 +23,57 @@ import { user } from './auth.ts';
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 const ccy = (name: string) => char(name, { length: 3 });
 
-export const workspaces = pgTable('workspaces', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: text('owner_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  baseCurrency: ccy('base_currency').notNull().default('RUB'),
-  timezone: text('timezone').notNull().default('Europe/Belgrade'),
-  locale: text('locale').notNull().default('ru'),
-  // Онбординг шаг 2: конфиг якорей выплат (PeriodConfig из @multa/core) + ожидаемый доход.
-  periodAnchors: jsonb('period_anchors'),
-  expectedIncomeMinor: bigint('expected_income_minor', { mode: 'bigint' }),
-  createdAt: createdAt(),
-});
+export const workspaces = pgTable(
+  'workspaces',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    baseCurrency: ccy('base_currency').notNull().default('RUB'),
+    timezone: text('timezone').notNull().default('Europe/Belgrade'),
+    locale: text('locale').notNull().default('ru'),
+    // Ритм планирования: PeriodConfig из @multa/core. Задаёт ГРАНИЦЫ периодов.
+    // Деньги здесь не живут — они в income_sources (правило «ритм ≠ деньги»).
+    periodAnchors: jsonb('period_anchors'),
+    // Правило переноса выплаты, попавшей на выходной. Влияет на границы периодов.
+    paydayWeekendRule: text('payday_weekend_rule').notNull().default('before'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('workspaces_weekend_rule_ck', sql`${t.paydayWeekendRule} in ('as-is','before','after')`),
+  ],
+);
+
+/**
+ * Источники дохода: только деньги (сколько и когда приходит). Границы периодов задаёт
+ * ритм воркспейса (workspaces.period_anchors), поэтому здесь нет ни якорей, ни флагов.
+ * schedule/amount — jsonb с типами IncomeSchedule/IncomeAmount из @multa/core;
+ * суммы внутри jsonb — строки-целые minor units (bigint в JSON не кладём).
+ */
+export const incomeSources = pgTable(
+  'income_sources',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    currency: ccy('currency').notNull(),
+    schedule: jsonb('schedule').notNull(),
+    amount: jsonb('amount').notNull(),
+    stability: text('stability').notNull().default('fixed'),
+    active: boolean('active').notNull().default(true),
+    startsOn: date('starts_on'),
+    endsOn: date('ends_on'),
+    sort: integer('sort').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('income_sources_stability_ck', sql`${t.stability} in ('fixed','variable')`),
+    index('income_sources_ws_idx').on(t.workspaceId, t.sort),
+  ],
+);
 
 export const accounts = pgTable(
   'accounts',
@@ -289,7 +328,8 @@ export const recurringItems = pgTable(
     escalation: jsonb('escalation'),
     active: boolean('active').notNull().default(true),
   },
-  (t) => [check('recurring_items_kind_ck', sql`${t.kind} in ('income','expense','envelope','goal','debt')`)],
+  // Доходы живут в income_sources — две правды об одном факте дали бы дрейф.
+  (t) => [check('recurring_items_kind_ck', sql`${t.kind} in ('expense','envelope','goal','debt')`)],
 );
 
 // Глобальный кэш официальных курсов (публичные данные, без workspace). Исторические не меняются.
