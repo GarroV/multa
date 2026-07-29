@@ -58,6 +58,55 @@ export function summarizePlan(result: CascadeResult, opts: { readonly daysInPeri
   return { toExchangeMinor, freeMinor: result.freeMinor, livingMinor, canSpendPerDayMinor };
 }
 
+export interface PlanFact {
+  /** Уже потрачено на жизнь в этом периоде (base). */
+  readonly spentLivingMinor: bigint;
+  /** Остаток на жизнь = план − факт. Отрицательный при перерасходе — показываем честно. */
+  readonly remainingLivingMinor: bigint;
+  /** Насколько вышли за план (0, если не вышли). Отдельным полем, чтобы UI не считал знаки. */
+  readonly overspentMinor: bigint;
+  /** Герой-цифра: остаток ÷ дней, которые ОСТАЛОСЬ жить до выплаты (04-web-ux §Дашборд). */
+  readonly canSpendPerDayMinor: bigint;
+}
+
+/**
+ * Накладывает факт периода на план: сколько осталось на жизнь и какой теперь дневной темп.
+ *
+ * Делитель — `daysLeft`, а не длина периода: цифра отвечает на вопрос «сколько можно тратить
+ * до выплаты», поэтому в середине периода делим остаток на остаток дней. Делим вниз — чтобы
+ * дневной темп нельзя было умножить на дни и получить больше, чем реально есть.
+ * При перерасходе темп 0 (а не отрицательный): тон штурмана, минус живёт в `overspentMinor`.
+ */
+export function summarizeFact(
+  summary: PlanSummary,
+  opts: { readonly spentLivingMinor: bigint; readonly daysLeft: number },
+): PlanFact {
+  const remainingLivingMinor = summary.livingMinor - opts.spentLivingMinor;
+  const spendable = remainingLivingMinor > 0n ? remainingLivingMinor : 0n;
+  return {
+    spentLivingMinor: opts.spentLivingMinor,
+    remainingLivingMinor,
+    overspentMinor: remainingLivingMinor < 0n ? -remainingLivingMinor : 0n,
+    canSpendPerDayMinor: opts.daysLeft > 0 ? spendable / BigInt(opts.daysLeft) : 0n,
+  };
+}
+
+export interface CategorySpending {
+  readonly spentMinor: bigint;
+  readonly remainingMinor: bigint;
+  readonly overspentMinor: bigint;
+}
+
+/** План/факт одной категории. Бюджет 0 («без бюджета») → любая трата уходит в перерасход. */
+export function categorySpending(budgetMinor: bigint, spentMinor: bigint): CategorySpending {
+  const remainingMinor = budgetMinor - spentMinor;
+  return {
+    spentMinor,
+    remainingMinor,
+    overspentMinor: remainingMinor < 0n ? -remainingMinor : 0n,
+  };
+}
+
 export interface AssembledPlan {
   readonly result: CascadeResult;
   readonly summary: PlanSummary;

@@ -16,9 +16,14 @@ export interface PayPeriod {
 export type WeekendRule = 'as-is' | 'before' | 'after';
 
 export type PeriodConfig =
-  | { kind: 'monthly-days'; days: number[]; weekendRule?: WeekendRule } // «10 и 25»
-  | { kind: 'every-weeks'; weeks: number; startsOn: string; weekendRule?: WeekendRule } // «каждые N недель» от даты
-  | { kind: 'custom'; dates: string[] }; // явные даты выплат
+  | { readonly kind: 'monthly-days'; readonly days: readonly number[]; readonly weekendRule?: WeekendRule } // «10 и 25»
+  | {
+      readonly kind: 'every-weeks';
+      readonly weeks: number;
+      readonly startsOn: string;
+      readonly weekendRule?: WeekendRule;
+    } // «каждые N недель» от даты
+  | { readonly kind: 'custom'; readonly dates: readonly string[] }; // явные даты выплат
 
 const MS_PER_DAY = 86_400_000;
 
@@ -117,7 +122,7 @@ export function everyWeeksDatesBetween(
 }
 
 /** Список дат выплат для monthly-days, начиная за месяц до `around`, длиной ~count+3 месяца. */
-function monthlyPaydays(days: number[], around: string, count: number): string[] {
+function monthlyPaydays(days: readonly number[], around: string, count: number): string[] {
   const from = addDays(around, -62); // месяц назад с запасом на любую длину месяца
   const to = addDays(around, 31 * (count + 3));
   return monthlyDatesBetween(days, from, to);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assemblePlan, orderPlanItems, PLAN_PRIORITY, summarizePlan } from './plan.ts';
+import { assemblePlan, categorySpending, orderPlanItems, PLAN_PRIORITY, summarizeFact, summarizePlan } from './plan.ts';
 import { cascade, type PlanItem } from './cascade.ts';
 
 const item = (
@@ -59,6 +59,60 @@ describe('summarizePlan — производные ага-момента', () =>
     expect(s.freeMinor).toBe(-30000n);
     expect(s.livingMinor).toBe(0n);
     expect(s.canSpendPerDayMinor).toBe(0n);
+  });
+});
+
+describe('summarizeFact — цифра дня от факта (Спринт 3)', () => {
+  const living = (livingMinor: bigint) => summarizePlan(cascade(livingMinor, [item('category', 'food', livingMinor)]), { daysInPeriod: 16 });
+
+  it('без трат делит остаток на ОСТАВШИЕСЯ дни, а не на длину периода', () => {
+    // Регрессия: цифра дня делилась на daysInPeriod (16) и в середине периода занижала темп.
+    const f = summarizeFact(living(35000n), { spentLivingMinor: 0n, daysLeft: 12 });
+
+    expect(f.remainingLivingMinor).toBe(35000n);
+    expect(f.canSpendPerDayMinor).toBe(2916n); // 35000 / 12, а не 35000 / 16
+  });
+
+  it('потраченное уменьшает остаток и темп', () => {
+    const f = summarizeFact(living(35000n), { spentLivingMinor: 11000n, daysLeft: 12 });
+
+    expect(f.spentLivingMinor).toBe(11000n);
+    expect(f.remainingLivingMinor).toBe(24000n);
+    expect(f.canSpendPerDayMinor).toBe(2000n); // 24000 / 12
+    expect(f.overspentMinor).toBe(0n);
+  });
+
+  it('перерасход показывает честный минус, но цифру дня не уводит ниже нуля', () => {
+    const f = summarizeFact(living(35000n), { spentLivingMinor: 40000n, daysLeft: 12 });
+
+    expect(f.remainingLivingMinor).toBe(-5000n);
+    expect(f.overspentMinor).toBe(5000n);
+    expect(f.canSpendPerDayMinor).toBe(0n);
+  });
+
+  it('последний день периода (осталось 0) → цифра дня 0, без деления на ноль', () => {
+    const f = summarizeFact(living(35000n), { spentLivingMinor: 0n, daysLeft: 0 });
+
+    expect(f.canSpendPerDayMinor).toBe(0n);
+    expect(f.remainingLivingMinor).toBe(35000n);
+  });
+
+  it('делит вниз: остаток не размазывается больше, чем есть', () => {
+    const f = summarizeFact(living(100n), { spentLivingMinor: 0n, daysLeft: 3 });
+
+    expect(f.canSpendPerDayMinor).toBe(33n); // 100 / 3 = 33.33 → 33
+    expect(f.canSpendPerDayMinor * 3n).toBeLessThanOrEqual(f.remainingLivingMinor);
+  });
+});
+
+describe('categorySpending — остаток по категории', () => {
+  it('остаток = бюджет − факт; перерасход отдаётся отдельно', () => {
+    expect(categorySpending(20000n, 12000n)).toEqual({ spentMinor: 12000n, remainingMinor: 8000n, overspentMinor: 0n });
+    expect(categorySpending(20000n, 26000n)).toEqual({ spentMinor: 26000n, remainingMinor: -6000n, overspentMinor: 6000n });
+  });
+
+  it('категория без бюджета: любая трата — перерасход', () => {
+    expect(categorySpending(0n, 500n)).toEqual({ spentMinor: 500n, remainingMinor: -500n, overspentMinor: 500n });
   });
 });
 

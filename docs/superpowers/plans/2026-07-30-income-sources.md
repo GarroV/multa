@@ -417,8 +417,14 @@ describe('incomeEventsIn', () => {
   });
 
   it('смешивает расписания: недельная подработка добавляет приходы внутрь периода', () => {
+    // Якорь подработки — пятница 3 июля, значит платит и 10-го (тоже пятница, совпадает с началом периода).
     const events = incomeEventsIn([advance, sideGig], july);
-    expect(events.map((e) => e.date)).toEqual(['2026-07-10', '2026-07-17', '2026-07-24']);
+    expect(events.map((e) => [e.date, e.label])).toEqual([
+      ['2026-07-10', 'Аванс'],
+      ['2026-07-10', 'Подработка'],
+      ['2026-07-17', 'Подработка'],
+      ['2026-07-24', 'Подработка'],
+    ]);
   });
 
   it('складывает приходы, схлопнувшиеся клампом короткого месяца', () => {
@@ -464,7 +470,7 @@ describe('incomeEventsIn', () => {
     const started = { ...sideGig, startsOn: '2026-07-18' };
     expect(incomeEventsIn([started], july).map((e) => e.date)).toEqual(['2026-07-24']);
     const ended = { ...sideGig, endsOn: '2026-07-18' };
-    expect(incomeEventsIn([ended], july).map((e) => e.date)).toEqual(['2026-07-17']);
+    expect(incomeEventsIn([ended], july).map((e) => e.date)).toEqual(['2026-07-10', '2026-07-17']);
   });
 
   it('нулевая сумма в план не идёт', () => {
@@ -660,11 +666,12 @@ git commit -m "feat(core): события источников дохода вн
 
 ```ts
 describe('expectedIncomeForPeriod', () => {
-  const events = incomeEventsIn([advance, sideGig], july); // 8 000 000 + 2 × 1 500 000
+  // Аванс 80 000,00 + подработка 15 000,00 × 3 (10, 17, 24 июля).
+  const events = incomeEventsIn([advance, sideGig], july);
 
   it('суммирует приходы в базовой валюте', () => {
     const total = expectedIncomeForPeriod(events, 'RUB', () => null);
-    expect(total.incomeMinor).toBe(11_000_000n);
+    expect(total.incomeMinor).toBe(8_000_000n + 3n * 1_500_000n);
     expect(total.unresolved).toEqual([]);
   });
 

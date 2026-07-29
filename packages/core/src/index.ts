@@ -3,3 +3,4 @@ export * from './periods.ts';
 export * from './cascade.ts';
 export * from './plan.ts';
 export * from './fx.ts';
+export * from './income.ts';
