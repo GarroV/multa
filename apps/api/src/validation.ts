@@ -17,17 +17,85 @@ export const createWorkspaceSchema = z.object({
   locale: z.enum(['ru', 'en']).optional(),
 });
 
-export const patchWorkspaceSchema = createWorkspaceSchema.partial();
+const ccy = z
+  .string()
+  .length(3)
+  .transform((s) => s.toUpperCase());
 
-export const anchorsSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('monthly-days'), days: z.array(z.number().int().min(1).max(31)).min(1) }),
-  z.object({ kind: z.literal('every-weeks'), weeks: z.number().int().positive(), startsOn: z.string() }),
-  z.object({ kind: z.literal('custom'), dates: z.array(z.string()).min(2) }),
+// --- Доход: ритм планирования и источники денег (правило «ритм ≠ деньги») ---
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'ожидается дата YYYY-MM-DD');
+
+/** Процент — десятичная строка в диапазоне (0, 100]. Считается в BigInt, не во float. */
+const percent = z
+  .union([z.string(), z.number()])
+  .transform((v) => String(v).trim())
+  .refine((s) => /^\d+(\.\d+)?$/.test(s), 'процент — десятичное число')
+  .refine((s) => Number(s) > 0 && Number(s) <= 100, 'процент в диапазоне (0, 100]');
+
+const positiveMinor = minor.refine((v) => v > 0n, 'сумма должна быть положительной');
+
+const monthDays = z
+  .array(z.number().int().min(1).max(31))
+  .min(1)
+  .max(4)
+  .transform((days) => [...new Set(days)].sort((a, b) => a - b));
+
+export const weekendRuleSchema = z.enum(['as-is', 'before', 'after']);
+
+/** Ритм планирования: только регулярные виды — из ритма выводятся границы периодов. */
+export const rhythmSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('monthly-days'), days: monthDays }),
+  z.object({
+    kind: z.literal('every-weeks'),
+    weeks: z.number().int().min(1).max(12),
+    startsOn: isoDate,
+  }),
 ]);
 
-export const paydaySchema = z.object({
-  anchors: anchorsSchema,
-  expectedIncomeMinor: minor,
+export const incomeScheduleSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('monthly-days'), days: monthDays }),
+  z.object({
+    kind: z.literal('every-weeks'),
+    weeks: z.number().int().min(1).max(12),
+    startsOn: isoDate,
+  }),
+  z.object({ kind: z.literal('one-off'), date: isoDate }),
+  z.object({ kind: z.literal('irregular') }),
+]);
+
+export const incomeAmountSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('absolute'), amountMinor: positiveMinor }),
+  z.object({ kind: z.literal('percent'), percent, ofMinor: positiveMinor }),
+]);
+
+export const incomeSourceSchema = z.object({
+  label: z.string().min(1).max(60),
+  currency: ccy,
+  schedule: incomeScheduleSchema,
+  amount: incomeAmountSchema,
+  stability: z.enum(['fixed', 'variable']).default('fixed'),
+  active: z.boolean().default(true),
+  startsOn: isoDate.optional(),
+  endsOn: isoDate.optional(),
+  sort: z.number().int().min(0).optional(),
+});
+
+/** Та же схема плюс id — ею же разбираются строки БД (jsonb-суммы приходят строками). */
+export const incomeSourceRowSchema = incomeSourceSchema.extend({ id: z.string().uuid() });
+
+export const incomeSourcePatchSchema = incomeSourceSchema.partial();
+
+/** Онбординг: ритм + правило выходных + набор источников одним запросом (атомарно). */
+export const onboardingIncomeSchema = z.object({
+  rhythm: rhythmSchema,
+  weekendRule: weekendRuleSchema.default('before'),
+  sources: z.array(incomeSourceSchema).min(1),
+});
+
+export const patchWorkspaceSchema = createWorkspaceSchema.partial().extend({
+  rhythm: rhythmSchema.optional(),
+  weekendRule: weekendRuleSchema.optional(),
 });
 
 export const rateQuerySchema = z.object({
@@ -37,11 +105,6 @@ export const rateQuerySchema = z.object({
 });
 
 // --- CRUD обязательств (Спринт 2). Деньги — minor units (см. `minor` выше). ---
-
-const ccy = z
-  .string()
-  .length(3)
-  .transform((s) => s.toUpperCase());
 
 export const debtCreateSchema = z.object({
   name: z.string().min(1),

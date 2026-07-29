@@ -7,7 +7,6 @@ import {
   categoryBudgetSchema,
   createWorkspaceSchema,
   patchWorkspaceSchema,
-  paydaySchema,
   rateQuerySchema,
 } from './validation.ts';
 import { auth } from './auth.ts';
@@ -15,23 +14,26 @@ import { db } from './db/client.ts';
 import { workspaces } from './db/schema/domain.ts';
 import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
+import { hasActiveIncome } from './income/store.ts';
 import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
 import { getCurrentPlan, setCategoryBudget } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
+import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
-/** bigint нельзя сериализовать в JSON — отдаём minor-суммы строками. */
+/** Воркспейс для клиента. Доход периода здесь не живёт — он считается по источникам. */
 function serializeWorkspace(ws: Workspace) {
   return {
     id: ws.id,
     baseCurrency: ws.baseCurrency,
     timezone: ws.timezone,
     locale: ws.locale,
-    periodAnchors: ws.periodAnchors,
-    expectedIncomeMinor: ws.expectedIncomeMinor != null ? String(ws.expectedIncomeMinor) : null,
+    // Ритм планирования (PeriodConfig) — задаёт границы периодов, не суммы.
+    rhythm: ws.periodAnchors,
+    weekendRule: ws.paydayWeekendRule,
   };
 }
 
@@ -60,9 +62,13 @@ app.get('/v1/me', requireAuth, async (c) => {
   const user = c.get('user')!;
   const rows = await db.select().from(workspaces).where(eq(workspaces.ownerId, user.id)).limit(1);
   const ws = rows[0];
+  // Онбординг завершён, когда есть ритм И хотя бы один активный источник дохода:
+  // без ритма нет границ периода, без источника план собрался бы на нуле.
+  const onboardingComplete = ws ? ws.periodAnchors != null && (await hasActiveIncome(ws.id)) : false;
   return c.json({
     user: { id: user.id, email: user.email, name: user.name },
     workspace: ws ? serializeWorkspace(ws) : null,
+    onboardingComplete,
   });
 });
 
@@ -97,18 +103,12 @@ app.patch('/v1/workspace', requireWorkspace, async (c) => {
       ...(body.baseCurrency ? { baseCurrency: body.baseCurrency.toUpperCase() } : {}),
       ...(body.timezone ? { timezone: body.timezone } : {}),
       ...(body.locale ? { locale: body.locale } : {}),
+      ...(body.weekendRule ? { paydayWeekendRule: body.weekendRule } : {}),
+      // Правило выходных живёт и внутри ритма (его читает generatePeriods), и в колонке.
+      ...(body.rhythm
+        ? { periodAnchors: { ...body.rhythm, weekendRule: body.weekendRule ?? ws.paydayWeekendRule } }
+        : {}),
     })
-    .where(eq(workspaces.id, ws.id))
-    .returning();
-  return c.json({ workspace: serializeWorkspace(updated[0]!) });
-});
-
-app.post('/v1/onboarding/payday', requireWorkspace, async (c) => {
-  const ws = c.get('workspace')!;
-  const body = paydaySchema.parse(await c.req.json());
-  const updated = await db
-    .update(workspaces)
-    .set({ periodAnchors: body.anchors, expectedIncomeMinor: body.expectedIncomeMinor })
     .where(eq(workspaces.id, ws.id))
     .returning();
   return c.json({ workspace: serializeWorkspace(updated[0]!) });
@@ -165,6 +165,9 @@ app.route('/v1', obligations);
 
 // CRUD категорий (Спринт 2): /v1/categories
 app.route('/v1', categoriesRoute);
+
+// Источники дохода + шаг онбординга «когда приходят деньги»: /v1/income-sources, /v1/onboarding/income
+app.route('/v1', incomeRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

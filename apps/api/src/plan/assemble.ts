@@ -16,16 +16,22 @@ import {
   convert,
   daysInPeriod,
   daysLeftInPeriod,
+  expectedIncomeForPeriod,
   generatePeriods,
+  incomeEventsIn,
   money,
+  percentOfMinor,
+  type IncomeSource,
   type PayPeriod,
   type PeriodConfig,
   type PlanItem,
   type TargetKind,
+  type WeekendRule,
 } from '@multa/core';
 import { and, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
 import { categories, currencyBuckets, debts, envelopes, goals, payPeriods, plannedItems } from '../db/schema/domain.ts';
+import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { getRate } from '../fx/service.ts';
 
@@ -145,14 +151,6 @@ interface UnresolvedItem {
   readonly reason: 'rate_unavailable';
 }
 
-/** % от суммы: income * pct / 100 в BigInt (floor; планирование, не платёж). */
-function pctOfMinor(incomeMinor: bigint, pct: string): bigint {
-  const [intPart = '0', fracPart = ''] = pct.trim().split('.');
-  const scaled = BigInt((intPart || '0') + fracPart); // "12.5" → 125
-  const denom = 100n * 10n ** BigInt(fracPart.length);
-  return (incomeMinor * scaled) / denom;
-}
-
 /** Целая часть numeric-строки как minor units ("8000.0000" → 8000n). */
 function numericToMinor(value: string): bigint {
   return BigInt(value.trim().split('.')[0] || '0');
@@ -212,8 +210,8 @@ async function resolveObligations(
   for (const b of bucketRows) await push('bucket', b.id, b.name, b.fromCurrency, b.amountMinor, { toCurrency: b.toCurrency });
   for (const e of envelopeRows) {
     if (e.ruleKind === 'percent') {
-      // Процент считается от дохода — сразу в base, без FX.
-      const pv = pctOfMinor(incomeMinor, e.ruleValue);
+      // Процент считается от дохода — сразу в base, без FX. Тот же хелпер, что и для выплат.
+      const pv = percentOfMinor(incomeMinor, e.ruleValue);
       await push('envelope', e.id, e.name, base, pv, { baseOverride: pv });
     } else {
       await push('envelope', e.id, e.name, e.currency, numericToMinor(e.ruleValue));
@@ -273,6 +271,52 @@ async function persistPlannedItems(
   });
 }
 
+export interface IncomeEventDto {
+  sourceId: string;
+  label: string;
+  date: string;
+  amountMinor: string;
+  currency: string;
+}
+
+export interface IncomeUnresolvedDto extends IncomeEventDto {
+  reason: 'rate_unavailable';
+}
+
+/**
+ * Доход периода: события источников внутри [startsOn, endsOn), приведённые к базовой валюте.
+ * Курсы подгружаются одним пакетом по валютам событий, чтобы ядро осталось чистым и синхронным.
+ */
+async function incomeForPeriod(
+  ws: Workspace,
+  sources: readonly IncomeSource[],
+  period: PayPeriod,
+  asOf: string,
+): Promise<{ incomeMinor: bigint; events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] }> {
+  const events = incomeEventsIn(sources, period, ws.paydayWeekendRule as WeekendRule);
+  const foreign = [...new Set(events.map((e) => e.currency).filter((ccy) => ccy !== ws.baseCurrency))];
+  const snapshots = await Promise.all(
+    foreign.map(async (ccy) => [ccy, await getRate(ccy, ws.baseCurrency, asOf)] as const),
+  );
+  const rates = new Map(snapshots);
+  const total = expectedIncomeForPeriod(events, ws.baseCurrency, (m) => {
+    const snap = rates.get(m.currency);
+    return snap ? convert(m, snap) : null;
+  });
+  const toDto = (e: (typeof events)[number]): IncomeEventDto => ({
+    sourceId: e.sourceId,
+    label: e.label,
+    date: e.date,
+    amountMinor: e.amountMinor.toString(),
+    currency: e.currency,
+  });
+  return {
+    incomeMinor: total.incomeMinor,
+    events: events.map(toDto),
+    unresolved: total.unresolved.map((e) => ({ ...toDto(e), reason: 'rate_unavailable' as const })),
+  };
+}
+
 export interface PlanAllocationDto {
   targetKind: TargetKind;
   targetId: string;
@@ -299,11 +343,19 @@ export interface PlanDto {
   canSpendPerDayMinor: string;
   allocations: PlanAllocationDto[];
   unresolved: UnresolvedItem[];
+  /** Разбивка ожидаемого дохода периода по источникам (дашборд, чеклист дня выплаты). */
+  income: { events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] };
 }
 
 /** Собирает и сохраняет план одного периода, возвращает DTO. */
-async function assembleForPeriod(ws: Workspace, period: PayPeriod, asOf: string): Promise<PlanDto> {
-  const incomeMinor = ws.expectedIncomeMinor ?? 0n;
+async function assembleForPeriod(
+  ws: Workspace,
+  sources: readonly IncomeSource[],
+  period: PayPeriod,
+  asOf: string,
+): Promise<PlanDto> {
+  const income = await incomeForPeriod(ws, sources, period, asOf);
+  const incomeMinor = income.incomeMinor;
   const { id: periodId, created } = await ensurePeriodRow(ws, period, incomeMinor);
   // Перенос — только при рождении периода: очистку бюджетов в существующем периоде не затираем.
   if (created) await carryOverCategories(ws, periodId, period.startsOn);
@@ -363,10 +415,11 @@ async function assembleForPeriod(ws: Workspace, period: PayPeriod, asOf: string)
     canSpendPerDayMinor: summary.canSpendPerDayMinor.toString(),
     allocations,
     unresolved,
+    income: { events: income.events, unresolved: income.unresolved },
   };
 }
 
-/** Текущий период по якорям workspace. Бросает при незавершённом онбординге/неопределимом периоде. */
+/** Текущий период по ритму воркспейса. Бросает при незавершённом онбординге/неопределимом периоде. */
 function currentPeriod(ws: Workspace, asOf: string): PayPeriod {
   if (!ws.periodAnchors) throw new Error('onboarding_incomplete');
   const [current] = generatePeriods(ws.periodAnchors as PeriodConfig, asOf, 2);
@@ -374,18 +427,26 @@ function currentPeriod(ws: Workspace, asOf: string): PayPeriod {
   return current;
 }
 
+/** Активные источники воркспейса. Пусто → онбординг не завершён (план собрался бы на нуле). */
+async function activeSources(ws: Workspace): Promise<IncomeSource[]> {
+  const sources = (await listSources(ws.id)).filter((s) => s.active);
+  if (sources.length === 0) throw new Error('onboarding_incomplete');
+  return sources;
+}
+
 /**
  * План текущего периода: гарантирует и собирает текущий + следующий периоды,
- * возвращает DTO текущего. Бросает, если онбординг не завершён (нет якорей).
+ * возвращает DTO текущего. Бросает, если онбординг не завершён (нет ритма или источников).
  */
 export async function getCurrentPlan(ws: Workspace, asOf: string): Promise<PlanDto> {
   if (!ws.periodAnchors) throw new Error('onboarding_incomplete');
+  const sources = await activeSources(ws);
   const anchors = ws.periodAnchors as PeriodConfig;
   const [current, next] = generatePeriods(anchors, asOf, 2);
   if (!current) throw new Error('period_undeterminable');
-  const dto = await assembleForPeriod(ws, current, asOf);
+  const dto = await assembleForPeriod(ws, sources, current, asOf);
   // Следующий период тоже собираем «вперёд» (DoD), но в ответ не кладём.
-  if (next) await assembleForPeriod(ws, next, asOf);
+  if (next) await assembleForPeriod(ws, sources, next, asOf);
   return dto;
 }
 
@@ -408,7 +469,9 @@ export async function setCategoryBudget(
   if (!owned[0]) throw new Error('category_not_found');
 
   const period = currentPeriod(ws, asOf);
-  const { id: periodId } = await ensurePeriodRow(ws, period, ws.expectedIncomeMinor ?? 0n);
+  const sources = await activeSources(ws);
+  const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+  const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
 
   if (plannedMinor <= 0n) {
     await db
