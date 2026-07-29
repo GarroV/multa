@@ -7,8 +7,21 @@
 		reverse_proxy api:3000
 	}
 
+	# Ассеты Vite содержат хэш в имени → кэшируем навсегда. Отдельный handle ещё и потому,
+	# что пропавший ассет должен отдавать 404, а не SPA-fallback (index.html под видом .js
+	# молча ломает страницу вместо честной ошибки в консоли).
+	@assets path /assets/*
+	handle @assets {
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	handle {
 		root * /srv
+		# index.html обязан перепроверяться: иначе после деплоя браузер продолжает грузить
+		# старый html со ссылкой на исчезнувший бандл — и пользователь видит белый экран.
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}
