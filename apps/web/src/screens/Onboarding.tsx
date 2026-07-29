@@ -1,11 +1,28 @@
-import { fromMajor } from '@multa/core';
+import { fromMajor, rhythmMismatches, type IncomeSource } from '@multa/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { IncomeSourceList } from '../components/IncomeSourceList.tsx';
 import { OnboardingShell } from '../components/OnboardingShell.tsx';
+import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { PAYDAY_PRESETS } from '../lib/paydayPresets.ts';
-import { useCreateEntity, useEntities, type Bucket, type Debt, type MeDto, type WorkspaceDto } from '../lib/queries.ts';
+import {
+  payoutsToSources,
+  rhythmToConfig,
+  rhythmToPayload,
+  type PayoutForm,
+  type RhythmForm,
+  type SourcePayload,
+} from '../lib/income.ts';
+import {
+  useCreateEntity,
+  useEntities,
+  useSaveOnboardingIncome,
+  type Bucket,
+  type Debt,
+  type MeDto,
+  type WorkspaceDto,
+} from '../lib/queries.ts';
 
 /** major → minor или null (не подставляем 0 молча). */
 function toMinor(value: string, ccy: string): string | null {
@@ -18,44 +35,91 @@ function toMinor(value: string, ccy: string): string | null {
   }
 }
 
-// --- Шаг 2: якоря выплат + доход ---
+// --- Шаг 2: ритм планирования + источники дохода ---
 
-function PaydayStep({ base, onDone }: { base: string; onDone: () => void }) {
-  const { t } = useI18n();
-  const [presetIdx, setPresetIdx] = useState(0);
-  const [income, setIncome] = useState('');
-  const incomeMinor = toMinor(income, base); // null → доход не введён/невалиден
-  const mutation = useMutation({
-    mutationFn: (minor: string) =>
-      api('/v1/onboarding/payday', {
-        method: 'POST',
-        body: JSON.stringify({ anchors: PAYDAY_PRESETS[presetIdx]!.anchors(), expectedIncomeMinor: minor }),
-      }),
-    onSuccess: onDone, // НЕ инвалидируем 'me' — иначе гейт откроет приложение до шагов 3-4
+const todayISO = (): string => new Date().toISOString().slice(0, 10);
+
+/**
+ * Сид меток выплат — ДАННЫЕ пользователя, не строки интерфейса, поэтому i18n-ключей у них нет:
+ * подставляем на языке локали и даём переписать.
+ */
+const SEED_LABELS: Record<'ru' | 'en', [string, string]> = {
+  ru: ['Аванс', 'Зарплата'],
+  en: ['Advance', 'Salary'],
+};
+
+/** Payload источников → доменный вид для проверки рассинхрона (суммы для неё не важны). */
+function toProbeSources(sources: readonly SourcePayload[]): IncomeSource[] {
+  return sources.map((s, i) => ({
+    id: String(i),
+    label: s.label,
+    currency: s.currency,
+    schedule: s.schedule as IncomeSource['schedule'],
+    amount: { kind: 'absolute', amountMinor: 1n },
+    stability: 'fixed',
+    active: true,
+  }));
+}
+
+function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
+  const { t, locale } = useI18n();
+  const today = todayISO();
+  const [rhythm, setRhythm] = useState<RhythmForm>({
+    kind: 'twiceMonthly',
+    days: [10, 25],
+    weeks: 2,
+    anchorDate: today,
+    weekendRule: 'before',
   });
+  const [payouts, setPayouts] = useState<PayoutForm[]>(() => {
+    const [first, second] = SEED_LABELS[locale];
+    return [
+      { label: first, day: 10, amount: '', percent: '' },
+      { label: second, day: 25, amount: '', percent: '' },
+    ];
+  });
+  const [usePercent, setUsePercent] = useState(false);
+  const [gross, setGross] = useState('');
+  const save = useSaveOnboardingIncome();
+
+  const sources = payoutsToSources(payouts, { currency: base, usePercent, gross });
+  const canContinue = sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '');
+  const mismatches = canContinue
+    ? rhythmMismatches(rhythmToConfig(rhythm), toProbeSources(sources), rhythm.weekendRule, today, 2)
+    : [];
+
   return (
     <OnboardingShell step={2}>
       <div>
         <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.payday.title')}</h1>
         <p className="dim" style={{ marginTop: 8 }}>{t('onboarding.payday.subtitle')}</p>
       </div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {PAYDAY_PRESETS.map((p, i) => (
-          <button key={p.key} type="button" className="chip" aria-pressed={presetIdx === i} onClick={() => setPresetIdx(i)}>
-            {t(p.key)}
-          </button>
-        ))}
-      </div>
-      <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('onboarding.payday.expectedAmount')} · {base}
-        </label>
-        <input className="field mono" inputMode="decimal" placeholder="0" value={income} onChange={(e) => setIncome(e.target.value.replace(',', '.'))} />
-      </div>
-      {mutation.isError && <div className="note-band">{t('common.error')}</div>}
+      <RhythmPicker value={rhythm} onChange={setRhythm} today={today} />
+      <IncomeSourceList
+        payouts={payouts}
+        usePercent={usePercent}
+        gross={gross}
+        currency={base}
+        onChange={setPayouts}
+        onTogglePercent={setUsePercent}
+        onGrossChange={setGross}
+      />
+      {mismatches.map((date) => (
+        <div className="note-band" key={date}>{t('income.amounts.mismatch', { date })}</div>
+      ))}
+      {save.isError && <div className="note-band">{t('common.error')}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        {/* Доход обязателен: без валидного значения не пускаем дальше (иначе план собрался бы на нуле). */}
-        <button className="btn" disabled={mutation.isPending || incomeMinor === null} onClick={() => incomeMinor && mutation.mutate(incomeMinor)}>
+        {/* Хотя бы одна валидная выплата обязательна: иначе план собрался бы на нуле. */}
+        <button
+          className="btn"
+          disabled={save.isPending || !canContinue}
+          onClick={() =>
+            save.mutate(
+              { rhythm: rhythmToPayload(rhythm), weekendRule: rhythm.weekendRule, sources },
+              { onSuccess: onDone }, // НЕ инвалидируем 'me' — иначе гейт откроет приложение до шагов 3-4
+            )
+          }
+        >
           {t('common.next')}
         </button>
       </div>
@@ -165,7 +229,7 @@ function BucketsStep({ base, onFinish, finishing, error }: { base: string; onFin
 /**
  * Флоу онбординга шаги 2-4 (шаг 1 — валюта — в OnboardingCurrency). Долги/корзины пропускаемы.
  * 'me' инвалидируется только на финише: пока флоу активен, гейт App держит онбординг открытым,
- * хотя periodAnchors уже записаны сервером после шага 2.
+ * хотя ритм и источники уже записаны сервером после шага 2.
  */
 export function Onboarding({ workspace }: { workspace: WorkspaceDto }) {
   const qc = useQueryClient();
@@ -181,7 +245,7 @@ export function Onboarding({ workspace }: { workspace: WorkspaceDto }) {
     },
   });
 
-  if (step === 2) return <PaydayStep base={base} onDone={() => setStep(3)} />;
+  if (step === 2) return <IncomeStep base={base} onDone={() => setStep(3)} />;
   if (step === 3) return <DebtsStep base={base} onNext={() => setStep(4)} />;
   return <BucketsStep base={base} onFinish={() => finish.mutate()} finishing={finish.isPending} error={finish.isError} />;
 }

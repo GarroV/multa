@@ -21,6 +21,19 @@ describe('createTranslator', () => {
   });
 });
 
+describe('ключи шага дохода', () => {
+  it('есть в обеих локалях', () => {
+    expect(translate('ru', 'income.rhythm.title')).toBe('Как часто приходят деньги?');
+    expect(translate('en', 'income.rhythm.title')).toBe('How often does money arrive?');
+  });
+
+  it('превью дат интерполирует список', () => {
+    expect(translate('ru', 'income.rhythm.preview', { dates: '10 авг · 25 авг' })).toBe(
+      'Ближайшие: 10 авг · 25 авг',
+    );
+  });
+});
+
 describe('plural', () => {
   it('русские формы one/few/many', () => {
     const forms = { one: 'день', few: 'дня', many: 'дней', other: 'дня' };

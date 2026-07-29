@@ -6,13 +6,37 @@ export interface WorkspaceDto {
   baseCurrency: string;
   timezone: string;
   locale: 'ru' | 'en';
-  periodAnchors: unknown | null;
-  expectedIncomeMinor: string | null;
+  /** Ритм планирования (PeriodConfig). Задаёт границы периодов, не суммы. */
+  rhythm: unknown | null;
+  weekendRule: 'as-is' | 'before' | 'after';
 }
 
 export interface MeDto {
   user: { id: string; email: string; name: string } | null;
   workspace: WorkspaceDto | null;
+  /** Есть ритм и хотя бы один активный источник дохода. */
+  onboardingComplete: boolean;
+}
+
+export interface IncomeSourceDto {
+  id: string;
+  label: string;
+  currency: string;
+  schedule: unknown;
+  amount: unknown;
+  stability: 'fixed' | 'variable';
+  active: boolean;
+  startsOn: string | null;
+  endsOn: string | null;
+  sort: number;
+}
+
+export interface IncomeEventDto {
+  sourceId: string;
+  label: string;
+  date: string;
+  amountMinor: string;
+  currency: string;
 }
 
 export type PlanTargetKind = 'debt' | 'bucket' | 'envelope' | 'category' | 'goal';
@@ -52,6 +76,8 @@ export interface PlanDto {
   canSpendPerDayMinor: string;
   allocations: PlanAllocation[];
   unresolved: PlanUnresolved[];
+  /** Разбивка дохода периода по источникам. */
+  income: { events: IncomeEventDto[]; unresolved: (IncomeEventDto & { reason: 'rate_unavailable' })[] };
 }
 
 export function useMe() {
@@ -63,7 +89,7 @@ export function useMe() {
         return await api<MeDto>('/v1/me');
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          return { user: null, workspace: null };
+          return { user: null, workspace: null, onboardingComplete: false };
         }
         throw err;
       }
@@ -204,5 +230,47 @@ export function useClearCategoryBudget() {
   return useMutation({
     mutationFn: (id: string) => api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'DELETE' }),
     onSuccess: (plan) => qc.setQueryData(['plan'], plan),
+  });
+}
+
+// --- Источники дохода ---
+
+export function useIncomeSources(enabled = true) {
+  return useQuery({
+    queryKey: ['income-sources'],
+    enabled,
+    retry: false,
+    queryFn: () => api<IncomeSourceDto[]>('/v1/income-sources'),
+  });
+}
+
+/** Шаг онбординга: ритм + источники одним запросом. 'me' инвалидирует вызывающий. */
+export function useSaveOnboardingIncome() {
+  return useMutation({
+    mutationFn: (body: unknown) =>
+      api('/v1/onboarding/income', { method: 'POST', body: JSON.stringify(body) }),
+  });
+}
+
+export function useCreateIncomeSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: unknown) =>
+      api<IncomeSourceDto>('/v1/income-sources', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['income-sources'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
+export function useDeleteIncomeSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api(`/v1/income-sources/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['income-sources'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
   });
 }

@@ -19,6 +19,7 @@ export function App() {
   }
   if (!me?.user) return <Login />;
   if (!me.workspace) return <OnboardingCurrency />;
-  if (!me.workspace.periodAnchors) return <Onboarding workspace={me.workspace} />;
+  // Онбординг закрыт, когда есть и ритм, и хотя бы один активный источник дохода.
+  if (!me.onboardingComplete) return <Onboarding workspace={me.workspace} />;
   return <AppShell />;
 }
