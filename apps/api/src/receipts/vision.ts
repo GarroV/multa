@@ -1,6 +1,12 @@
 import { fromMajor } from '@multa/core';
-import { env } from '../env.ts';
 import { logger } from '../logger.ts';
+
+/**
+ * Ключ OpenAI читаем из process.env напрямую, а не через env-схему: модули внешних сервисов
+ * должны импортироваться в тестах без полного окружения (иначе один отсутствующий DATABASE_URL
+ * рушит юниты разбора ответов). Валидация ключа при старте живёт в env.ts.
+ */
+const openaiKey = (): string | undefined => process.env.OPENAI_API_KEY;
 
 /**
  * Vision-фоллбэк чеков (Спринт 5). Включается ТОЛЬКО когда QR не сработал: QR бесплатный и
@@ -92,7 +98,7 @@ export function parseVisionPayload(raw: string): VisionReceipt | null {
  * сеть отказала или ответу нельзя доверять — вызывающий тогда уводит сумму в «Общее».
  */
 export async function recognizeReceipt(imageUrl: string): Promise<VisionReceipt | null> {
-  if (!env.OPENAI_API_KEY) {
+  if (!openaiKey()) {
     logger.warn('vision: OPENAI_API_KEY не задан — фоллбэк недоступен');
     return null;
   }
@@ -101,7 +107,7 @@ export async function recognizeReceipt(imageUrl: string): Promise<VisionReceipt 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openaiKey()}`,
       },
       body: JSON.stringify({
         model: MODEL,

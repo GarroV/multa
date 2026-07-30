@@ -212,6 +212,15 @@ export const textEntrySchema = z.object({
   text: z.string().min(1).max(300),
 });
 
+/** Голосовая заметка: только data:audio/... — ссылки на чужие файлы не тянем. */
+export const voiceEntrySchema = z.object({
+  audioUrl: z
+    .string()
+    .min(20)
+    .max(14_000_000)
+    .refine((v) => v.startsWith('data:audio/'), 'ожидается data:audio/...'),
+});
+
 /** Запрос вариантов пересборки: какой строке и сколько нужно добавить. */
 export const rebalanceQuerySchema = z.object({
   targetId: z.string().uuid(),
