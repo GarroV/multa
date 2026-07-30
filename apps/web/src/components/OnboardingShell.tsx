@@ -21,7 +21,7 @@ export function OnboardingShell({ step, children }: { step: number; children: Re
                   flex: 1,
                   borderRadius: 2,
                   background: i < step ? 'var(--accent)' : 'var(--line)',
-                  boxShadow: i < step ? 'var(--glow-cyan)' : 'none',
+                  
                 }}
               />
             ))}
