@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { assemblePlan, categorySpending, orderPlanItems, PLAN_PRIORITY, summarizeFact, summarizePlan } from './plan.ts';
+import {
+  assemblePlan,
+  categorySpending,
+  executionOf,
+  orderPlanItems,
+  PLAN_PRIORITY,
+  summarizeFact,
+  summarizePlan,
+} from './plan.ts';
 import { cascade, type PlanItem } from './cascade.ts';
 
 const item = (
@@ -131,5 +139,27 @@ describe('assemblePlan — сборка целиком', () => {
     expect(result.compressedMinor).toBe(30000n);
     expect(result.totalAllocatedMinor).toBeLessThanOrEqual(100000n); // инвариант 3
     expect(summary.toExchangeMinor).toBe(60000n);
+  });
+});
+
+describe('executionOf — исполнение плановой строки (Спринт 3)', () => {
+  it('полная сумма — исполнено, остатка нет', () => {
+    expect(executionOf(45000n, 45000n)).toEqual({ status: 'confirmed', remainderMinor: 0n });
+  });
+
+  it('заплатили больше плана — всё равно исполнено, остаток не отрицательный', () => {
+    expect(executionOf(45000n, 50000n)).toEqual({ status: 'confirmed', remainderMinor: 0n });
+  });
+
+  it('часть суммы — частично, остаток показывает недоданное', () => {
+    expect(executionOf(45000n, 20000n)).toEqual({ status: 'partial', remainderMinor: 25000n });
+  });
+
+  it('ноль — ещё не сделано (pending), а не «частично на ноль»', () => {
+    expect(executionOf(45000n, 0n)).toEqual({ status: 'pending', remainderMinor: 45000n });
+  });
+
+  it('строка без плана исполнять нечего — n_a', () => {
+    expect(executionOf(0n, 0n)).toEqual({ status: 'n_a', remainderMinor: 0n });
   });
 });

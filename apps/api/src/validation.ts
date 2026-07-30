@@ -167,14 +167,44 @@ export const categoryBudgetSchema = z.object({
  * `categoryId` опционален: «крупный мазок» без категории — легитимный сценарий (04-web-ux §Ввод).
  * `occurredOn` по умолчанию сегодня; период вычисляется на сервере по этой дате.
  */
-export const transactionCreateSchema = z.object({
-  amountMinor: minor.refine((v) => v > 0n, 'сумма должна быть больше нуля'),
-  currency: ccy,
-  categoryId: z.string().uuid().optional(),
+export const transactionCreateSchema = z
+  .object({
+    /** Трата или внеплановый приход («сегодня прилетел side hustle»). Знак несёт kind. */
+    kind: z.enum(['expense', 'income']).default('expense'),
+    amountMinor: minor.refine((v) => v > 0n, 'сумма должна быть больше нуля'),
+    currency: ccy,
+    categoryId: z.string().uuid().optional(),
+    occurredOn: isoDate.optional(),
+    note: z.string().max(500).optional(),
+    source: z.enum(['manual', 'text', 'voice', 'receipt', 'import']).optional(),
+    rawInput: z.string().max(500).optional(),
+  })
+  .refine((v) => v.kind !== 'income' || v.categoryId === undefined, {
+    // Категории описывают траты: приход с категорией исказил бы её бюджет и остаток.
+    message: 'у прихода не бывает категории',
+    path: ['categoryId'],
+  });
+
+/**
+ * Подтверждение плановой строки. Без суммы — «сделал целиком»; с суммой меньше плана —
+ * частичное исполнение (остаток остаётся видимым в плане).
+ */
+export const executionSchema = z.object({
+  executedMinor: minor.refine((v) => v >= 0n, 'сумма не может быть отрицательной').optional(),
+});
+
+/**
+ * Факт размена: обе стороны сделки. Валюты обязаны различаться (проверяется в роуте),
+ * суммы — положительные: «отдал 0» это не размен.
+ */
+export const exchangeCreateSchema = z.object({
+  fromCurrency: ccy,
+  toCurrency: ccy,
+  fromMinor: positiveMinor,
+  toMinor: positiveMinor,
   occurredOn: isoDate.optional(),
+  bucketId: z.string().uuid().optional(),
   note: z.string().max(500).optional(),
-  source: z.enum(['manual', 'text', 'voice', 'receipt', 'import']).optional(),
-  rawInput: z.string().max(500).optional(),
 });
 
 /** Фильтр списка транзакций. Без параметров — текущий период. */

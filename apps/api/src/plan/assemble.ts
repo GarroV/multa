@@ -15,6 +15,7 @@ import {
   assemblePlan,
   categorySpending,
   convert,
+  executionOf,
   daysInPeriod,
   daysLeftInPeriod,
   expectedIncomeForPeriod,
@@ -24,6 +25,7 @@ import {
   percentOfMinor,
   periodForDate,
   summarizeFact,
+  type ExecutionStatus,
   type IncomeSource,
   type PayPeriod,
   type PeriodConfig,
@@ -82,6 +84,22 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
   return rows
     .filter((r) => r.plannedMinor > 0n)
     .map((r) => ({ targetId: r.targetId, name: r.name, isProtected: r.isProtected, baseMinor: r.plannedMinor }));
+}
+
+/** Статусы исполнения плановых строк периода: ключ `kind:id`. */
+async function loadExecutions(periodId: string): Promise<Map<string, { status: ExecutionStatus; executedMinor: bigint }>> {
+  const rows = await db
+    .select({
+      targetKind: plannedItems.targetKind,
+      targetId: plannedItems.targetId,
+      status: plannedItems.executionStatus,
+      executedMinor: plannedItems.executedMinor,
+    })
+    .from(plannedItems)
+    .where(eq(plannedItems.periodId, periodId));
+  return new Map(
+    rows.map((r) => [`${r.targetKind}:${r.targetId}`, { status: r.status as ExecutionStatus, executedMinor: r.executedMinor }]),
+  );
 }
 
 /**
@@ -337,11 +355,14 @@ async function incomeForPeriod(
 interface PeriodSpending {
   readonly byCategory: ReadonlyMap<string, bigint>;
   readonly livingMinor: bigint;
+  /** Внеплановые приходы периода (side hustle): их нет в источниках, поэтому идут отдельно. */
+  readonly extraIncomeMinor: bigint;
 }
 
 async function loadPeriodSpending(ws: Workspace, period: PayPeriod): Promise<PeriodSpending> {
   const rows = await db
     .select({
+      kind: transactions.kind,
       targetKind: transactions.targetKind,
       targetId: transactions.targetId,
       total: sql<string>`sum(${transactions.baseAmountMinor})`,
@@ -355,23 +376,26 @@ async function loadPeriodSpending(ws: Workspace, period: PayPeriod): Promise<Per
         // Полуинтервал [startsOn, endsOn) — как у событий дохода, иначе день выплаты попал бы в два периода.
         gte(transactions.occurredOn, period.startsOn),
         lt(transactions.occurredOn, period.endsOn),
-        eq(transactions.kind, 'expense'),
+        inArray(transactions.kind, ['expense', 'income']),
       ),
     )
-    .groupBy(transactions.targetKind, transactions.targetId);
+    .groupBy(transactions.kind, transactions.targetKind, transactions.targetId);
 
   const byCategory = new Map<string, bigint>();
   let livingMinor = 0n;
+  let extraIncomeMinor = 0n;
   for (const row of rows) {
     const total = BigInt(row.total ?? '0');
-    if (row.targetKind === 'category' && row.targetId) {
+    if (row.kind === 'income') {
+      extraIncomeMinor += total;
+    } else if (row.targetKind === 'category' && row.targetId) {
       byCategory.set(row.targetId, (byCategory.get(row.targetId) ?? 0n) + total);
       livingMinor += total;
     } else if (row.targetKind == null) {
       livingMinor += total; // трата без категории тоже съедает деньги на жизнь
     }
   }
-  return { byCategory, livingMinor };
+  return { byCategory, livingMinor, extraIncomeMinor };
 }
 
 export interface PlanAllocationDto {
@@ -387,6 +411,11 @@ export interface PlanAllocationDto {
   spentMinor: string; // факт периода, base (для категорий; у обязательств пока 0)
   remainingMinor: string; // allocated − spent, может быть отрицательным
   overspentMinor: string;
+  /** Исполнение плановой строки: pending | confirmed | partial | skipped | n_a. */
+  executionStatus: ExecutionStatus;
+  executedMinor: string;
+  /** Сколько по строке ещё не внесено (0 у исполненных и у категорий). */
+  remainderMinor: string;
 }
 
 export interface PlanDto {
@@ -394,7 +423,10 @@ export interface PlanDto {
   daysInPeriod: number;
   daysLeft: number;
   baseCurrency: string;
+  /** Доход периода = ожидаемый по источникам + внеплановые приходы, уже зафиксированные фактом. */
   incomeMinor: string;
+  /** Сколько из дохода пришло вне плана (side hustle) — показываем отдельной строкой. */
+  extraIncomeMinor: string;
   totalPlannedMinor: string;
   totalAllocatedMinor: string;
   compressedMinor: string;
@@ -413,6 +445,26 @@ export interface PlanDto {
   income: { events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] };
 }
 
+/**
+ * Поля исполнения для строки плана. Категории исполнения не требуют (`n_a`): их факт
+ * приходит тратами. Статус из БД первичен — «пропустил» нельзя вывести из суммы.
+ */
+function executionFields(
+  targetKind: TargetKind,
+  allocatedMinor: bigint,
+  saved: { status: ExecutionStatus; executedMinor: bigint } | undefined,
+): { executionStatus: ExecutionStatus; executedMinor: string; remainderMinor: string } {
+  if (targetKind === 'category') return { executionStatus: 'n_a', executedMinor: '0', remainderMinor: '0' };
+  const executedMinor = saved?.executedMinor ?? 0n;
+  const derived = executionOf(allocatedMinor, executedMinor);
+  const status = saved?.status === 'skipped' ? 'skipped' : derived.status;
+  return {
+    executionStatus: status,
+    executedMinor: executedMinor.toString(),
+    remainderMinor: (status === 'skipped' ? 0n : derived.remainderMinor).toString(),
+  };
+}
+
 /** Собирает и сохраняет план одного периода, возвращает DTO. */
 async function assembleForPeriod(
   ws: Workspace,
@@ -421,7 +473,10 @@ async function assembleForPeriod(
   asOf: string,
 ): Promise<PlanDto> {
   const income = await incomeForPeriod(ws, sources, period, asOf);
-  const incomeMinor = income.incomeMinor;
+  const spending = await loadPeriodSpending(ws, period);
+  // Внеплановый приход раздаётся тем же каскадом, что и зарплата: деньги пришли — им нужно
+  // место в плане. Поэтому он входит в доход периода до каскада, а не «сверху» после него.
+  const incomeMinor = income.incomeMinor + spending.extraIncomeMinor;
   const { id: periodId, created } = await ensurePeriodRow(ws, period, incomeMinor);
   // Перенос — только при рождении периода: очистку бюджетов в существующем периоде не затираем.
   if (created) await carryOverCategories(ws, periodId, period.startsOn);
@@ -443,8 +498,8 @@ async function assembleForPeriod(
   for (const r of resolved) desc.set(`${r.targetKind}:${r.targetId}`, { name: r.name, sourceCurrency: r.sourceCurrency, sourceMinor: r.sourceMinor, ...(r.toCurrency ? { toCurrency: r.toCurrency } : {}) });
   for (const c of cats) desc.set(`category:${c.targetId}`, { name: c.name, sourceCurrency: ws.baseCurrency, sourceMinor: c.baseMinor });
 
-  const spending = await loadPeriodSpending(ws, period);
   const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
+  const executions = await loadExecutions(periodId);
 
   const allocations: PlanAllocationDto[] = result.allocations.map((a) => {
     const src = desc.get(`${a.targetKind}:${a.targetId}`)!;
@@ -463,6 +518,7 @@ async function assembleForPeriod(
       spentMinor: cat.spentMinor.toString(),
       remainingMinor: cat.remainingMinor.toString(),
       overspentMinor: cat.overspentMinor.toString(),
+      ...executionFields(a.targetKind, a.allocatedMinor, executions.get(`${a.targetKind}:${a.targetId}`)),
     };
   });
 
@@ -490,6 +546,9 @@ async function assembleForPeriod(
         spentMinor: cat.spentMinor.toString(),
         remainingMinor: cat.remainingMinor.toString(),
         overspentMinor: cat.overspentMinor.toString(),
+        executionStatus: 'n_a',
+        executedMinor: '0',
+        remainderMinor: '0',
       });
     }
   }
@@ -509,6 +568,7 @@ async function assembleForPeriod(
     daysLeft: daysLeftInPeriod(period, asOf),
     baseCurrency: ws.baseCurrency,
     incomeMinor: incomeMinor.toString(),
+    extraIncomeMinor: spending.extraIncomeMinor.toString(),
     totalPlannedMinor: result.totalPlannedMinor.toString(),
     totalAllocatedMinor: result.totalAllocatedMinor.toString(),
     compressedMinor: result.compressedMinor.toString(),
@@ -610,5 +670,77 @@ export async function setCategoryBudget(
         set: { plannedMinor: sql`excluded.planned_minor` },
       });
   }
+  return getCurrentPlan(ws, asOf);
+}
+
+/**
+ * Исполнение плановой строки (01-domain-model §Исполнение): «сделал» / «пропустил».
+ *
+ * Подтверждение создаёт транзакцию со ссылкой на planned_item — исполнение долга это
+ * тоже факт движения денег. Повторное подтверждение переписывает свою транзакцию, а не
+ * плодит новые (кнопку легко нажать дважды).
+ *
+ * Категории исполнять нельзя: их факт приходит тратами естественно (там `n_a`).
+ * Суммы — в base-валюте: planned_minor хранится в base, поэтому и executed тоже.
+ */
+export async function setExecution(
+  ws: Workspace,
+  asOf: string,
+  targetKind: TargetKind,
+  targetId: string,
+  mode: 'confirm' | 'skip',
+  executedOverrideMinor?: bigint,
+): Promise<PlanDto> {
+  if (targetKind === 'category') throw new Error('execution_not_applicable');
+
+  const period = currentPeriod(ws, asOf);
+  const sources = await activeSources(ws);
+  const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+  const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
+
+  const rows = await db
+    .select({ id: plannedItems.id, plannedMinor: plannedItems.plannedMinor })
+    .from(plannedItems)
+    .where(
+      and(
+        eq(plannedItems.workspaceId, ws.id),
+        eq(plannedItems.periodId, periodId),
+        eq(plannedItems.targetKind, targetKind),
+        eq(plannedItems.targetId, targetId),
+      ),
+    )
+    .limit(1);
+  const item = rows[0];
+  if (!item) throw new Error('planned_item_not_found');
+
+  const executedMinor = mode === 'skip' ? 0n : (executedOverrideMinor ?? item.plannedMinor);
+  const status = mode === 'skip' ? 'skipped' : executionOf(item.plannedMinor, executedMinor).status;
+
+  // Транзакции этой строки пересоздаём: одна строка плана — одна транзакция исполнения.
+  await db.delete(transactions).where(and(eq(transactions.workspaceId, ws.id), eq(transactions.plannedItemId, item.id)));
+  if (executedMinor > 0n) {
+    await db.insert(transactions).values({
+      workspaceId: ws.id,
+      periodId,
+      kind: 'expense',
+      targetKind,
+      targetId,
+      amountMinor: executedMinor,
+      currency: ws.baseCurrency,
+      baseAmountMinor: executedMinor,
+      rate: '1',
+      rateSource: 'base',
+      rateDate: asOf,
+      occurredOn: asOf,
+      source: 'manual',
+      plannedItemId: item.id,
+    });
+  }
+
+  await db
+    .update(plannedItems)
+    .set({ executionStatus: status, executedMinor })
+    .where(eq(plannedItems.id, item.id));
+
   return getCurrentPlan(ws, asOf);
 }

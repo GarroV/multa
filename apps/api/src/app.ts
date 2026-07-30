@@ -1,3 +1,4 @@
+import type { TargetKind } from '@multa/core';
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -7,6 +8,7 @@ import {
   categoryBudgetSchema,
   createWorkspaceSchema,
   patchWorkspaceSchema,
+  executionSchema,
   rateQuerySchema,
 } from './validation.ts';
 import { auth } from './auth.ts';
@@ -17,10 +19,11 @@ import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
 import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
-import { getCurrentPlan, setCategoryBudget } from './plan/assemble.ts';
+import { getCurrentPlan, setCategoryBudget, setExecution } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
+import { exchangeRoute } from './routes/exchange.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
 
@@ -153,6 +156,29 @@ app.put('/v1/plan/current/categories/:id', requireWorkspace, async (c) => {
 
 app.delete('/v1/plan/current/categories/:id', requireWorkspace, (c) => handleCategoryBudget(c, 0n));
 
+// Раскладка дня выплаты: «сделал» / «пропустил» по плановой строке (01-domain-model §Исполнение).
+async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'confirm' | 'skip') {
+  const ws = c.get('workspace')!;
+  const targetKind = c.req.param('kind') as TargetKind;
+  const targetId = c.req.param('id');
+  if (!targetId) return c.json({ error: 'not_found' }, 404);
+  const body = mode === 'confirm' ? executionSchema.parse(await c.req.json().catch(() => ({}))) : {};
+  try {
+    const plan = await setExecution(ws, today(ws.timezone), targetKind, targetId, mode, body.executedMinor);
+    return c.json(plan);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'execution_not_applicable') {
+      return c.json({ error: 'execution_not_applicable' }, 400);
+    }
+    if (err instanceof Error && err.message === 'planned_item_not_found') return c.json({ error: 'not_found' }, 404);
+    if (err instanceof Error && err.message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
+    throw err;
+  }
+}
+
+app.post('/v1/plan/current/items/:kind/:id/confirm', requireWorkspace, (c) => handleExecution(c, 'confirm'));
+app.post('/v1/plan/current/items/:kind/:id/skip', requireWorkspace, (c) => handleExecution(c, 'skip'));
+
 // --- FX ---
 
 app.get('/v1/fx/rate', requireAuth, async (c) => {
@@ -173,6 +199,9 @@ app.route('/v1', incomeRoute);
 
 // Факт трат (Спринт 3): /v1/transactions
 app.route('/v1', transactionsRoute);
+
+// Размен валюты со спредом (Спринт 3): /v1/exchange-ops
+app.route('/v1', exchangeRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

@@ -248,6 +248,34 @@ describe('transactionCreateSchema (факт трат, Спринт 3)', () => {
   });
 });
 
+describe('transactionCreateSchema — приход как факт (side hustle)', () => {
+  const body = (over: Record<string, unknown> = {}) => ({ amountMinor: '2500000', currency: 'RUB', ...over });
+
+  it('по умолчанию это трата — kind не обязателен', () => {
+    expect(transactionCreateSchema.parse(body()).kind).toBe('expense');
+  });
+
+  it('принимает приход и не требует категории', () => {
+    const parsed = transactionCreateSchema.parse(body({ kind: 'income', note: 'фриланс' }));
+
+    expect(parsed.kind).toBe('income');
+    expect(parsed.categoryId).toBeUndefined();
+  });
+
+  it('приход с категорией отвергает: категории — про траты, иначе факт попадёт в бюджет категории', () => {
+    expect(
+      transactionCreateSchema.safeParse(body({ kind: 'income', categoryId: '3f0f0b3e-0f6e-4a1f-9a2e-2b7c3d4e5f60' }))
+        .success,
+    ).toBe(false);
+  });
+
+  it('чужие виды операций не принимает (перевод/размен идут своими путями)', () => {
+    for (const bad of ['transfer_out', 'exchange', 'refund']) {
+      expect(transactionCreateSchema.safeParse(body({ kind: bad })).success).toBe(false);
+    }
+  });
+});
+
 describe('transactionListSchema', () => {
   it('без параметров валиден (значит «текущий период»)', () => {
     expect(transactionListSchema.parse({})).toEqual({});

@@ -7,7 +7,9 @@ import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   isOnboardingIncomplete,
+  useConfirmExecution,
   usePlan,
+  useSkipExecution,
   type PlanAllocation,
   type PlanDto,
   type PlanTargetKind,
@@ -29,8 +31,20 @@ function Centered({ children }: { children: ReactNode }) {
 
 function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; locale: string }) {
   const { t } = useI18n();
+  const confirm = useConfirmExecution();
+  const skip = useSkipExecution();
   const allocated = `${formatMinor(a.allocatedMinor, base, locale)} ${base}`;
   const trimmed = BigInt(a.shortfallMinor) > 0n;
+  const done = a.executionStatus === 'confirmed';
+  const busy = confirm.isPending || skip.isPending;
+  const statusLabel =
+    a.executionStatus === 'partial'
+      ? t('exec.status.partial', { amount: `${formatMinor(a.remainderMinor, base, locale)} ${base}` })
+      : a.executionStatus === 'confirmed'
+        ? t('exec.status.confirmed')
+        : a.executionStatus === 'skipped'
+          ? t('exec.status.skipped')
+          : t('exec.status.pending');
   // Вторичная строка: исходная валюта, если отличается от базовой (корзины — всегда, с назначением).
   const secondary =
     a.targetKind === 'bucket'
@@ -50,7 +64,44 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
             {t('plan.row.trimmed', { amount: `${formatMinor(a.shortfallMinor, base, locale)} ${base}` })}
           </span>
         )}
-        <span className="mono">{allocated}</span>
+        <span
+          className="micro"
+          style={{
+            color: done
+              ? 'var(--neon-lime)'
+              : a.executionStatus === 'partial'
+                ? 'var(--neon-amber)'
+                : 'var(--text-dim)',
+          }}
+        >
+          {statusLabel}
+        </span>
+        <span className="mono" style={done ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>
+          {allocated}
+        </span>
+        {/* Исполнение — вручную по умолчанию: кредит банку тоже переводят руками. */}
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ padding: '4px 10px' }}
+          disabled={busy}
+          aria-pressed={done}
+          title={t('exec.confirm')}
+          onClick={() => confirm.mutate({ targetKind: a.targetKind, targetId: a.targetId })}
+        >
+          ✓
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ padding: '4px 10px' }}
+          disabled={busy}
+          aria-pressed={a.executionStatus === 'skipped'}
+          title={t('exec.skip')}
+          onClick={() => skip.mutate({ targetKind: a.targetKind, targetId: a.targetId })}
+        >
+          ⤫
+        </button>
       </span>
     </div>
   );
@@ -97,6 +148,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           value={fmt(plan.canSpendPerDayMinor)}
           tone="accent"
         />
+        {BigInt(plan.extraIncomeMinor) > 0n && (
+          <Stat label={t('plan.summary.extraIncome')} value={fmt(plan.extraIncomeMinor)} tone="accent" />
+        )}
         {BigInt(plan.spentLivingMinor) > 0n && (
           <>
             <Stat label={t('plan.summary.spent')} value={fmt(plan.spentLivingMinor)} />

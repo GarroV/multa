@@ -299,19 +299,22 @@ export const exchangeOps = pgTable('exchange_ops', {
     .notNull()
     .references(() => workspaces.id, { onDelete: 'cascade' }),
   bucketId: uuid('bucket_id').references(() => currencyBuckets.id),
-  fromAccount: uuid('from_account')
-    .notNull()
-    .references(() => accounts.id),
-  toAccount: uuid('to_account')
-    .notNull()
-    .references(() => accounts.id),
+  // Счета появятся позже (в MVP их нет), поэтому валюты хранятся в самой операции,
+  // а ссылки на счёт опциональны: размен «наличкой у меняльника» тоже факт.
+  fromAccount: uuid('from_account').references(() => accounts.id),
+  toAccount: uuid('to_account').references(() => accounts.id),
+  fromCurrency: ccy('from_currency').notNull(),
+  toCurrency: ccy('to_currency').notNull(),
   fromMinor: bigint('from_minor', { mode: 'bigint' }).notNull(),
   toMinor: bigint('to_minor', { mode: 'bigint' }).notNull(),
   actualRate: numeric('actual_rate', { precision: 20, scale: 10 }).notNull(),
-  officialRate: numeric('official_rate', { precision: 20, scale: 10 }).notNull(),
-  officialSource: text('official_source').notNull(),
-  spreadPct: numeric('spread_pct', { precision: 8, scale: 4 }).notNull(),
+  // Официального курса на дату может не быть — тогда спред не считается (null, а не ноль).
+  officialRate: numeric('official_rate', { precision: 20, scale: 10 }),
+  officialSource: text('official_source'),
+  spreadPct: numeric('spread_pct', { precision: 8, scale: 4 }),
+  spreadMinor: bigint('spread_minor', { mode: 'bigint' }),
   occurredOn: date('occurred_on').notNull(),
+  note: text('note'),
 });
 
 export const recurringItems = pgTable(

@@ -110,7 +110,7 @@ transactionsRoute.post('/transactions', async (c) => {
     .values({
       workspaceId: ws.id,
       periodId,
-      kind: 'expense',
+      kind: body.kind,
       ...(body.categoryId ? { targetKind: 'category', targetId: body.categoryId } : {}),
       amountMinor: body.amountMinor,
       currency: body.currency,
