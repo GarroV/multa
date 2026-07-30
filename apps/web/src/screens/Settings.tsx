@@ -100,20 +100,20 @@ export function Settings() {
 
   if (!ws)
     return (
-      <div style={{ padding: 24 }} className="dim">
+      <div className="page sub">
         {t('common.loading')}
       </div>
     );
 
   return (
-    <div style={{ padding: 24, maxWidth: 560, display: 'grid', gap: 20 }}>
-      <h1 className="section-title">{t('settings.title')}</h1>
-      <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('settings.currency')}
-        </label>
+    <div className="page" style={{ maxWidth: 560 }}>
+      <div className="page-head">
+        <h1 className="page-title">{t('settings.title')}</h1>
+      </div>
+      <section className="tile tile-wide">
+        <span className="micro">{t('settings.currency')}</span>
         <input
-          className="field mono"
+          className="field num field-sm"
           value={currency}
           maxLength={3}
           onChange={(e) => {
@@ -121,11 +121,9 @@ export function Settings() {
             setSaved(false);
           }}
         />
-      </div>
-      <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('settings.rhythm')}
-        </label>
+      </section>
+      <section className="tile tile-wide">
+        <span className="micro">{t('settings.rhythm')}</span>
         <RhythmPicker
           value={rhythm}
           onChange={(next) => {
@@ -134,22 +132,19 @@ export function Settings() {
           }}
           today={todayISO()}
         />
-      </div>
-      <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('settings.sources')}
-        </label>
-        <div className="card" style={{ display: 'grid', gap: 4 }}>
+      </section>
+      <section className="tile tile-wide">
+        <span className="micro">{t('settings.sources')}</span>
           {sources.map((s) => (
             <div key={s.id} className="list-item">
               <span>
-                {s.label} <span className="dim">· {scheduleLabel(s.schedule)}</span>
+                {s.label} <span className="sub">· {scheduleLabel(s.schedule)}</span>
                 {s.stability === 'variable' && (
-                  <span className="dim"> · {t('income.variable')}</span>
+                  <span className="sub"> · {t('income.variable')}</span>
                 )}
               </span>
               <span className="row">
-                <span className="mono dim">
+                <span className="num sub">
                   {amountLabel(s.amount, s.currency)} {s.currency}
                 </span>
                 <button
@@ -164,18 +159,16 @@ export function Settings() {
               </span>
             </div>
           ))}
-          <div className="row">
+          <div className="form-row" style={{ marginTop: 6 }}>
             <input
-              className="field"
-              style={{ flex: 2, minWidth: 110 }}
+              className="field grow"
               aria-label={t('income.amounts.label')}
               placeholder={t('income.amounts.label')}
               value={draft.label}
               onChange={(e) => setDraft({ ...draft, label: e.target.value })}
             />
             <input
-              className="field mono"
-              style={{ width: 64 }}
+              className="field num field-ccy"
               inputMode="numeric"
               aria-label={t('income.amounts.day')}
               value={draft.day}
@@ -185,8 +178,7 @@ export function Settings() {
               }}
             />
             <input
-              className="field mono"
-              style={{ flex: 1, minWidth: 100 }}
+              className="field num grow"
               inputMode="decimal"
               aria-label={t('income.amounts.amount')}
               placeholder={`${t('income.amounts.amount')} · ${ws.baseCurrency}`}
@@ -208,10 +200,9 @@ export function Settings() {
               {t('common.add')}
             </button>
           </div>
-        </div>
-      </div>
+      </section>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        {saved && <span className="dim">{t('common.saved')}</span>}
+        {saved && <span className="sub st-ok">{t('common.saved')}</span>}
         <button className="btn" disabled={save.isPending} onClick={() => save.mutate()}>
           {t('common.save')}
         </button>

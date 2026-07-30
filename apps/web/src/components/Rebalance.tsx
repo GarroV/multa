@@ -72,7 +72,7 @@ export function Rebalance({
           </div>
         ))}
 
-        {apply.isError && <div className="danger" style={{ fontSize: 13 }}>⚠ {t('common.error')}</div>}
+        {apply.isError && <div className="sub danger">⚠ {t('common.error')}</div>}
       </div>
     </div>
   );

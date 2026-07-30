@@ -122,17 +122,23 @@ body {
 
 .chip {
   background: var(--bg-panel);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   color: var(--text-mid);
-  border-radius: var(--radius);
-  padding: 16px 20px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
   cursor: pointer;
   font: inherit;
-  transition: all 0.15s;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.chip:hover {
+  color: var(--text-hi);
+  border-color: var(--text-dim);
 }
 .chip[aria-pressed='true'] {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent-quiet);
+  border-color: var(--accent-quiet);
+  color: var(--text-hi);
 }
 
 .field {
