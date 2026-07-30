@@ -1990,9 +1990,15 @@ export function rhythmToConfig(form: RhythmForm): PeriodConfig {
   return { kind: 'monthly-days', days: [...new Set(days)].sort((a, b) => a - b), weekendRule: form.weekendRule };
 }
 
-/** Ближайшие даты выплат, которые реально сгенерит планировщик. */
+/**
+ * Ближайшие даты выплат, которые реально сгенерит планировщик.
+ * Границы периодов и есть даты выплат; первый период содержит `from` и начинается раньше него,
+ * поэтому берём все границы и отбрасываем прошедшие — превью про будущее, а не про историю.
+ */
 export function previewDates(form: RhythmForm, from: string, count = 3): string[] {
-  return generatePeriods(rhythmToConfig(form), from, count).map((p) => p.startsOn);
+  const periods = generatePeriods(rhythmToConfig(form), from, count + 2);
+  const boundaries = periods.flatMap((p) => [p.startsOn, p.endsOn]);
+  return [...new Set(boundaries)].filter((d) => d >= from).slice(0, count);
 }
 
 /** major-строка → minor units или null (не подставляем 0 молча). */
