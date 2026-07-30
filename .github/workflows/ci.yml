@@ -47,3 +47,12 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # Прод-сборка web без VITE_API_URL — ровно та конфигурация, что уезжает на сервер.
+      - name: Build web (prod)
+        run: pnpm --filter @multa/web build
+
+      # Смоук собранного бандла: логин однажды умер падением на уровне модуля, которое
+      # тесты по исходникам не видят (у них своя сборка и свой env).
+      - name: Smoke prod bundle
+        run: pnpm --filter @multa/web test:bundle
