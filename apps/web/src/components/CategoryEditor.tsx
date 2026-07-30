@@ -1,5 +1,6 @@
 import { fromMajor, money, toMajorString } from '@multa/core';
 import { useState } from 'react';
+import { Rebalance } from './Rebalance.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
@@ -37,6 +38,7 @@ function CategoryRow({
   const patch = usePatchCategory();
   const del = useDeleteCategory();
   // Строка может прийти без бюджета (только с фактом) — поле оставляем пустым, а не «0».
+  const [rebalancing, setRebalancing] = useState(false);
   const [val, setVal] = useState(
     budget && budget.plannedMinor !== '0' ? toMajorString(money(BigInt(budget.plannedMinor), base)) : '',
   );
@@ -106,6 +108,47 @@ function CategoryRow({
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
         <span className="dim mono" style={{ fontSize: 13, width: 34 }}>{base}</span>
+        {budget?.advice && (
+          <span className="row" style={{ gap: 6 }}>
+            <span className="dim" style={{ fontSize: 12 }}>
+              {t(budget.advice.kind === 'raise' ? 'advice.raise' : 'advice.lower', {
+                amount: `${formatMinor(budget.advice.suggestedMinor, base, locale)} ${base}`,
+                periods: budget.advice.periods,
+              })}
+            </span>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '2px 8px', fontSize: 12 }}
+              onClick={() => {
+                const next = budget.advice!.suggestedMinor;
+                setVal(toMajorString(money(BigInt(next), base)));
+                setBudget.mutate({ id: cat.id, plannedMinor: next });
+              }}
+            >
+              {t('advice.apply', { amount: formatMinor(budget.advice.suggestedMinor, base, locale) })}
+            </button>
+          </span>
+        )}
+        {overspent && budget && (
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            title={t('rebalance.open')}
+            onClick={() => setRebalancing(true)}
+          >
+            {t('rebalance.open')}
+          </button>
+        )}
+        {rebalancing && budget && (
+          <Rebalance
+            categoryId={cat.id}
+            categoryName={cat.name}
+            needMinor={budget.overspentMinor}
+            base={base}
+            locale={locale}
+            onClose={() => setRebalancing(false)}
+          />
+        )}
         {!cat.isSystem && (
           <button className="btn btn-ghost" style={{ padding: '4px 10px' }} title={t('common.delete')} onClick={() => del.mutate(cat.id)}>
             ✕

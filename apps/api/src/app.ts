@@ -10,6 +10,8 @@ import {
   patchWorkspaceSchema,
   executionSchema,
   rateQuerySchema,
+  rebalanceApplySchema,
+  rebalanceQuerySchema,
 } from './validation.ts';
 import { auth } from './auth.ts';
 import { db } from './db/client.ts';
@@ -19,11 +21,12 @@ import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
 import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
-import { getCurrentPlan, setCategoryBudget, setExecution } from './plan/assemble.ts';
+import { applyRebalance, getCurrentPlan, rebalanceSuggestions, setCategoryBudget, setExecution } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
+import { forecastRoute } from './routes/forecast.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
 
@@ -176,6 +179,45 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
   }
 }
 
+// Пересборка плана: варианты «откуда добавим» и применение выбранного (Спринт 4).
+app.get('/v1/plan/current/rebalance', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const q = rebalanceQuerySchema.parse(c.req.query());
+  try {
+    return c.json(await rebalanceSuggestions(ws, today(ws.timezone), q.targetId, q.needMinor));
+  } catch (err) {
+    if (err instanceof Error && err.message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
+    throw err;
+  }
+});
+
+app.post('/v1/plan/current/rebalance', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const body = rebalanceApplySchema.parse(await c.req.json());
+  try {
+    const plan = await applyRebalance(ws, today(ws.timezone), {
+      fromKind: body.fromKind,
+      fromId: body.fromId,
+      toId: body.toId,
+      amountMinor: body.amountMinor,
+    });
+    return c.json(plan);
+  } catch (err) {
+    const known: Record<string, number> = {
+      invalid_amount: 400,
+      source_protected: 400,
+      same_target: 400,
+      insufficient_source: 409,
+      planned_item_not_found: 404,
+      onboarding_incomplete: 409,
+    };
+    if (err instanceof Error && known[err.message]) {
+      return c.json({ error: err.message }, known[err.message] as 400);
+    }
+    throw err;
+  }
+});
+
 app.post('/v1/plan/current/items/:kind/:id/confirm', requireWorkspace, (c) => handleExecution(c, 'confirm'));
 app.post('/v1/plan/current/items/:kind/:id/skip', requireWorkspace, (c) => handleExecution(c, 'skip'));
 
@@ -202,6 +244,9 @@ app.route('/v1', transactionsRoute);
 
 // Размен валюты со спредом (Спринт 3): /v1/exchange-ops
 app.route('/v1', exchangeRoute);
+
+// Прогноз-таймлайн (Спринт 4): /v1/forecast
+app.route('/v1', forecastRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

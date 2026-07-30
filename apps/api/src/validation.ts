@@ -207,6 +207,20 @@ export const exchangeCreateSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+/** Запрос вариантов пересборки: какой строке и сколько нужно добавить. */
+export const rebalanceQuerySchema = z.object({
+  targetId: z.string().uuid(),
+  needMinor: positiveMinor,
+});
+
+/** Применение пересборки: откуда, куда, сколько. Долги и корзины источником быть не могут. */
+export const rebalanceApplySchema = z.object({
+  fromKind: z.enum(['category', 'envelope', 'goal']),
+  fromId: z.string().uuid(),
+  toId: z.string().uuid(),
+  amountMinor: positiveMinor,
+});
+
 /** Фильтр списка транзакций. Без параметров — текущий период. */
 export const transactionListSchema = z.object({
   from: isoDate.optional(),

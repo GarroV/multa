@@ -13,6 +13,8 @@
 
 import {
   assemblePlan,
+  budgetAdvice,
+  burnRate,
   categorySpending,
   convert,
   executionOf,
@@ -24,6 +26,7 @@ import {
   money,
   percentOfMinor,
   periodForDate,
+  rebalanceOptions,
   summarizeFact,
   type ExecutionStatus,
   type IncomeSource,
@@ -42,6 +45,7 @@ import {
   envelopes,
   goals,
   payPeriods,
+  planRevisions,
   plannedItems,
   transactions,
 } from '../db/schema/domain.ts';
@@ -84,6 +88,45 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
   return rows
     .filter((r) => r.plannedMinor > 0n)
     .map((r) => ({ targetId: r.targetId, name: r.name, isProtected: r.isProtected, baseMinor: r.plannedMinor }));
+}
+
+/**
+ * Факт по категориям за прошлые периоды — на нём учится совет по бюджету.
+ * Берём последние 6 закрытых периодов: год истории для «привычки» не нужен, а сезонность
+ * (декабрь) не должна тянуть совет через полгода.
+ */
+async function loadCategoryHistory(ws: Workspace, beforeStartsOn: string): Promise<Map<string, bigint[]>> {
+  const rows = await db
+    .select({
+      targetId: transactions.targetId,
+      startsOn: payPeriods.startsOn,
+      total: sql<string>`sum(${transactions.baseAmountMinor})`,
+    })
+    .from(transactions)
+    .innerJoin(payPeriods, eq(payPeriods.id, transactions.periodId))
+    .where(
+      and(
+        eq(transactions.workspaceId, ws.id),
+        eq(transactions.kind, 'expense'),
+        eq(transactions.targetKind, 'category'),
+        lt(payPeriods.startsOn, beforeStartsOn),
+      ),
+    )
+    .groupBy(transactions.targetId, payPeriods.startsOn)
+    .orderBy(desc(payPeriods.startsOn))
+    .limit(200);
+
+  const byCategory = new Map<string, bigint[]>();
+  const seenPeriods = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.targetId) continue;
+    const periods = seenPeriods.get(row.targetId) ?? new Set<string>();
+    if (periods.size >= 6 && !periods.has(row.startsOn)) continue;
+    periods.add(row.startsOn);
+    seenPeriods.set(row.targetId, periods);
+    byCategory.set(row.targetId, [...(byCategory.get(row.targetId) ?? []), BigInt(row.total ?? '0')]);
+  }
+  return byCategory;
 }
 
 /** Статусы исполнения плановых строк периода: ключ `kind:id`. */
@@ -416,6 +459,10 @@ export interface PlanAllocationDto {
   executedMinor: string;
   /** Сколько по строке ещё не внесено (0 у исполненных и у категорий). */
   remainderMinor: string;
+  /** Защищённая категория: автоматика её не режет, только явный выбор пользователя. */
+  protectedCategory?: boolean;
+  /** Совет по бюджету на основе факта прошлых периодов (Спринт 4): поднять или опустить. */
+  advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number };
 }
 
 export interface PlanDto {
@@ -443,6 +490,8 @@ export interface PlanDto {
   unresolved: UnresolvedItem[];
   /** Разбивка ожидаемого дохода периода по источникам (дашборд, чеклист дня выплаты). */
   income: { events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] };
+  /** Темп трат и предупреждение «деньги кончатся такого-то числа» (Спринт 4). */
+  burn: { perDayMinor: string; willLast: boolean; runsOutOn: string | null };
 }
 
 /**
@@ -462,6 +511,20 @@ function executionFields(
     executionStatus: status,
     executedMinor: executedMinor.toString(),
     remainderMinor: (status === 'skipped' ? 0n : derived.remainderMinor).toString(),
+  };
+}
+
+/** Совет по бюджету категории; для обязательств советов нет — их суммы задаёт договор. */
+function adviceFields(
+  targetKind: TargetKind,
+  plannedMinor: bigint,
+  history: bigint[] | undefined,
+): { advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number } } {
+  if (targetKind !== 'category' || !history) return {};
+  const advice = budgetAdvice({ plannedMinor, history });
+  if (!advice) return {};
+  return {
+    advice: { kind: advice.kind, suggestedMinor: advice.suggestedMinor.toString(), periods: advice.periods },
   };
 }
 
@@ -500,6 +563,13 @@ async function assembleForPeriod(
 
   const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
   const executions = await loadExecutions(periodId);
+  const history = await loadCategoryHistory(ws, period.startsOn);
+  const burn = burnRate({
+    livingMinor: summary.livingMinor,
+    spentLivingMinor: spending.livingMinor,
+    period,
+    asOf,
+  });
 
   const allocations: PlanAllocationDto[] = result.allocations.map((a) => {
     const src = desc.get(`${a.targetKind}:${a.targetId}`)!;
@@ -519,6 +589,10 @@ async function assembleForPeriod(
       remainingMinor: cat.remainingMinor.toString(),
       overspentMinor: cat.overspentMinor.toString(),
       ...executionFields(a.targetKind, a.allocatedMinor, executions.get(`${a.targetKind}:${a.targetId}`)),
+      ...(a.targetKind === 'category'
+        ? { protectedCategory: cats.find((c) => c.targetId === a.targetId)?.isProtected === true }
+        : {}),
+      ...adviceFields(a.targetKind, a.allocatedMinor, history.get(a.targetId)),
     };
   });
 
@@ -582,6 +656,11 @@ async function assembleForPeriod(
     allocations,
     unresolved,
     income: { events: income.events, unresolved: income.unresolved },
+    burn: {
+      perDayMinor: burn.perDayMinor.toString(),
+      willLast: burn.willLast,
+      runsOutOn: burn.runsOutOn,
+    },
   };
 }
 
@@ -741,6 +820,142 @@ export async function setExecution(
     .update(plannedItems)
     .set({ executionStatus: status, executedMinor })
     .where(eq(plannedItems.id, item.id));
+
+  return getCurrentPlan(ws, asOf);
+}
+
+export interface RebalanceOptionDto {
+  targetKind: TargetKind;
+  targetId: string;
+  name: string;
+  availableMinor: string;
+  takeMinor: string;
+  /** Бейдж «как обычно»: из этого источника уже брали в прошлых пересборках. */
+  usual: boolean;
+}
+
+/**
+ * Варианты пересборки: откуда добавить денег строке `targetId` (04-web-ux §Пересборка).
+ * Порядок уступки считает ядро; здесь добавляется история: варианты, которые пользователь
+ * уже выбирал, поднимаются вверх и помечаются «как обычно» — система предлагает то, что он
+ * решал раньше, а не то, что ей удобнее.
+ */
+export async function rebalanceSuggestions(
+  ws: Workspace,
+  asOf: string,
+  targetId: string,
+  needMinor: bigint,
+): Promise<RebalanceOptionDto[]> {
+  const plan = await getCurrentPlan(ws, asOf);
+  const rows = plan.allocations.map((a) => ({
+    targetKind: a.targetKind,
+    targetId: a.targetId,
+    name: a.name,
+    allocatedMinor: BigInt(a.allocatedMinor),
+    spentMinor: BigInt(a.targetKind === 'category' ? a.spentMinor : a.executedMinor),
+    protected: a.protectedCategory === true,
+  }));
+  const options = rebalanceOptions({ rows, needMinor, targetId });
+
+  const history = await loadRebalanceHistory(ws.id);
+  return options
+    .map((o) => ({
+      targetKind: o.targetKind,
+      targetId: o.targetId,
+      name: o.name,
+      availableMinor: o.availableMinor.toString(),
+      takeMinor: o.takeMinor.toString(),
+      usual: (history.get(o.targetId) ?? 0) > 0,
+    }))
+    .sort((a, b) => (history.get(b.targetId) ?? 0) - (history.get(a.targetId) ?? 0));
+}
+
+/** Сколько раз из каждого источника уже брали (по принятым PlanRevision). */
+async function loadRebalanceHistory(workspaceId: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ moves: planRevisions.moves })
+    .from(planRevisions)
+    .where(and(eq(planRevisions.workspaceId, workspaceId), eq(planRevisions.accepted, true)))
+    .orderBy(desc(planRevisions.createdAt))
+    .limit(50);
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const moves = row.moves as { fromId?: string }[] | null;
+    for (const move of moves ?? []) {
+      if (!move.fromId) continue;
+      counts.set(move.fromId, (counts.get(move.fromId) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/**
+ * Применяет пересборку: снимает сумму с источника и добавляет получателю, записывая
+ * PlanRevision (инвариант 5 — каждая правка плана оставляет след, на нём учится ранжирование).
+ * Долги и корзины источником быть не могут — их бюджет автоматика не режет.
+ */
+export async function applyRebalance(
+  ws: Workspace,
+  asOf: string,
+  /** fromKind приходит от клиента только для читаемости запроса — решение принимается по БД. */
+  input: { fromKind?: TargetKind; fromId: string; toId: string; amountMinor: bigint },
+): Promise<PlanDto> {
+  if (input.amountMinor <= 0n) throw new Error('invalid_amount');
+  if (input.fromId === input.toId) throw new Error('same_target');
+
+  const period = currentPeriod(ws, asOf);
+  const sources = await activeSources(ws);
+  const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+  const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
+
+  const rows = await db
+    .select({
+      id: plannedItems.id,
+      targetKind: plannedItems.targetKind,
+      targetId: plannedItems.targetId,
+      plannedMinor: plannedItems.plannedMinor,
+    })
+    .from(plannedItems)
+    .where(and(eq(plannedItems.periodId, periodId), inArray(plannedItems.targetId, [input.fromId, input.toId])));
+  const from = rows.find((r) => r.targetId === input.fromId);
+  const to = rows.find((r) => r.targetId === input.toId);
+  if (!from || !to) throw new Error('planned_item_not_found');
+  // Тип источника берём из БД, а не из запроса: клиент мог назвать долг «категорией»
+  // и обойти защиту (железное правило 7 — данные от клиента не авторитетны).
+  if (from.targetKind === 'debt' || from.targetKind === 'bucket') throw new Error('source_protected');
+  if (from.targetKind === 'category') {
+    const owned = await db
+      .select({ isProtected: categories.protected })
+      .from(categories)
+      .where(and(eq(categories.id, from.targetId), eq(categories.workspaceId, ws.id)))
+      .limit(1);
+    if (owned[0]?.isProtected) throw new Error('source_protected');
+  }
+  if (from.plannedMinor < input.amountMinor) throw new Error('insufficient_source');
+
+  await db
+    .update(plannedItems)
+    .set({ plannedMinor: from.plannedMinor - input.amountMinor })
+    .where(eq(plannedItems.id, from.id));
+  await db
+    .update(plannedItems)
+    .set({ plannedMinor: to.plannedMinor + input.amountMinor })
+    .where(eq(plannedItems.id, to.id));
+
+  await db.insert(planRevisions).values({
+    workspaceId: ws.id,
+    periodId,
+    reason: 'overspend',
+    moves: [
+      {
+        fromKind: from.targetKind,
+        fromId: from.targetId,
+        toKind: to.targetKind,
+        toId: to.targetId,
+        amountMinor: input.amountMinor.toString(),
+      },
+    ],
+  });
 
   return getCurrentPlan(ws, asOf);
 }

@@ -3,10 +3,45 @@ import type { ReactNode } from 'react';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { isOnboardingIncomplete, usePlan, type PlanDto } from '../lib/queries.ts';
+import {
+  isOnboardingIncomplete,
+  useForecast,
+  usePlan,
+  type ForecastEvent,
+  type PlanDto,
+} from '../lib/queries.ts';
 
 function Centered({ children }: { children: ReactNode }) {
   return <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>{children}</div>;
+}
+
+/** Лента «что впереди»: закрытие долгов, сбор целей, риски. Считает сервер. */
+function ForecastCard({ base, locale }: { base: string; locale: string }) {
+  const { t } = useI18n();
+  const { data } = useForecast();
+  if (!data || data.events.length === 0) return null;
+
+  const label = (e: ForecastEvent): string => {
+    const amount = e.amountMinor ? `${formatMinor(e.amountMinor, base, locale)} ${base}` : '';
+    if (e.kind === 'debt_closed') return t('forecast.debtClosed', { name: e.name });
+    if (e.kind === 'freed_money') return t('forecast.freed', { amount });
+    if (e.kind === 'goal_reached') return t('forecast.goalReached', { name: e.name });
+    return t('forecast.goalRisk', { name: e.name, amount });
+  };
+
+  return (
+    <div className="card">
+      <div className="plan-group-head">
+        <span className="micro">{t('forecast.title')}</span>
+      </div>
+      {data.events.slice(0, 6).map((e) => (
+        <div key={`${e.kind}:${e.targetId}`} className="list-item">
+          <span style={e.kind === 'goal_at_risk' ? { color: 'var(--neon-amber)' } : undefined}>{label(e)}</span>
+          <span className="mono dim" style={{ fontSize: 13 }}>{e.on}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Dashboard({ plan }: { plan: PlanDto }) {
@@ -43,6 +78,19 @@ function Dashboard({ plan }: { plan: PlanDto }) {
 
       {plan.unresolved.length > 0 && (
         <div className="note-band">{t('plan.unresolved.affectsHero')}</div>
+      )}
+
+      {/* Сигнал приходит до того, как деньги кончились: тон штурмана, без вины. */}
+      {!plan.burn.willLast && plan.burn.runsOutOn && (
+        <div className="note-band">
+          <div style={{ fontWeight: 600 }}>{t('signal.burn.title', { date: plan.burn.runsOutOn })}</div>
+          <div style={{ marginTop: 4 }}>
+            {t('signal.burn.body', {
+              perDay: fmt(plan.burn.perDayMinor),
+              perDayPlan: fmt(plan.canSpendPerDayMinor),
+            })}
+          </div>
+        </div>
       )}
 
       {BigInt(plan.livingMinor) > 0n && (
@@ -101,6 +149,8 @@ function Dashboard({ plan }: { plan: PlanDto }) {
           ))}
         </div>
       )}
+
+      <ForecastCard base={base} locale={locale} />
 
       {hasPlan && (
         <div className="card" style={{ display: 'grid', gap: 12 }}>
