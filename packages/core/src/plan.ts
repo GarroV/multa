@@ -91,6 +91,29 @@ export function summarizeFact(
   };
 }
 
+/** Статусы исполнения плановой строки (01-domain-model §Исполнение). */
+export type ExecutionStatus = 'pending' | 'confirmed' | 'partial' | 'skipped' | 'n_a';
+
+export interface Execution {
+  readonly status: ExecutionStatus;
+  /** Сколько ещё не внесено по этой строке (0, если исполнено или исполнять нечего). */
+  readonly remainderMinor: bigint;
+}
+
+/**
+ * Статус строки по фактически внесённой сумме.
+ *
+ * `skipped` здесь не возвращается: пропуск — осознанное действие пользователя, а не вывод из
+ * суммы (ноль означает «ещё не сделал», и пропуск не должен путаться с забывчивостью).
+ * Переплата не делает остаток отрицательным: строка просто исполнена.
+ */
+export function executionOf(plannedMinor: bigint, executedMinor: bigint): Execution {
+  if (plannedMinor <= 0n) return { status: 'n_a', remainderMinor: 0n };
+  if (executedMinor <= 0n) return { status: 'pending', remainderMinor: plannedMinor };
+  if (executedMinor >= plannedMinor) return { status: 'confirmed', remainderMinor: 0n };
+  return { status: 'partial', remainderMinor: plannedMinor - executedMinor };
+}
+
 export interface CategorySpending {
   readonly spentMinor: bigint;
   readonly remainingMinor: bigint;

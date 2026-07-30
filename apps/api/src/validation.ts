@@ -185,6 +185,14 @@ export const transactionCreateSchema = z
     path: ['categoryId'],
   });
 
+/**
+ * Подтверждение плановой строки. Без суммы — «сделал целиком»; с суммой меньше плана —
+ * частичное исполнение (остаток остаётся видимым в плане).
+ */
+export const executionSchema = z.object({
+  executedMinor: minor.refine((v) => v >= 0n, 'сумма не может быть отрицательной').optional(),
+});
+
 /** Фильтр списка транзакций. Без параметров — текущий период. */
 export const transactionListSchema = z.object({
   from: isoDate.optional(),

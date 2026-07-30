@@ -61,6 +61,9 @@ export interface PlanAllocation {
   spentMinor: string; // факт периода, base
   remainingMinor: string; // allocated − spent, может быть отрицательным
   overspentMinor: string;
+  executionStatus: 'pending' | 'confirmed' | 'partial' | 'skipped' | 'n_a';
+  executedMinor: string;
+  remainderMinor: string;
 }
 
 export interface PlanUnresolved {
@@ -369,6 +372,34 @@ export function useCreateSpend() {
   return useTransactionMutation<SpendInput>((body) =>
     api<Transaction>('/v1/transactions', { method: 'POST', body: JSON.stringify(body) }),
   );
+}
+
+/** «Сделал» по плановой строке: без суммы — целиком, с суммой — частично. Ответ — свежий план. */
+export function useConfirmExecution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ targetKind, targetId, executedMinor }: { targetKind: string; targetId: string; executedMinor?: string }) =>
+      api<PlanDto>(`/v1/plan/current/items/${targetKind}/${targetId}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify(executedMinor ? { executedMinor } : {}),
+      }),
+    onSuccess: (plan) => {
+      qc.setQueryData(['plan'], plan);
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
+
+export function useSkipExecution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ targetKind, targetId }: { targetKind: string; targetId: string }) =>
+      api<PlanDto>(`/v1/plan/current/items/${targetKind}/${targetId}/skip`, { method: 'POST' }),
+    onSuccess: (plan) => {
+      qc.setQueryData(['plan'], plan);
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
 }
 
 export function useDeleteSpend() {
