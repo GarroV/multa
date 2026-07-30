@@ -8,6 +8,27 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # Интеграционные тесты api ходят в настоящий Postgres: они проверяют миграции, каскад и
+    # изоляцию workspace, а на моках эти гарантии проверить нечем.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: multa
+          POSTGRES_PASSWORD: multa_dev_password
+          POSTGRES_DB: multa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U multa -d multa_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://multa:multa_dev_password@localhost:5432/multa_test
+
     steps:
       - uses: actions/checkout@v4
 

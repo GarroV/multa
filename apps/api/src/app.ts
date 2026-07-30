@@ -54,7 +54,8 @@ const corsOptions = {
 
 export const app = new Hono<{ Variables: AppVariables }>();
 
-app.use('*', honoLogger());
+// Access-лог не нужен в тестах: он топит вывод vitest и прячет причину падения.
+if (process.env.NODE_ENV !== 'test') app.use('*', honoLogger());
 app.use('/v1/*', cors(corsOptions));
 
 // better-auth (email+password + TOTP) — на /v1/auth/*
@@ -208,6 +209,7 @@ app.post('/v1/plan/current/rebalance', requireWorkspace, async (c) => {
     const known: Record<string, number> = {
       invalid_amount: 400,
       source_protected: 400,
+      target_not_adjustable: 400,
       same_target: 400,
       insufficient_source: 409,
       planned_item_not_found: 404,
