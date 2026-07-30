@@ -94,6 +94,7 @@ export interface PlanDto {
   overspentMinor: string;
   allocations: PlanAllocation[];
   unresolved: PlanUnresolved[];
+  burn: { perDayMinor: string; willLast: boolean; runsOutOn: string | null };
   /** Разбивка дохода периода по источникам. */
   income: { events: IncomeEventDto[]; unresolved: (IncomeEventDto & { reason: 'rate_unavailable' })[] };
 }
@@ -461,4 +462,38 @@ export function useCreateExchange() {
 
 export function useDeleteExchange() {
   return useExchangeMutation<string>((id) => api(`/v1/exchange-ops/${id}`, { method: 'DELETE' }));
+}
+
+// --- Пересборка плана (Спринт 4) ---
+
+export interface RebalanceOption {
+  targetKind: string;
+  targetId: string;
+  name: string;
+  availableMinor: string;
+  takeMinor: string;
+  /** Из этого источника пользователь уже брал раньше. */
+  usual: boolean;
+}
+
+export function useRebalanceOptions(targetId: string | null, needMinor: string) {
+  return useQuery({
+    queryKey: ['rebalance', targetId, needMinor],
+    enabled: !!targetId && BigInt(needMinor || '0') > 0n,
+    retry: false,
+    queryFn: () =>
+      api<RebalanceOption[]>(`/v1/plan/current/rebalance?targetId=${targetId}&needMinor=${needMinor}`),
+  });
+}
+
+export function useApplyRebalance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { fromKind: string; fromId: string; toId: string; amountMinor: string }) =>
+      api<PlanDto>('/v1/plan/current/rebalance', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: (plan) => {
+      qc.setQueryData(['plan'], plan);
+      void qc.invalidateQueries({ queryKey: ['rebalance'] });
+    },
+  });
 }

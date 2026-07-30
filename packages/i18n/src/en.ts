@@ -94,6 +94,10 @@ export const en = {
   'plan.empty.noPlan': 'Nothing to route yet — set income and add obligations.',
   'plan.empty.needIncome': 'Setup was skipped. Add an income source and the plan builds itself.',
   'plan.today.viewFull': 'Full plan →',
+  'signal.burn.title': 'At this pace the living money runs out on {date}',
+  'signal.burn.body': 'You are spending {perDay} a day, {perDayPlan} was the plan. Move budget or ease off — both are fine.',
+  'signal.burn.action': 'Rebalance',
+  'signal.ok': 'Pace fits the plan',
 
   // Auth
   'auth.title': 'multa',
@@ -188,6 +192,12 @@ export const en = {
   'exec.status.skipped': 'skipped',
   'exec.status.pending': 'not yet',
   'exec.hint': 'Mark what you actually transferred — the plan keeps score, not you.',
+  'rebalance.title': '{category} is running out. Where do we take it from?',
+  'rebalance.open': 'Rebalance',
+  'rebalance.usual': 'as usual',
+  'rebalance.take': 'Take {amount}',
+  'rebalance.empty': 'Nothing to take from — debts and baskets stay untouched.',
+  'rebalance.need': 'Need',
   'plan.summary.spent': 'Spent',
   'plan.summary.remaining': 'Left to live on',
   'plan.overspent.note': 'You are {amount} over plan — the daily pace is at zero. You can move budget from another category.',

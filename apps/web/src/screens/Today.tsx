@@ -45,6 +45,19 @@ function Dashboard({ plan }: { plan: PlanDto }) {
         <div className="note-band">{t('plan.unresolved.affectsHero')}</div>
       )}
 
+      {/* Сигнал приходит до того, как деньги кончились: тон штурмана, без вины. */}
+      {!plan.burn.willLast && plan.burn.runsOutOn && (
+        <div className="note-band">
+          <div style={{ fontWeight: 600 }}>{t('signal.burn.title', { date: plan.burn.runsOutOn })}</div>
+          <div style={{ marginTop: 4 }}>
+            {t('signal.burn.body', {
+              perDay: fmt(plan.burn.perDayMinor),
+              perDayPlan: fmt(plan.canSpendPerDayMinor),
+            })}
+          </div>
+        </div>
+      )}
+
       {BigInt(plan.livingMinor) > 0n && (
         <div className="card" style={{ display: 'grid', gap: 10 }}>
           <div className="row" style={{ justifyContent: 'space-between' }}>

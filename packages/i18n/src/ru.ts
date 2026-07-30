@@ -92,6 +92,10 @@ export const ru: Record<TranslationKey, string> = {
   'plan.empty.noPlan': 'Пока раскладывать нечего — задай доход и добавь обязательства.',
   'plan.empty.needIncome': 'Настройку пропустили. Добавь источник дохода — план соберётся сам.',
   'plan.today.viewFull': 'Весь план →',
+  'signal.burn.title': 'При таком темпе деньги на жизнь кончатся {date}',
+  'signal.burn.body': 'Тратишь {perDay} в день, по плану было {perDayPlan}. Можно перекинуть бюджет или притормозить — оба варианта нормальны.',
+  'signal.burn.action': 'Пересобрать',
+  'signal.ok': 'Темп в рамках плана',
 
   // Auth
   'auth.title': 'multa',
@@ -186,6 +190,12 @@ export const ru: Record<TranslationKey, string> = {
   'exec.status.skipped': 'пропущено',
   'exec.status.pending': 'не внесено',
   'exec.hint': 'Отмечай, что реально перевёл — счёт ведёт план, а не ты.',
+  'rebalance.title': '{category} заканчивается. Откуда добавим?',
+  'rebalance.open': 'Пересобрать',
+  'rebalance.usual': 'как обычно',
+  'rebalance.take': 'Взять {amount}',
+  'rebalance.empty': 'Взять неоткуда — долги и корзины остаются нетронутыми.',
+  'rebalance.need': 'Нужно',
   'plan.summary.spent': 'Потрачено',
   'plan.summary.remaining': 'Осталось на жизнь',
   'plan.overspent.note': 'Вышли за план на {amount} — дневной темп на нуле. Можно перекинуть бюджет из другой категории.',
