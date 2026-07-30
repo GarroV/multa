@@ -89,7 +89,7 @@ function CategoryRow({
         {factLabel && (
           <span
             className="dim mono"
-            style={{ fontSize: 13, ...(overspent ? { color: 'var(--neon-amber)' } : {}) }}
+            style={{ fontSize: 13, ...(overspent ? { color: 'var(--warn)' } : {}) }}
           >
             · {factLabel}
           </span>

@@ -38,7 +38,7 @@ function OpRow({ op, locale }: { op: ExchangeOp; locale: string }) {
         {lost === null ? (
           <span className="dim" style={{ fontSize: 12 }}>{t('fx.spreadUnknown')}</span>
         ) : (
-          <span className="mono" style={{ fontSize: 13, color: gain ? 'var(--neon-lime)' : 'var(--neon-amber)' }}>
+          <span className="mono" style={{ fontSize: 13, color: gain ? 'var(--ok)' : 'var(--warn)' }}>
             {gain ? '−' : ''}
             {formatMinor((gain ? -lost : lost).toString(), op.toCurrency, locale)} {op.toCurrency}
             {op.spreadPct && ` (${op.spreadPct}%)`}

@@ -68,9 +68,9 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
           className="micro"
           style={{
             color: done
-              ? 'var(--neon-lime)'
+              ? 'var(--ok)'
               : a.executionStatus === 'partial'
-                ? 'var(--neon-amber)'
+                ? 'var(--warn)'
                 : 'var(--text-dim)',
           }}
         >
@@ -202,7 +202,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
 
       {plan.unresolved.length > 0 && (
         <div className="card" style={{ display: 'grid', gap: 10 }}>
-          <span className="micro" style={{ color: 'var(--neon-amber)' }}>{t('plan.unresolved.title')}</span>
+          <span className="micro" style={{ color: 'var(--warn)' }}>{t('plan.unresolved.title')}</span>
           {plan.unresolved.map((u) => (
             <div key={`${u.targetKind}:${u.targetId}`} className="list-item">
               <span>{u.name}</span>

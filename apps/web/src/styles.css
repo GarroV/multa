@@ -109,8 +109,7 @@ body {
   transition: background 120ms ease, border-color 120ms ease;
 }
 .btn:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--neon-cyan) 10%, transparent);
-  box-shadow: var(--glow-cyan);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
 }
 .btn:disabled {
   opacity: 0.4;
@@ -132,9 +131,8 @@ body {
   transition: all 0.15s;
 }
 .chip[aria-pressed='true'] {
-  border-color: var(--neon-cyan);
-  color: var(--neon-cyan);
-  box-shadow: var(--glow-cyan);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .field {
@@ -162,10 +160,10 @@ body {
 }
 
 .danger {
-  color: var(--neon-magenta);
+  color: var(--over);
 }
 a {
-  color: var(--neon-cyan);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -275,10 +273,10 @@ a {
   color: var(--text-hi);
 }
 .plan-summary .stat.accent {
-  color: var(--neon-cyan);
+  color: var(--accent);
 }
 .plan-summary .stat.warn {
-  color: var(--neon-amber);
+  color: var(--warn);
 }
 .plan-group + .plan-group {
   margin-top: 20px;
@@ -293,8 +291,8 @@ a {
 .badge-trim {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--neon-amber);
-  border: 1px solid color-mix(in oklab, var(--neon-amber) 45%, transparent);
+  color: var(--warn);
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
   border-radius: 999px;
   padding: 2px 8px;
 }
@@ -307,8 +305,8 @@ a {
   font-size: 13px;
 }
 .note-band.info {
-  border-left-color: var(--neon-violet);
-  background: color-mix(in oklab, var(--neon-violet) 10%, transparent);
+  border-left-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
 }
 
 /* Панель ввода факта: перекрывает экран, но оставляет контекст видимым по краям. */
@@ -344,12 +342,10 @@ a {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--neon-cyan);
-  box-shadow: var(--glow-cyan);
+  background: var(--accent);
 }
 .fact-bar.over > span {
-  background: var(--neon-amber);
-  box-shadow: none;
+  background: var(--warn);
 }
 
 /* --- Ведомость: числа, сетка обзора и сигнатурная полоса периода --- */
