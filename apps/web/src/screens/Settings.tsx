@@ -4,8 +4,13 @@ import { useState } from 'react';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { rhythmToPayload, type RhythmForm } from '../lib/income.ts';
-import { useDeleteIncomeSource, useIncomeSources, useMe } from '../lib/queries.ts';
+import { payoutsToSources, rhythmToPayload, type RhythmForm } from '../lib/income.ts';
+import {
+  useCreateIncomeSource,
+  useDeleteIncomeSource,
+  useIncomeSources,
+  useMe,
+} from '../lib/queries.ts';
 
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
@@ -60,6 +65,15 @@ export function Settings() {
   const ws = me?.workspace;
   const { data: sources = [] } = useIncomeSources(Boolean(ws));
   const removeSource = useDeleteIncomeSource();
+  const addSource = useCreateIncomeSource();
+
+  // Новая выплата: метка + число месяца + сумма. Здесь же закрывается путь после «пропустить настройку».
+  const [draft, setDraft] = useState({ label: '', day: 25, amount: '' });
+  const draftPayload = payoutsToSources([{ ...draft, percent: '' }], {
+    currency: ws?.baseCurrency ?? 'RUB',
+    usePercent: false,
+    gross: '',
+  })[0];
 
   const [currency, setCurrency] = useState(ws?.baseCurrency ?? 'RUB');
   const [rhythm, setRhythm] = useState<RhythmForm>(
@@ -84,13 +98,20 @@ export function Settings() {
     },
   });
 
-  if (!ws) return <div style={{ padding: 24 }} className="dim">{t('common.loading')}</div>;
+  if (!ws)
+    return (
+      <div style={{ padding: 24 }} className="dim">
+        {t('common.loading')}
+      </div>
+    );
 
   return (
     <div style={{ padding: 24, maxWidth: 560, display: 'grid', gap: 20 }}>
       <h1 className="section-title">{t('settings.title')}</h1>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('settings.currency')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('settings.currency')}
+        </label>
         <input
           className="field mono"
           value={currency}
@@ -102,7 +123,9 @@ export function Settings() {
         />
       </div>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('settings.rhythm')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('settings.rhythm')}
+        </label>
         <RhythmPicker
           value={rhythm}
           onChange={(next) => {
@@ -113,13 +136,17 @@ export function Settings() {
         />
       </div>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('settings.sources')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('settings.sources')}
+        </label>
         <div className="card" style={{ display: 'grid', gap: 4 }}>
           {sources.map((s) => (
             <div key={s.id} className="list-item">
               <span>
                 {s.label} <span className="dim">· {scheduleLabel(s.schedule)}</span>
-                {s.stability === 'variable' && <span className="dim"> · {t('income.variable')}</span>}
+                {s.stability === 'variable' && (
+                  <span className="dim"> · {t('income.variable')}</span>
+                )}
               </span>
               <span className="row">
                 <span className="mono dim">
@@ -137,6 +164,50 @@ export function Settings() {
               </span>
             </div>
           ))}
+          <div className="row">
+            <input
+              className="field"
+              style={{ flex: 2, minWidth: 110 }}
+              aria-label={t('income.amounts.label')}
+              placeholder={t('income.amounts.label')}
+              value={draft.label}
+              onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+            />
+            <input
+              className="field mono"
+              style={{ width: 64 }}
+              inputMode="numeric"
+              aria-label={t('income.amounts.day')}
+              value={draft.day}
+              onChange={(e) => {
+                const n = Number(e.target.value.replace(/\D/g, ''));
+                setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
+              }}
+            />
+            <input
+              className="field mono"
+              style={{ flex: 1, minWidth: 100 }}
+              inputMode="decimal"
+              aria-label={t('income.amounts.amount')}
+              placeholder={`${t('income.amounts.amount')} · ${ws.baseCurrency}`}
+              value={draft.amount}
+              onChange={(e) => setDraft({ ...draft, amount: e.target.value.replace(',', '.') })}
+            />
+            <button
+              type="button"
+              className="btn"
+              disabled={addSource.isPending || !draftPayload}
+              onClick={() =>
+                draftPayload &&
+                addSource.mutate(
+                  { ...draftPayload, sort: sources.length },
+                  { onSuccess: () => setDraft({ label: '', day: 25, amount: '' }) },
+                )
+              }
+            >
+              {t('common.add')}
+            </button>
+          </div>
         </div>
       </div>
       <div className="row" style={{ justifyContent: 'flex-end' }}>

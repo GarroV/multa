@@ -87,6 +87,30 @@ export async function listSources(workspaceId: string): Promise<IncomeSource[]> 
   return (await listSourceRows(workspaceId)).map(rowToSource);
 }
 
+/** Ритм по умолчанию для пропущенного обучения: полумесячный, выплата раньше выходного. */
+const DEFAULT_RHYTHM = {
+  kind: 'monthly-days',
+  days: [10, 25],
+  weekendRule: 'before',
+} as const;
+
+/**
+ * Помечает обучение пропущенным. `withDefaultRhythm` — когда ритма ещё нет: без него периоды
+ * неопределимы, и приложение не смогло бы показать даже пустой период.
+ */
+export async function skipOnboarding(
+  workspaceId: string,
+  withDefaultRhythm: boolean,
+): Promise<void> {
+  await db
+    .update(workspaces)
+    .set({
+      onboardingSkipped: true,
+      ...(withDefaultRhythm ? { periodAnchors: DEFAULT_RHYTHM, paydayWeekendRule: 'before' } : {}),
+    })
+    .where(eq(workspaces.id, workspaceId));
+}
+
 export async function hasActiveIncome(workspaceId: string): Promise<boolean> {
   const rows = await db
     .select({ id: incomeSources.id })

@@ -16,7 +16,11 @@ export interface PayPeriod {
 export type WeekendRule = 'as-is' | 'before' | 'after';
 
 export type PeriodConfig =
-  | { readonly kind: 'monthly-days'; readonly days: readonly number[]; readonly weekendRule?: WeekendRule } // «10 и 25»
+  | {
+      readonly kind: 'monthly-days';
+      readonly days: readonly number[];
+      readonly weekendRule?: WeekendRule;
+    } // «10 и 25»
   | {
       readonly kind: 'every-weeks';
       readonly weeks: number;
@@ -128,7 +132,12 @@ function monthlyPaydays(days: readonly number[], around: string, count: number):
   return monthlyDatesBetween(days, from, to);
 }
 
-function everyWeeksPaydays(weeks: number, anchorStart: string, around: string, count: number): string[] {
+function everyWeeksPaydays(
+  weeks: number,
+  anchorStart: string,
+  around: string,
+  count: number,
+): string[] {
   const step = weeks * 7;
   const base = toUTC(anchorStart);
   const target = toUTC(around);

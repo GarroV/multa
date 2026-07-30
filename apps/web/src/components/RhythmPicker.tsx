@@ -1,6 +1,12 @@
 import type { TranslationKey } from '@multa/i18n';
 import type { WeekendRule } from '@multa/core';
-import { previewDates, type RhythmForm, type RhythmKind } from '../lib/income.ts';
+import {
+  formatPayday,
+  previewDates,
+  withRhythmKind,
+  type RhythmForm,
+  type RhythmKind,
+} from '../lib/income.ts';
 import { useI18n } from '../lib/i18n.tsx';
 
 const KINDS: { kind: RhythmKind; key: TranslationKey }[] = [
@@ -35,9 +41,8 @@ export function RhythmPicker({
   today: string;
 }) {
   const { t, locale } = useI18n();
-  const fmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' });
   const dates = previewDates(value, today, 3)
-    .map((iso) => fmt.format(new Date(`${iso}T00:00:00Z`)))
+    .map((iso) => formatPayday(iso, locale))
     .join(' · ');
 
   return (
@@ -53,7 +58,7 @@ export function RhythmPicker({
               type="button"
               className="chip"
               aria-pressed={value.kind === kind}
-              onClick={() => onChange({ ...value, kind })}
+              onClick={() => onChange(withRhythmKind(value, kind))}
             >
               {t(key)}
             </button>

@@ -51,6 +51,30 @@ export function rhythmToConfig(form: RhythmForm): PeriodConfig {
   };
 }
 
+const DEFAULT_DAYS = [10, 25];
+
+/**
+ * Нормализует числа при смене вида ритма: «два раза в месяц» требует ровно двух чисел,
+ * «раз в месяц» — одного. Иначе после переключения ритм молча остался бы однодневным.
+ */
+export function withRhythmKind(form: RhythmForm, kind: RhythmKind): RhythmForm {
+  if (kind === 'twiceMonthly') {
+    const days = [form.days[0] ?? DEFAULT_DAYS[0]!, form.days[1] ?? DEFAULT_DAYS[1]!];
+    return { ...form, kind, days: days[0] === days[1] ? DEFAULT_DAYS : days };
+  }
+  if (kind === 'monthly') return { ...form, kind, days: [form.days[0] ?? DEFAULT_DAYS[0]!] };
+  return { ...form, kind };
+}
+
+/** Дата выплаты по-человечески («10 авг.») — и в превью, и в предупреждениях. */
+export function formatPayday(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(new Date(`${iso}T00:00:00Z`));
+}
+
 /** Ритм для API: без weekendRule — сервер склеивает его сам, чтобы правило жило в одном месте. */
 export function rhythmToPayload(form: RhythmForm): Record<string, unknown> {
   const { weekendRule: _rule, ...rest } = rhythmToConfig(form) as Record<string, unknown> & {
@@ -94,7 +118,8 @@ export function payoutsToSources(
     let amount: unknown;
     if (opts.usePercent) {
       const pct = payout.percent.trim().replace(',', '.');
-      if (!grossMinor || !/^\d+(\.\d+)?$/.test(pct) || Number(pct) <= 0 || Number(pct) > 100) continue;
+      if (!grossMinor || !/^\d+(\.\d+)?$/.test(pct) || Number(pct) <= 0 || Number(pct) > 100)
+        continue;
       amount = { kind: 'percent', percent: pct, ofMinor: grossMinor };
     } else {
       const amountMinor = toMinor(payout.amount, opts.currency);

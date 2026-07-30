@@ -6,6 +6,7 @@ import {
   patchSourceById,
   replaceOnboardingIncome,
   serializeSource,
+  skipOnboarding,
 } from '../income/store.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import {
@@ -53,4 +54,15 @@ incomeRoute.post('/onboarding/income', async (c) => {
   const body = onboardingIncomeSchema.parse(await c.req.json());
   const rows = await replaceOnboardingIncome(ws.id, body);
   return c.json({ sources: rows.map(serializeSource) }, 201);
+});
+
+/**
+ * Пропустить обучение: пускаем в приложение без дохода. Ритм ставим дефолтный, если его нет —
+ * иначе периоды неопределимы и пустой дашборд не смог бы показать даже границы. Доход остаётся
+ * пустым: план будет чистым листом, пока пользователь не заполнит источники в настройках.
+ */
+incomeRoute.post('/onboarding/skip', async (c) => {
+  const ws = c.get('workspace')!;
+  await skipOnboarding(ws.id, ws.periodAnchors == null);
+  return c.body(null, 204);
 });

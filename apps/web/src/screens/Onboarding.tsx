@@ -7,6 +7,7 @@ import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
+  formatPayday,
   payoutsToSources,
   rhythmToConfig,
   rhythmToPayload,
@@ -83,16 +84,25 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
   const save = useSaveOnboardingIncome();
 
   const sources = payoutsToSources(payouts, { currency: base, usePercent, gross });
-  const canContinue = sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '');
+  const canContinue =
+    sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '');
   const mismatches = canContinue
-    ? rhythmMismatches(rhythmToConfig(rhythm), toProbeSources(sources), rhythm.weekendRule, today, 2)
+    ? rhythmMismatches(
+        rhythmToConfig(rhythm),
+        toProbeSources(sources),
+        rhythm.weekendRule,
+        today,
+        2,
+      )
     : [];
 
   return (
     <OnboardingShell step={2}>
       <div>
         <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.payday.title')}</h1>
-        <p className="dim" style={{ marginTop: 8 }}>{t('onboarding.payday.subtitle')}</p>
+        <p className="dim" style={{ marginTop: 8 }}>
+          {t('onboarding.payday.subtitle')}
+        </p>
       </div>
       <RhythmPicker value={rhythm} onChange={setRhythm} today={today} />
       <IncomeSourceList
@@ -105,7 +115,9 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
         onGrossChange={setGross}
       />
       {mismatches.map((date) => (
-        <div className="note-band" key={date}>{t('income.amounts.mismatch', { date })}</div>
+        <div className="note-band" key={date}>
+          {t('income.amounts.mismatch', { date: formatPayday(date, locale) })}
+        </div>
       ))}
       {save.isError && <div className="note-band">{t('common.error')}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -142,8 +154,20 @@ function DebtsStep({ base, onNext }: { base: string; onNext: () => void }) {
     const pay = toMinor(payment || '0', base);
     if (!name.trim() || remaining === null || pay === null) return;
     create.mutate(
-      { name: name.trim(), currency: base, principalMinor: remaining, remainingMinor: remaining, paymentMinor: pay },
-      { onSuccess: () => { setName(''); setAmount(''); setPayment(''); } },
+      {
+        name: name.trim(),
+        currency: base,
+        principalMinor: remaining,
+        remainingMinor: remaining,
+        paymentMinor: pay,
+      },
+      {
+        onSuccess: () => {
+          setName('');
+          setAmount('');
+          setPayment('');
+        },
+      },
     );
   };
 
@@ -151,27 +175,57 @@ function DebtsStep({ base, onNext }: { base: string; onNext: () => void }) {
     <OnboardingShell step={3}>
       <div>
         <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.debts.title')}</h1>
-        <p className="dim" style={{ marginTop: 8 }}>{t('onboarding.debts.subtitle')}</p>
+        <p className="dim" style={{ marginTop: 8 }}>
+          {t('onboarding.debts.subtitle')}
+        </p>
       </div>
       {debts.length > 0 && (
         <div className="card" style={{ display: 'grid', gap: 4 }}>
           {debts.map((d) => (
             <div key={d.id} className="list-item">
               <span>{d.name}</span>
-              <span className="mono dim">{d.paymentMinor !== '0' ? `${d.currency} · ${t('obl.payment')}` : d.currency}</span>
+              <span className="mono dim">
+                {d.paymentMinor !== '0' ? `${d.currency} · ${t('obl.payment')}` : d.currency}
+              </span>
             </div>
           ))}
         </div>
       )}
       <div className="row">
-        <input className="field" style={{ flex: 2, minWidth: 120 }} placeholder={t('common.name')} value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="field mono" style={{ flex: 1, minWidth: 90 }} inputMode="decimal" placeholder={t('common.amount')} value={amount} onChange={(e) => setAmount(e.target.value.replace(',', '.'))} />
-        <input className="field mono" style={{ flex: 1, minWidth: 90 }} inputMode="decimal" placeholder={t('obl.payment')} value={payment} onChange={(e) => setPayment(e.target.value.replace(',', '.'))} />
-        <button className="btn" disabled={create.isPending} onClick={add}>{t('common.add')}</button>
+        <input
+          className="field"
+          style={{ flex: 2, minWidth: 120 }}
+          placeholder={t('common.name')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="field mono"
+          style={{ flex: 1, minWidth: 90 }}
+          inputMode="decimal"
+          placeholder={t('common.amount')}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
+        />
+        <input
+          className="field mono"
+          style={{ flex: 1, minWidth: 90 }}
+          inputMode="decimal"
+          placeholder={t('obl.payment')}
+          value={payment}
+          onChange={(e) => setPayment(e.target.value.replace(',', '.'))}
+        />
+        <button className="btn" disabled={create.isPending} onClick={add}>
+          {t('common.add')}
+        </button>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <button className="btn btn-ghost" onClick={onNext}>{t('common.skip')}</button>
-        <button className="btn" onClick={onNext}>{t('common.next')}</button>
+        <button className="btn btn-ghost" onClick={onNext}>
+          {t('common.skip')}
+        </button>
+        <button className="btn" onClick={onNext}>
+          {t('common.next')}
+        </button>
       </div>
     </OnboardingShell>
   );
@@ -179,7 +233,17 @@ function DebtsStep({ base, onNext }: { base: string; onNext: () => void }) {
 
 // --- Шаг 4: валютные корзины (пропускаемо) ---
 
-function BucketsStep({ base, onFinish, finishing, error }: { base: string; onFinish: () => void; finishing: boolean; error: boolean }) {
+function BucketsStep({
+  base,
+  onFinish,
+  finishing,
+  error,
+}: {
+  base: string;
+  onFinish: () => void;
+  finishing: boolean;
+  error: boolean;
+}) {
   const { t } = useI18n();
   const { data: buckets = [] } = useEntities<Bucket>('buckets');
   const create = useCreateEntity('buckets');
@@ -192,7 +256,12 @@ function BucketsStep({ base, onFinish, finishing, error }: { base: string; onFin
     if (!name.trim() || amt === null) return;
     create.mutate(
       { name: name.trim(), fromCurrency: base, toCurrency: to, amountMinor: amt },
-      { onSuccess: () => { setName(''); setAmount(''); } },
+      {
+        onSuccess: () => {
+          setName('');
+          setAmount('');
+        },
+      },
     );
   };
 
@@ -200,27 +269,60 @@ function BucketsStep({ base, onFinish, finishing, error }: { base: string; onFin
     <OnboardingShell step={4}>
       <div>
         <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.buckets.title')}</h1>
-        <p className="dim" style={{ marginTop: 8 }}>{t('onboarding.buckets.subtitle')}</p>
+        <p className="dim" style={{ marginTop: 8 }}>
+          {t('onboarding.buckets.subtitle')}
+        </p>
       </div>
       {buckets.length > 0 && (
         <div className="card" style={{ display: 'grid', gap: 4 }}>
           {buckets.map((b) => (
             <div key={b.id} className="list-item">
-              <span>{b.name} <span className="dim">· {b.fromCurrency} → {b.toCurrency}</span></span>
+              <span>
+                {b.name}{' '}
+                <span className="dim">
+                  · {b.fromCurrency} → {b.toCurrency}
+                </span>
+              </span>
             </div>
           ))}
         </div>
       )}
       <div className="row">
-        <input className="field" style={{ flex: 2, minWidth: 120 }} placeholder={t('common.name')} value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="field mono" style={{ width: 62 }} maxLength={3} title={t('obl.to')} value={to} onChange={(e) => setTo(e.target.value.toUpperCase())} />
-        <input className="field mono" style={{ flex: 1, minWidth: 90 }} inputMode="decimal" placeholder={`${t('common.amount')} · ${base}`} value={amount} onChange={(e) => setAmount(e.target.value.replace(',', '.'))} />
-        <button className="btn" disabled={create.isPending} onClick={add}>{t('common.add')}</button>
+        <input
+          className="field"
+          style={{ flex: 2, minWidth: 120 }}
+          placeholder={t('common.name')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="field mono"
+          style={{ width: 62 }}
+          maxLength={3}
+          title={t('obl.to')}
+          value={to}
+          onChange={(e) => setTo(e.target.value.toUpperCase())}
+        />
+        <input
+          className="field mono"
+          style={{ flex: 1, minWidth: 90 }}
+          inputMode="decimal"
+          placeholder={`${t('common.amount')} · ${base}`}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
+        />
+        <button className="btn" disabled={create.isPending} onClick={add}>
+          {t('common.add')}
+        </button>
       </div>
       {error && <div className="note-band">{t('common.error')}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <button className="btn btn-ghost" disabled={finishing} onClick={onFinish}>{t('common.skip')}</button>
-        <button className="btn" disabled={finishing} onClick={onFinish}>{t('onboarding.finish')}</button>
+        <button className="btn btn-ghost" disabled={finishing} onClick={onFinish}>
+          {t('common.skip')}
+        </button>
+        <button className="btn" disabled={finishing} onClick={onFinish}>
+          {t('onboarding.finish')}
+        </button>
       </div>
     </OnboardingShell>
   );
@@ -247,5 +349,12 @@ export function Onboarding({ workspace }: { workspace: WorkspaceDto }) {
 
   if (step === 2) return <IncomeStep base={base} onDone={() => setStep(3)} />;
   if (step === 3) return <DebtsStep base={base} onNext={() => setStep(4)} />;
-  return <BucketsStep base={base} onFinish={() => finish.mutate()} finishing={finish.isPending} error={finish.isError} />;
+  return (
+    <BucketsStep
+      base={base}
+      onFinish={() => finish.mutate()}
+      finishing={finish.isPending}
+      error={finish.isError}
+    />
+  );
 }

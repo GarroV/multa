@@ -16,6 +16,13 @@ export interface MeDto {
   workspace: WorkspaceDto | null;
   /** Есть ритм и хотя бы один активный источник дохода. */
   onboardingComplete: boolean;
+  /** Обучение пропущено осознанно — пускаем в приложение с пустым планом. */
+  onboardingSkipped: boolean;
+}
+
+/** Онбординг не пройден: план собрать нельзя, но это не ошибка — нужен пустой экран с CTA. */
+export function isOnboardingIncomplete(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'onboarding_incomplete';
 }
 
 export interface IncomeSourceDto {
@@ -89,7 +96,7 @@ export function useMe() {
         return await api<MeDto>('/v1/me');
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          return { user: null, workspace: null, onboardingComplete: false };
+          return { user: null, workspace: null, onboardingComplete: false, onboardingSkipped: false };
         }
         throw err;
       }
@@ -249,6 +256,32 @@ export function useSaveOnboardingIncome() {
   return useMutation({
     mutationFn: (body: unknown) =>
       api('/v1/onboarding/income', { method: 'POST', body: JSON.stringify(body) }),
+  });
+}
+
+/** Валюта по умолчанию, если обучение пропустили до шага выбора валюты. Меняется в настройках. */
+const DEFAULT_BASE_CURRENCY = 'RUB';
+
+/** Пропустить обучение: в приложение с пустым планом, доход можно задать позже в настройках. */
+export function useSkipOnboarding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      // Скип возможен с первого экрана, где воркспейса ещё нет — создаём его с дефолтной валютой.
+      const me = qc.getQueryData<MeDto>(['me']);
+      if (!me?.workspace) {
+        await api('/v1/workspace', {
+          method: 'POST',
+          body: JSON.stringify({ baseCurrency: DEFAULT_BASE_CURRENCY }),
+        });
+      }
+      await api('/v1/onboarding/skip', { method: 'POST' });
+    },
+    onSuccess: async () => {
+      // Явный fetch, а не invalidate: гейт App должен детерминированно открыть приложение.
+      const me = await api<MeDto>('/v1/me');
+      qc.setQueryData(['me'], me);
+    },
   });
 }
 

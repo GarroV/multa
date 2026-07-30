@@ -58,6 +58,7 @@ export const ru: Record<TranslationKey, string> = {
   'onboarding.buckets.title': 'Тратишь в другой валюте?',
   'onboarding.buckets.subtitle': 'Корзина размена: сколько дохода откладывать в другой валюте (аренда, жизнь). Можно пропустить.',
   'onboarding.finish': 'К моему плану',
+  'onboarding.skipAll': 'пропустить настройку',
 
   // Дашборд — пустой план периода
   'plan.empty.title': 'План пока чистый лист',
@@ -89,6 +90,7 @@ export const ru: Record<TranslationKey, string> = {
   'plan.unresolved.hint': 'Пока курс не подтянется, эти строки вне раскладки.',
   'plan.unresolved.affectsHero': 'У части обязательств нет курса — цифра дня их не учитывает и может быть завышена.',
   'plan.empty.noPlan': 'Пока раскладывать нечего — задай доход и добавь обязательства.',
+  'plan.empty.needIncome': 'Настройку пропустили. Добавь источник дохода — план соберётся сам.',
   'plan.today.viewFull': 'Весь план →',
 
   // Auth

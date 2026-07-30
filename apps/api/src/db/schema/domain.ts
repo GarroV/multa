@@ -38,6 +38,9 @@ export const workspaces = pgTable(
     periodAnchors: jsonb('period_anchors'),
     // Правило переноса выплаты, попавшей на выходной. Влияет на границы периодов.
     paydayWeekendRule: text('payday_weekend_rule').notNull().default('before'),
+    // Пользователь пропустил обучение: пускаем в приложение без дохода (план будет пустым).
+    // Флаг на сервере, а не в localStorage: с другого устройства онбординг не должен спрашивать заново.
+    onboardingSkipped: boolean('onboarding_skipped').notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [

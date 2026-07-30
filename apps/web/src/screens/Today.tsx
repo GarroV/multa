@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { usePlan, type PlanDto } from '../lib/queries.ts';
+import { isOnboardingIncomplete, usePlan, type PlanDto } from '../lib/queries.ts';
 
 function Centered({ children }: { children: ReactNode }) {
   return <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>{children}</div>;
@@ -94,6 +95,8 @@ export function Today() {
   const { t } = useI18n();
   const { data: plan, isLoading, error, refetch } = usePlan(true);
   if (isLoading) return <Centered>{t('common.loading')}</Centered>;
+  // Обучение пропущено и дохода нет — это не ошибка, а честный чистый лист с дорогой в настройки.
+  if (isOnboardingIncomplete(error)) return <NoIncomeYet />;
   if (error) {
     return (
       <Centered>

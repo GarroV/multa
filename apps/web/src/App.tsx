@@ -19,7 +19,8 @@ export function App() {
   }
   if (!me?.user) return <Login />;
   if (!me.workspace) return <OnboardingCurrency />;
-  // Онбординг закрыт, когда есть и ритм, и хотя бы один активный источник дохода.
-  if (!me.onboardingComplete) return <Onboarding workspace={me.workspace} />;
+  // Онбординг закрыт, когда есть и ритм, и хотя бы один активный источник дохода —
+  // либо когда пользователь осознанно его пропустил (тогда план пустой до ввода дохода).
+  if (!me.onboardingComplete && !me.onboardingSkipped) return <Onboarding workspace={me.workspace} />;
   return <AppShell />;
 }

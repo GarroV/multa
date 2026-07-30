@@ -69,6 +69,8 @@ app.get('/v1/me', requireAuth, async (c) => {
     user: { id: user.id, email: user.email, name: user.name },
     workspace: ws ? serializeWorkspace(ws) : null,
     onboardingComplete,
+    // Пропустил обучение — пускаем в приложение, план останется пустым до ввода дохода.
+    onboardingSkipped: ws?.onboardingSkipped ?? false,
   });
 });
 

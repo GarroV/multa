@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ADD COLUMN "onboarding_skipped" boolean DEFAULT false NOT NULL;

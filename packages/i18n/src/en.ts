@@ -60,6 +60,7 @@ export const en = {
   'onboarding.buckets.title': 'Spending in another currency?',
   'onboarding.buckets.subtitle': 'A swap basket: how much of your income to set aside in another currency (rent, life). Skippable.',
   'onboarding.finish': 'See my plan',
+  'onboarding.skipAll': 'skip setup',
 
   // Дашборд — пустой план периода
   'plan.empty.title': 'Your plan is a blank page',
@@ -91,6 +92,7 @@ export const en = {
   'plan.unresolved.hint': 'These lines stay out of the split until rates refresh.',
   'plan.unresolved.affectsHero': 'Some obligations have no rate yet — the daily figure leaves them out and may read too high.',
   'plan.empty.noPlan': 'Nothing to route yet — set income and add obligations.',
+  'plan.empty.needIncome': 'Setup was skipped. Add an income source and the plan builds itself.',
   'plan.today.viewFull': 'Full plan →',
 
   // Auth

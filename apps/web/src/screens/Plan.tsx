@@ -2,9 +2,16 @@ import type { TranslationKey } from '@multa/i18n';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
+import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { usePlan, type PlanAllocation, type PlanDto, type PlanTargetKind } from '../lib/queries.ts';
+import {
+  isOnboardingIncomplete,
+  usePlan,
+  type PlanAllocation,
+  type PlanDto,
+  type PlanTargetKind,
+} from '../lib/queries.ts';
 
 // Категории редактируются отдельным блоком (CategoryEditor); в read-only лентах — только обязательства.
 const GROUP_ORDER: PlanTargetKind[] = ['debt', 'bucket', 'envelope', 'goal'];
@@ -149,6 +156,8 @@ export function Plan() {
   const { t } = useI18n();
   const { data: plan, isLoading, error, refetch } = usePlan(true);
   if (isLoading) return <Centered>{t('common.loading')}</Centered>;
+  // Дохода ещё нет (обучение пропущено) — не ошибка, а пустой лист с дорогой в настройки.
+  if (isOnboardingIncomplete(error)) return <NoIncomeYet />;
   if (error) {
     return (
       <Centered>

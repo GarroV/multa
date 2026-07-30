@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatPayday,
   payoutsToSources,
   percentSum,
   previewDates,
   rhythmToConfig,
   rhythmToPayload,
+  withRhythmKind,
   type RhythmForm,
 } from './income.ts';
 
@@ -40,6 +42,38 @@ describe('rhythmToConfig', () => {
       startsOn: '2026-08-07',
       weekendRule: 'as-is',
     });
+  });
+});
+
+describe('withRhythmKind', () => {
+  it('возврат к «два раза в месяц» после правки одного числа даёт снова два числа', () => {
+    const monthlyDay5 = withRhythmKind({ ...twiceMonthly, days: [5] }, 'monthly');
+    expect(monthlyDay5.days).toEqual([5]);
+    // Регресс: раньше ритм молча оставался однодневным, а второе поле пустым.
+    expect(withRhythmKind(monthlyDay5, 'twiceMonthly').days).toEqual([5, 25]);
+  });
+
+  it('«раз в месяц» оставляет первое число', () => {
+    expect(withRhythmKind(twiceMonthly, 'monthly').days).toEqual([10]);
+  });
+
+  it('не даёт двух одинаковых чисел — откатывает к дефолту', () => {
+    const monthly = withRhythmKind({ ...twiceMonthly, days: [25] }, 'monthly');
+    expect(withRhythmKind({ ...monthly, days: [25, 25] }, 'twiceMonthly').days).toEqual([10, 25]);
+  });
+
+  it('цикл недель числа не трогает', () => {
+    expect(withRhythmKind(twiceMonthly, 'everyWeeks')).toEqual({
+      ...twiceMonthly,
+      kind: 'everyWeeks',
+    });
+  });
+});
+
+describe('formatPayday', () => {
+  it('даёт человеческую дату без сдвига таймзоны', () => {
+    expect(formatPayday('2026-08-10', 'ru')).toBe('10 авг.');
+    expect(formatPayday('2026-08-10', 'en')).toBe('Aug 10');
   });
 });
 
