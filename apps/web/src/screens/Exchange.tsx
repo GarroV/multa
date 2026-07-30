@@ -21,24 +21,26 @@ function OpRow({ op, locale }: { op: ExchangeOp; locale: string }) {
 
   return (
     <div className="list-item">
-      <span className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <span className="dim mono" style={{ fontSize: 13 }}>{op.occurredOn.slice(5)}</span>
-        <span className="mono">
+      <span className="row" style={{ gap: 8, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        <span className="sub num">{op.occurredOn.slice(5)}</span>
+        <span className="num">
           {formatMinor(op.fromMinor, op.fromCurrency, locale)} {op.fromCurrency}
           <span className="dim"> → </span>
           {formatMinor(op.toMinor, op.toCurrency, locale)} {op.toCurrency}
         </span>
-        <span className="dim mono" style={{ fontSize: 13 }}>
-          {t('fx.rate')} {op.actualRate}
+        <span className="sub num">
+          {t('fx.rate')} {Number(op.actualRate).toFixed(4)}
           {op.officialRate && ` · ${t('fx.official')} ${Number(op.officialRate).toFixed(4)}`}
         </span>
-        {op.note && <span className="dim" style={{ fontSize: 13 }}>· {op.note}</span>}
+        {op.note && (
+          <span className="sub" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>· {op.note}</span>
+        )}
       </span>
       <span className="row" style={{ gap: 10 }}>
         {lost === null ? (
           <span className="dim" style={{ fontSize: 12 }}>{t('fx.spreadUnknown')}</span>
         ) : (
-          <span className="mono" style={{ fontSize: 13, color: gain ? 'var(--ok)' : 'var(--warn)' }}>
+          <span className={`num sub ${gain ? 'st-ok' : 'st-warn'}`}>
             {gain ? '−' : ''}
             {formatMinor((gain ? -lost : lost).toString(), op.toCurrency, locale)} {op.toCurrency}
             {op.spreadPct && ` (${op.spreadPct}%)`}
@@ -109,25 +111,25 @@ export function Exchange() {
   };
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: 24, display: 'grid', gap: 20 }}>
-      <h1 className="section-title" style={{ margin: 0 }}>{t('fx.title')}</h1>
+    <div className="page">
+      <div className="page-head">
+        <h1 className="page-title">{t('fx.title')}</h1>
+      </div>
 
-      <div className="card" style={{ display: 'grid', gap: 14 }}>
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'end' }}>
+      <section className="tile tile-wide">
+        <div className="form-row" style={{ alignItems: 'end' }}>
           <div style={{ display: 'grid', gap: 6 }}>
             <span className="micro">{t('fx.gave')}</span>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="form-row" style={{ gap: 6 }}>
               <input
-                className="field mono"
-                style={{ width: 130, textAlign: 'right' }}
+                className="field num field-sm"
                 inputMode="decimal"
                 placeholder="0"
                 value={fromValue}
                 onChange={(e) => setFromValue(e.target.value)}
               />
               <input
-                className="field mono"
-                style={{ width: 74, textTransform: 'uppercase' }}
+                className="field num field-ccy"
                 maxLength={3}
                 value={fromCurrency}
                 onChange={(e) => setFromCurrency(e.target.value.toUpperCase())}
@@ -137,18 +139,16 @@ export function Exchange() {
           <span className="dim" style={{ paddingBottom: 10 }}>→</span>
           <div style={{ display: 'grid', gap: 6 }}>
             <span className="micro">{t('fx.got')}</span>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="form-row" style={{ gap: 6 }}>
               <input
-                className="field mono"
-                style={{ width: 130, textAlign: 'right' }}
+                className="field num field-sm"
                 inputMode="decimal"
                 placeholder="0"
                 value={toValue}
                 onChange={(e) => setToValue(e.target.value)}
               />
               <input
-                className="field mono"
-                style={{ width: 74, textTransform: 'uppercase' }}
+                className="field num field-ccy"
                 maxLength={3}
                 value={toCurrency}
                 onChange={(e) => setToCurrency(e.target.value.toUpperCase())}
@@ -158,7 +158,7 @@ export function Exchange() {
           <div style={{ display: 'grid', gap: 6 }}>
             <span className="micro">{t('spend.date')}</span>
             <input
-              className="field mono"
+              className="field num"
               type="date"
               max={todayISO()}
               value={occurredOn}
@@ -167,10 +167,9 @@ export function Exchange() {
           </div>
         </div>
 
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <div className="form-row">
           <input
-            className="field"
-            style={{ flex: 1, minWidth: 160 }}
+            className="field grow"
             placeholder="—"
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -181,13 +180,13 @@ export function Exchange() {
           </button>
         </div>
 
-        {sameCurrency && <span className="danger" style={{ fontSize: 13 }}>{t('fx.sameCurrency')}</span>}
-        {invalid && !sameCurrency && <span className="danger" style={{ fontSize: 13 }}>{t('spend.badAmount')}</span>}
-        {create.isError && <span className="danger" style={{ fontSize: 13 }}>⚠ {t('common.error')}</span>}
-      </div>
+        {sameCurrency && <span className="sub danger">{t('fx.sameCurrency')}</span>}
+        {invalid && !sameCurrency && <span className="sub danger">{t('spend.badAmount')}</span>}
+        {create.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
+      </section>
 
       {data && data.totalLost.length > 0 && (
-        <div className="plan-summary">
+        <div className="stats">
           {data.totalLost.map((l) => {
             const minor = BigInt(l.minor);
             const gain = minor < 0n;
@@ -203,16 +202,14 @@ export function Exchange() {
         </div>
       )}
 
-      <div className="card">
-        <div className="plan-group-head">
-          <span className="micro">{t('fx.history')}</span>
-        </div>
+      <section className="tile tile-wide" aria-label={t('fx.history')}>
+        <span className="micro">{t('fx.history')}</span>
         {data?.ops.length ? (
           data.ops.map((op) => <OpRow key={op.id} op={op} locale={locale} />)
         ) : (
-          <div className="dim" style={{ fontSize: 13 }}>{t('fx.empty')}</div>
+          <div className="sub">{t('fx.empty')}</div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
