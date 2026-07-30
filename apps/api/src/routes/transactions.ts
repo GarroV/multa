@@ -8,7 +8,13 @@ import { getRate } from '../fx/service.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
 import { ensurePeriodForDate } from '../plan/assemble.ts';
 import { parseEntryWithLlm } from '../receipts/textLlm.ts';
-import { textEntrySchema, transactionCreateSchema, transactionListSchema } from '../validation.ts';
+import { transcribe } from '../receipts/voice.ts';
+import {
+  textEntrySchema,
+  transactionCreateSchema,
+  transactionListSchema,
+  voiceEntrySchema,
+} from '../validation.ts';
 
 /**
  * Факт трат (Спринт 3). Транзакция хранит триаду: сумма в своей валюте + `base_amount_minor`
@@ -145,10 +151,8 @@ transactionsRoute.delete('/transactions/:id', async (c) => {
  * платный LLM (единственный внешний ключ в продукте). Ничего не записываем: отдаём разбор, чтобы
  * пользователь увидел, как его поняли, и подтвердил. Не разобрали — 422, а не случайная трата.
  */
-transactionsRoute.post('/transactions/parse', async (c) => {
-  const ws = c.get('workspace')!;
-  const body = textEntrySchema.parse(await c.req.json());
-
+/** Один разбор для клавиатуры и голоса: расхождения в поведении недопустимы. */
+async function parsePhrase(ws: Workspace, text: string) {
   const catRows = await db
     .select({ id: categories.id, name: categories.name })
     .from(categories)
@@ -156,11 +160,11 @@ transactionsRoute.post('/transactions/parse', async (c) => {
   const names = catRows.map((c2) => c2.name);
   const ctx = { baseCurrency: ws.baseCurrency, today: today(ws.timezone), categories: names };
 
-  const local = parseEntry(body.text, ctx);
+  const local = parseEntry(text, ctx);
   if (local.amountMinor !== null) {
     const hit = local.categoryName ? catRows.find((c2) => c2.name === local.categoryName) : undefined;
-    return c.json({
-      source: 'regex',
+    return {
+      source: 'regex' as const,
       kind: local.kind,
       amountMinor: local.amountMinor.toString(),
       currency: local.currency,
@@ -168,14 +172,14 @@ transactionsRoute.post('/transactions/parse', async (c) => {
       categoryId: hit?.id ?? null,
       categoryName: local.categoryName ?? null,
       note: local.note ?? null,
-    });
+    };
   }
 
-  const llm = await parseEntryWithLlm(body.text, ctx);
-  if (!llm) return c.json({ error: 'not_understood' }, 422);
+  const llm = await parseEntryWithLlm(text, ctx);
+  if (!llm) return null;
   const hit = llm.categoryName ? catRows.find((c2) => c2.name === llm.categoryName) : undefined;
-  return c.json({
-    source: 'llm',
+  return {
+    source: 'llm' as const,
     kind: llm.kind,
     amountMinor: llm.amountMinor.toString(),
     currency: llm.currency,
@@ -183,5 +187,29 @@ transactionsRoute.post('/transactions/parse', async (c) => {
     categoryId: hit?.id ?? null,
     categoryName: llm.categoryName,
     note: llm.note,
-  });
+  };
+}
+
+transactionsRoute.post('/transactions/parse', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = textEntrySchema.parse(await c.req.json());
+  const parsed = await parsePhrase(ws, body.text);
+  if (!parsed) return c.json({ error: 'not_understood' }, 422);
+  return c.json(parsed);
+});
+
+/**
+ * Голос: запись → Whisper → тот же разбор фразы. Своей логики понимания у голоса нет,
+ * иначе он начал бы расходиться с клавиатурой.
+ */
+transactionsRoute.post('/transactions/voice', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = voiceEntrySchema.parse(await c.req.json());
+
+  const text = await transcribe(body.audioUrl, ws.locale === 'en' ? 'en' : 'ru');
+  if (!text) return c.json({ error: 'transcription_failed' }, 422);
+
+  const parsed = await parsePhrase(ws, text);
+  if (!parsed) return c.json({ error: 'not_understood', transcript: text }, 422);
+  return c.json({ ...parsed, transcript: text });
 });

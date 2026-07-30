@@ -1,6 +1,12 @@
 import { fromMajor } from '@multa/core';
-import { env } from '../env.ts';
 import { logger } from '../logger.ts';
+
+/**
+ * Ключ OpenAI читаем из process.env напрямую, а не через env-схему: модули внешних сервисов
+ * должны импортироваться в тестах без полного окружения (иначе один отсутствующий DATABASE_URL
+ * рушит юниты разбора ответов). Валидация ключа при старте живёт в env.ts.
+ */
+const openaiKey = (): string | undefined => process.env.OPENAI_API_KEY;
 
 /**
  * LLM-фоллбэк текстового ввода (хвост Спринта 5). Порядок как у чеков: сначала бесплатный
@@ -79,14 +85,14 @@ export function parseTextPayload(raw: string, ctx: TextEntryContext): ParsedText
 
 /** Разбирает свободную фразу. null — ключа нет, сеть отказала или ответу нельзя доверять. */
 export async function parseEntryWithLlm(text: string, ctx: TextEntryContext): Promise<ParsedTextEntry | null> {
-  if (!env.OPENAI_API_KEY) {
+  if (!openaiKey()) {
     logger.warn('textLlm: OPENAI_API_KEY не задан — фоллбэк недоступен');
     return null;
   }
   try {
     const res = await fetch(OPENAI_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey()}` },
       body: JSON.stringify({
         model: MODEL,
         messages: [
