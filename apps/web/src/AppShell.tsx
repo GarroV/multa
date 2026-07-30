@@ -1,8 +1,11 @@
 import type { TranslationKey } from '@multa/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
+import { useState } from 'react';
+import { SpendEntry } from './components/SpendEntry.tsx';
 import { authClient } from './lib/authClient.ts';
 import { useI18n } from './lib/i18n.tsx';
+import { useMe } from './lib/queries.ts';
 
 const NAV: { to: string; key: TranslationKey }[] = [
   { to: '/today', key: 'nav.today' },
@@ -15,6 +18,9 @@ const NAV: { to: string; key: TranslationKey }[] = [
 export function AppShell() {
   const { t, locale, setLocale } = useI18n();
   const qc = useQueryClient();
+  const { data: me } = useMe();
+  const [spendOpen, setSpendOpen] = useState(false);
+  const base = me?.workspace?.baseCurrency;
 
   return (
     <div className="app-shell">
@@ -22,6 +28,17 @@ export function AppShell() {
         <div className="brand" style={{ fontWeight: 600, fontSize: 20, padding: '8px 16px 16px' }}>
           multa
         </div>
+        {/* Ввод факта доступен с любого экрана (04-web-ux §Ввод: «глобальная кнопка +»). */}
+        {base && (
+          <button
+            type="button"
+            className="btn"
+            style={{ margin: '0 16px 12px' }}
+            onClick={() => setSpendOpen(true)}
+          >
+            + {t('spend.open')}
+          </button>
+        )}
         {NAV.map((n) => (
           <Link key={n.to} to={n.to} className="nav-item" activeProps={{ className: 'nav-item nav-active' }}>
             {t(n.key)}
@@ -57,6 +74,7 @@ export function AppShell() {
       <main style={{ minWidth: 0 }}>
         <Outlet />
       </main>
+      {spendOpen && base && <SpendEntry base={base} locale={locale} onClose={() => setSpendOpen(false)} />}
     </div>
   );
 }

@@ -97,6 +97,16 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           value={fmt(plan.canSpendPerDayMinor)}
           tone="accent"
         />
+        {BigInt(plan.spentLivingMinor) > 0n && (
+          <>
+            <Stat label={t('plan.summary.spent')} value={fmt(plan.spentLivingMinor)} />
+            <Stat
+              label={t('plan.summary.remaining')}
+              value={fmt(plan.remainingLivingMinor)}
+              tone={BigInt(plan.remainingLivingMinor) < 0n ? 'warn' : undefined}
+            />
+          </>
+        )}
       </div>
 
       {plan.unresolved.length > 0 && (

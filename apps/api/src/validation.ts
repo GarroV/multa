@@ -158,3 +158,27 @@ export const categoryPatchSchema = z.object({
 export const categoryBudgetSchema = z.object({
   plannedMinor: minor.refine((v) => v >= 0n, 'бюджет не может быть отрицательным'),
 });
+
+// --- Факт (Спринт 3). Транзакция хранит сумму в своей валюте + снапшот курса. ---
+// Дату валидирует тот же `isoDate`, что и ритм дохода выше: один формат даты на границе API.
+
+/**
+ * Ручной ввод траты. Сумма — положительная (знак несёт `kind`, см. 02-data-schema).
+ * `categoryId` опционален: «крупный мазок» без категории — легитимный сценарий (04-web-ux §Ввод).
+ * `occurredOn` по умолчанию сегодня; период вычисляется на сервере по этой дате.
+ */
+export const transactionCreateSchema = z.object({
+  amountMinor: minor.refine((v) => v > 0n, 'сумма должна быть больше нуля'),
+  currency: ccy,
+  categoryId: z.string().uuid().optional(),
+  occurredOn: isoDate.optional(),
+  note: z.string().max(500).optional(),
+  source: z.enum(['manual', 'text', 'voice', 'receipt', 'import']).optional(),
+  rawInput: z.string().max(500).optional(),
+});
+
+/** Фильтр списка транзакций. Без параметров — текущий период. */
+export const transactionListSchema = z.object({
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+});

@@ -9,6 +9,8 @@ import {
   onboardingIncomeSchema,
   rateQuerySchema,
   rhythmSchema,
+  transactionCreateSchema,
+  transactionListSchema,
 } from './validation.ts';
 
 const debtBody = (paymentMinor: unknown) => ({
@@ -211,5 +213,46 @@ describe('rateQuerySchema', () => {
   it('требует from и to', () => {
     expect(() => rateQuerySchema.parse({ from: 'EUR' })).toThrow();
     expect(rateQuerySchema.parse({ from: 'EUR', to: 'RUB' })).toMatchObject({ from: 'EUR', to: 'RUB' });
+  });
+});
+
+describe('transactionCreateSchema (факт трат, Спринт 3)', () => {
+  const body = (over: Record<string, unknown> = {}) => ({ amountMinor: '25000', currency: 'rub', ...over });
+
+  it('отдаёт сумму bigint и нормализует валюту к верхнему регистру', () => {
+    const parsed = transactionCreateSchema.parse(body());
+    expect(parsed.amountMinor).toBe(25000n);
+    expect(parsed.currency).toBe('RUB');
+  });
+
+  it('отвергает ноль и минус: знак несёт kind, а не сумма', () => {
+    expect(transactionCreateSchema.safeParse(body({ amountMinor: '0' })).success).toBe(false);
+    expect(transactionCreateSchema.safeParse(body({ amountMinor: '-100' })).success).toBe(false);
+  });
+
+  it('дату принимает только как YYYY-MM-DD', () => {
+    expect(transactionCreateSchema.parse(body({ occurredOn: '2026-07-30' })).occurredOn).toBe('2026-07-30');
+    for (const bad of ['30.07.2026', '2026-7-30', 'сегодня', '2026-07-30T12:00:00Z']) {
+      expect(transactionCreateSchema.safeParse(body({ occurredOn: bad })).success).toBe(false);
+    }
+  });
+
+  it('категория опциональна (крупный мазок без категории), но обязана быть uuid', () => {
+    expect(transactionCreateSchema.parse(body()).categoryId).toBeUndefined();
+    expect(transactionCreateSchema.safeParse(body({ categoryId: 'food' })).success).toBe(false);
+  });
+
+  it('источник — только из разрешённого списка (совпадает с check в схеме БД)', () => {
+    expect(transactionCreateSchema.parse(body({ source: 'text' })).source).toBe('text');
+    expect(transactionCreateSchema.safeParse(body({ source: 'telepathy' })).success).toBe(false);
+  });
+});
+
+describe('transactionListSchema', () => {
+  it('без параметров валиден (значит «текущий период»)', () => {
+    expect(transactionListSchema.parse({})).toEqual({});
+  });
+  it('кривые даты отвергает', () => {
+    expect(transactionListSchema.safeParse({ from: '01-07-2026', to: '2026-07-30' }).success).toBe(false);
   });
 });

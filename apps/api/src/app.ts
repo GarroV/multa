@@ -21,8 +21,8 @@ import { getCurrentPlan, setCategoryBudget } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { transactionsRoute } from './routes/transactions.ts';
+import { today } from './clock.ts';
 
 /** Воркспейс для клиента. Доход периода здесь не живёт — он считается по источникам. */
 function serializeWorkspace(ws: Workspace) {
@@ -121,7 +121,7 @@ app.patch('/v1/workspace', requireWorkspace, async (c) => {
 app.get('/v1/plan/current', requireWorkspace, async (c) => {
   const ws = c.get('workspace')!;
   try {
-    const plan = await getCurrentPlan(ws, today());
+    const plan = await getCurrentPlan(ws, today(ws.timezone));
     return c.json(plan);
   } catch (err) {
     if (err instanceof Error && err.message === 'onboarding_incomplete') {
@@ -137,7 +137,7 @@ async function handleCategoryBudget(c: Context<{ Variables: AppVariables }>, pla
   const id = c.req.param('id');
   if (!id) return c.json({ error: 'not_found' }, 404);
   try {
-    const plan = await setCategoryBudget(ws, today(), id, plannedMinor);
+    const plan = await setCategoryBudget(ws, today(ws.timezone), id, plannedMinor);
     return c.json(plan);
   } catch (err) {
     if (err instanceof Error && err.message === 'category_not_found') return c.json({ error: 'not_found' }, 404);
@@ -170,6 +170,9 @@ app.route('/v1', categoriesRoute);
 
 // Источники дохода + шаг онбординга «когда приходят деньги»: /v1/income-sources, /v1/onboarding/income
 app.route('/v1', incomeRoute);
+
+// Факт трат (Спринт 3): /v1/transactions
+app.route('/v1', transactionsRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

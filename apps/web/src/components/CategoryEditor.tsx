@@ -36,7 +36,10 @@ function CategoryRow({
   const clearBudget = useClearCategoryBudget();
   const patch = usePatchCategory();
   const del = useDeleteCategory();
-  const [val, setVal] = useState(budget ? toMajorString(money(BigInt(budget.plannedMinor), base)) : '');
+  // Строка может прийти без бюджета (только с фактом) — поле оставляем пустым, а не «0».
+  const [val, setVal] = useState(
+    budget && budget.plannedMinor !== '0' ? toMajorString(money(BigInt(budget.plannedMinor), base)) : '',
+  );
 
   const commit = () => {
     const s = val.trim();
@@ -50,6 +53,16 @@ function CategoryRow({
   };
 
   const trimmed = budget && BigInt(budget.shortfallMinor) > 0n;
+  const spent = budget ? BigInt(budget.spentMinor) : 0n;
+  const overspent = budget ? BigInt(budget.overspentMinor) > 0n : false;
+  // Факт по категории показываем только когда он есть — пустой план не засоряем нулями.
+  // При перерасходе (в том числе трата без бюджета) остаток не печатаем: он отрицательный.
+  const factLabel =
+    spent > 0n && budget
+      ? overspent
+        ? t('cat.overspent', { amount: `${formatMinor(budget.overspentMinor, base, locale)} ${base}` })
+        : `${t('cat.spent', { amount: formatMinor(budget.spentMinor, base, locale) })} · ${t('cat.remaining', { amount: `${formatMinor(budget.remainingMinor, base, locale)} ${base}` })}`
+      : null;
   // Ошибка любой мутации строки не должна выглядеть как успех (тихий сбой) — подсвечиваем.
   const rowError = setBudget.isError || clearBudget.isError || patch.isError || del.isError;
 
@@ -69,6 +82,14 @@ function CategoryRow({
         {trimmed && (
           <span className="badge-trim">
             {t('plan.row.trimmed', { amount: `${formatMinor(budget!.shortfallMinor, base, locale)} ${base}` })}
+          </span>
+        )}
+        {factLabel && (
+          <span
+            className="dim mono"
+            style={{ fontSize: 13, ...(overspent ? { color: 'var(--neon-amber)' } : {}) }}
+          >
+            · {factLabel}
           </span>
         )}
         {rowError && <span className="danger" title={t('common.error')} style={{ fontSize: 13 }}>⚠ {t('common.retry')}</span>}

@@ -143,6 +143,27 @@ export const ru: Record<TranslationKey, string> = {
   'settings.rhythm': 'Ритм планирования',
   'settings.sources': 'Источники дохода',
 
+  // Факт трат (Спринт 3)
+  'spend.open': 'Записать трату',
+  'spend.title': 'Что потратил?',
+  'spend.subtitle': 'Крупным мазком — тоже нормально. Точность до копейки не нужна.',
+  'spend.amount': 'Сколько',
+  'spend.category': 'Куда',
+  'spend.noCategory': 'Без категории',
+  'spend.date': 'Когда',
+  'spend.submit': 'Записать',
+  'spend.recent': 'Траты периода',
+  'spend.empty': 'В этом периоде трат пока нет',
+  'spend.rateUnavailable': 'Курса на эту дату нет — возьми другую дату или валюту.',
+  'spend.badAmount': 'Сумма — числом, например 1250 или 12,50',
+  'spend.spentOfPlan': 'потрачено {spent} из {plan}',
+  'plan.summary.spent': 'Потрачено',
+  'plan.summary.remaining': 'Осталось на жизнь',
+  'plan.overspent.note': 'Вышли за план на {amount} — дневной темп на нуле. Можно перекинуть бюджет из другой категории.',
+  'cat.spent': 'потрачено {amount}',
+  'cat.remaining': 'осталось {amount}',
+  'cat.overspent': 'перерасход {amount}',
+
   // Заглушки
   'placeholder.soon': 'Скоро — Спринт 2',
 };
