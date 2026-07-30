@@ -64,19 +64,10 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
             {t('plan.row.trimmed', { amount: `${formatMinor(a.shortfallMinor, base, locale)} ${base}` })}
           </span>
         )}
-        <span
-          className="micro"
-          style={{
-            color: done
-              ? 'var(--ok)'
-              : a.executionStatus === 'partial'
-                ? 'var(--warn)'
-                : 'var(--text-dim)',
-          }}
-        >
+        <span className={`micro${done ? ' st-ok' : a.executionStatus === 'partial' ? ' st-warn' : ''}`}>
           {statusLabel}
         </span>
-        <span className="mono" style={done ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>
+        <span className="num" style={done ? { textDecoration: 'line-through', opacity: 0.55 } : undefined}>
           {allocated}
         </span>
         {/* Исполнение — вручную по умолчанию: кредит банку тоже переводят руками. */}
@@ -129,13 +120,13 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   })).filter((g) => g.rows.length > 0);
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: 24, display: 'grid', gap: 20 }}>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h1 className="section-title" style={{ margin: 0 }}>{t('nav.plan')}</h1>
-        <span className="micro">{plan.period.startsOn} → {plan.period.endsOn}</span>
+    <div className="page">
+      <div className="page-head">
+        <h1 className="page-title">{t('nav.plan')}</h1>
+        <span className="micro num">{plan.period.startsOn} → {plan.period.endsOn}</span>
       </div>
 
-      <div className="plan-summary">
+      <div className="stats">
         <Stat label={t('plan.summary.income')} value={fmt(plan.incomeMinor)} />
         <Stat label={t('plan.summary.committed')} value={fmt(plan.totalAllocatedMinor)} />
         <Stat
@@ -175,9 +166,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
 
       {hasNothing && (
         <div className="card">
-          <div style={{ fontSize: 16, fontWeight: 600 }}>{t('plan.empty.title')}</div>
-          <div className="dim" style={{ marginTop: 8 }}>{t('plan.empty.noPlan')}</div>
-          <Link to="/obligations" className="btn" style={{ display: 'inline-block', marginTop: 16 }}>
+          <div style={{ fontWeight: 600 }}>{t('plan.empty.title')}</div>
+          <div className="sub" style={{ marginTop: 4 }}>{t('plan.empty.noPlan')}</div>
+          <Link to="/obligations" className="btn" style={{ display: 'inline-block', marginTop: 12 }}>
             {t('nav.obligations')}
           </Link>
         </div>
@@ -188,29 +179,29 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {groups.map((g) => {
         const groupTotal = g.rows.reduce((acc, r) => acc + BigInt(r.allocatedMinor), 0n);
         return (
-          <div key={g.kind} className="plan-group card">
-            <div className="plan-group-head">
+          <section key={g.kind} className="tile tile-wide" aria-label={t(GROUP_LABEL[g.kind])}>
+            <div className="tile-head">
               <span className="micro">{t(GROUP_LABEL[g.kind])}</span>
-              <span className="mono dim">{fmt(groupTotal.toString())}</span>
+              <span className="num num-dim">{fmt(groupTotal.toString())}</span>
             </div>
             {g.rows.map((a) => (
               <AllocationRow key={a.targetId} a={a} base={base} locale={locale} />
             ))}
-          </div>
+          </section>
         );
       })}
 
       {plan.unresolved.length > 0 && (
-        <div className="card" style={{ display: 'grid', gap: 10 }}>
-          <span className="micro" style={{ color: 'var(--warn)' }}>{t('plan.unresolved.title')}</span>
+        <section className="tile tile-wide" aria-label={t('plan.unresolved.title')}>
+          <span className="micro st-warn">{t('plan.unresolved.title')}</span>
           {plan.unresolved.map((u) => (
             <div key={`${u.targetKind}:${u.targetId}`} className="list-item">
               <span>{u.name}</span>
-              <span className="mono dim">{formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}</span>
+              <span className="num num-dim">{formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}</span>
             </div>
           ))}
-          <div className="dim" style={{ fontSize: 13 }}>{t('plan.unresolved.hint')}</div>
-        </div>
+          <div className="sub">{t('plan.unresolved.hint')}</div>
+        </section>
       )}
     </div>
   );
@@ -225,8 +216,8 @@ export function Plan() {
   if (error) {
     return (
       <Centered>
-        <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-          <span className="dim">{t('common.error')}</span>
+        <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
+          <span className="sub">{t('common.error')}</span>
           <button className="btn" onClick={() => void refetch()}>{t('common.retry')}</button>
         </div>
       </Centered>

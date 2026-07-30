@@ -87,19 +87,13 @@ function CategoryRow({
           </span>
         )}
         {factLabel && (
-          <span
-            className="dim mono"
-            style={{ fontSize: 13, ...(overspent ? { color: 'var(--warn)' } : {}) }}
-          >
-            · {factLabel}
-          </span>
+          <span className={`sub num${overspent ? ' st-over' : ''}`}>· {factLabel}</span>
         )}
         {rowError && <span className="danger" title={t('common.error')} style={{ fontSize: 13 }}>⚠ {t('common.retry')}</span>}
       </span>
       <span className="row" style={{ gap: 8 }}>
         <input
-          className="field mono"
-          style={{ width: 110, textAlign: 'right' }}
+          className="field num field-sm"
           inputMode="decimal"
           placeholder="0"
           value={val}
@@ -107,7 +101,7 @@ function CategoryRow({
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
-        <span className="dim mono" style={{ fontSize: 13, width: 34 }}>{base}</span>
+        <span className="sub num" style={{ width: 32 }}>{base}</span>
         {budget?.advice && (
           <span className="row" style={{ gap: 6 }}>
             <span className="dim" style={{ fontSize: 12 }}>
@@ -175,18 +169,17 @@ export function CategoryEditor({ allocations, base, locale }: { allocations: Pla
   };
 
   return (
-    <div className="card">
-      <div className="plan-group-head">
+    <section className="tile tile-wide" aria-label={t('plan.groups.category')}>
+      <div className="tile-head">
         <span className="micro">{t('plan.groups.category')}</span>
-        <span className="dim" style={{ fontSize: 12 }}>{t('plan.category.budgetHint')}</span>
+        <span className="sub">{t('plan.category.budgetHint')}</span>
       </div>
       {categories.map((cat) => (
         <CategoryRow key={cat.id} cat={cat} budget={budgetByCat.get(cat.id)} base={base} locale={locale} />
       ))}
-      <div className="row" style={{ marginTop: 14 }}>
+      <div className="form-row" style={{ marginTop: 10 }}>
         <input
-          className="field"
-          style={{ flex: 1, minWidth: 140 }}
+          className="field grow"
           placeholder={t('cat.new.placeholder')}
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -194,7 +187,7 @@ export function CategoryEditor({ allocations, base, locale }: { allocations: Pla
         />
         <button className="btn" disabled={create.isPending} onClick={add}>{t('common.add')}</button>
       </div>
-      {create.isError && <div className="dim danger" style={{ marginTop: 8, fontSize: 13 }}>⚠ {t('common.error')}</div>}
-    </div>
+      {create.isError && <div className="sub danger" style={{ marginTop: 6 }}>⚠ {t('common.error')}</div>}
+    </section>
   );
 }
