@@ -193,6 +193,20 @@ export const executionSchema = z.object({
   executedMinor: minor.refine((v) => v >= 0n, 'сумма не может быть отрицательной').optional(),
 });
 
+/**
+ * Факт размена: обе стороны сделки. Валюты обязаны различаться (проверяется в роуте),
+ * суммы — положительные: «отдал 0» это не размен.
+ */
+export const exchangeCreateSchema = z.object({
+  fromCurrency: ccy,
+  toCurrency: ccy,
+  fromMinor: positiveMinor,
+  toMinor: positiveMinor,
+  occurredOn: isoDate.optional(),
+  bucketId: z.string().uuid().optional(),
+  note: z.string().max(500).optional(),
+});
+
 /** Фильтр списка транзакций. Без параметров — текущий период. */
 export const transactionListSchema = z.object({
   from: isoDate.optional(),

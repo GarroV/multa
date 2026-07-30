@@ -5,3 +5,4 @@ export * from './plan.ts';
 export * from './fx.ts';
 export * from './income.ts';
 export * from './parseEntry.ts';
+export * from './exchange.ts';

@@ -1,0 +1,101 @@
+import { exchangeResult } from '@multa/core';
+import { and, desc, eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { today } from '../clock.ts';
+import { db } from '../db/client.ts';
+import { exchangeOps } from '../db/schema/domain.ts';
+import { getRate } from '../fx/service.ts';
+import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { exchangeCreateSchema } from '../validation.ts';
+
+/**
+ * Размен валюты (Спринт 3). Пользователь вводит обе стороны сделки — сколько отдал и сколько
+ * получил; фактический курс и спред считает ядро, официальный курс на дату кладём снапшотом
+ * рядом (правило 2: история не пересчитывается, даже если котировку потом уточнят).
+ */
+export const exchangeRoute = new Hono<{ Variables: AppVariables }>();
+exchangeRoute.use('*', requireWorkspace);
+
+function serialize(row: typeof exchangeOps.$inferSelect) {
+  return {
+    id: row.id,
+    fromCurrency: row.fromCurrency,
+    toCurrency: row.toCurrency,
+    fromMinor: row.fromMinor.toString(),
+    toMinor: row.toMinor.toString(),
+    actualRate: row.actualRate,
+    officialRate: row.officialRate,
+    officialSource: row.officialSource,
+    spreadPct: row.spreadPct,
+    spreadMinor: row.spreadMinor != null ? row.spreadMinor.toString() : null,
+    occurredOn: row.occurredOn,
+    note: row.note,
+  };
+}
+
+exchangeRoute.get('/exchange-ops', async (c) => {
+  const ws = c.get('workspace')!;
+  const rows = await db
+    .select()
+    .from(exchangeOps)
+    .where(eq(exchangeOps.workspaceId, ws.id))
+    .orderBy(desc(exchangeOps.occurredOn), desc(exchangeOps.id))
+    .limit(100);
+  const ops = rows.map(serialize);
+  // Копилка потерь: суммируем спред только там, где официальный курс был известен.
+  const lossByCurrency = new Map<string, bigint>();
+  for (const row of rows) {
+    if (row.spreadMinor == null) continue;
+    lossByCurrency.set(row.toCurrency, (lossByCurrency.get(row.toCurrency) ?? 0n) + row.spreadMinor);
+  }
+  return c.json({
+    ops,
+    totalLost: [...lossByCurrency].map(([currency, minor]) => ({ currency, minor: minor.toString() })),
+  });
+});
+
+exchangeRoute.post('/exchange-ops', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = exchangeCreateSchema.parse(await c.req.json());
+  if (body.fromCurrency === body.toCurrency) return c.json({ error: 'same_currency' }, 400);
+  const occurredOn = body.occurredOn ?? today(ws.timezone);
+
+  const official = await getRate(body.fromCurrency, body.toCurrency, occurredOn);
+  const result = exchangeResult({
+    fromMinor: body.fromMinor,
+    fromCurrency: body.fromCurrency,
+    toMinor: body.toMinor,
+    toCurrency: body.toCurrency,
+    official,
+  });
+  if (result.effectiveRate === null) return c.json({ error: 'invalid_amounts' }, 400);
+
+  const inserted = await db
+    .insert(exchangeOps)
+    .values({
+      workspaceId: ws.id,
+      fromCurrency: body.fromCurrency,
+      toCurrency: body.toCurrency,
+      fromMinor: body.fromMinor,
+      toMinor: body.toMinor,
+      actualRate: result.effectiveRate,
+      ...(official ? { officialRate: official.rate, officialSource: official.source } : {}),
+      ...(result.spreadPct !== null ? { spreadPct: result.spreadPct } : {}),
+      ...(result.lostMinor !== null ? { spreadMinor: result.lostMinor } : {}),
+      occurredOn,
+      ...(body.note ? { note: body.note } : {}),
+      ...(body.bucketId ? { bucketId: body.bucketId } : {}),
+    })
+    .returning();
+  return c.json(serialize(inserted[0]!), 201);
+});
+
+exchangeRoute.delete('/exchange-ops/:id', async (c) => {
+  const ws = c.get('workspace')!;
+  const deleted = await db
+    .delete(exchangeOps)
+    .where(and(eq(exchangeOps.id, c.req.param('id')), eq(exchangeOps.workspaceId, ws.id)))
+    .returning({ id: exchangeOps.id });
+  if (!deleted[0]) return c.json({ error: 'not_found' }, 404);
+  return c.body(null, 204);
+});

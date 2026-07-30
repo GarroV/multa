@@ -23,6 +23,7 @@ import { getCurrentPlan, setCategoryBudget, setExecution } from './plan/assemble
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
+import { exchangeRoute } from './routes/exchange.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
 
@@ -198,6 +199,9 @@ app.route('/v1', incomeRoute);
 
 // Факт трат (Спринт 3): /v1/transactions
 app.route('/v1', transactionsRoute);
+
+// Размен валюты со спредом (Спринт 3): /v1/exchange-ops
+app.route('/v1', exchangeRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

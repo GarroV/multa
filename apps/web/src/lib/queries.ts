@@ -405,3 +405,60 @@ export function useSkipExecution() {
 export function useDeleteSpend() {
   return useTransactionMutation<string>((id) => api(`/v1/transactions/${id}`, { method: 'DELETE' }));
 }
+
+// --- Размен валюты (Спринт 3) ---
+
+export interface ExchangeOp {
+  id: string;
+  fromCurrency: string;
+  toCurrency: string;
+  fromMinor: string;
+  toMinor: string;
+  actualRate: string;
+  officialRate: string | null;
+  officialSource: string | null;
+  spreadPct: string | null;
+  spreadMinor: string | null;
+  occurredOn: string;
+  note: string | null;
+}
+
+export interface ExchangeDto {
+  ops: ExchangeOp[];
+  /** Накопленные потери на спреде по валютам получения. */
+  totalLost: { currency: string; minor: string }[];
+}
+
+export function useExchangeOps() {
+  return useQuery({ queryKey: ['exchange-ops'], retry: false, queryFn: () => api<ExchangeDto>('/v1/exchange-ops') });
+}
+
+export interface ExchangeInput {
+  fromCurrency: string;
+  toCurrency: string;
+  fromMinor: string;
+  toMinor: string;
+  occurredOn?: string;
+  note?: string;
+}
+
+function useExchangeMutation<TVars>(mutationFn: (vars: TVars) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['exchange-ops'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
+export function useCreateExchange() {
+  return useExchangeMutation<ExchangeInput>((body) =>
+    api<ExchangeOp>('/v1/exchange-ops', { method: 'POST', body: JSON.stringify(body) }),
+  );
+}
+
+export function useDeleteExchange() {
+  return useExchangeMutation<string>((id) => api(`/v1/exchange-ops/${id}`, { method: 'DELETE' }));
+}
