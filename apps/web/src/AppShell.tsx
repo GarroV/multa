@@ -2,6 +2,7 @@ import type { TranslationKey } from '@multa/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
 import { useState } from 'react';
+import { ReceiptEntry } from './components/ReceiptEntry.tsx';
 import { SpendEntry } from './components/SpendEntry.tsx';
 import { authClient } from './lib/authClient.ts';
 import { useI18n } from './lib/i18n.tsx';
@@ -20,6 +21,7 @@ export function AppShell() {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const [spendOpen, setSpendOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   const base = me?.workspace?.baseCurrency;
 
   return (
@@ -37,6 +39,16 @@ export function AppShell() {
             onClick={() => setSpendOpen(true)}
           >
             + {t('spend.open')}
+          </button>
+        )}
+        {base && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ margin: '0 16px 12px' }}
+            onClick={() => setReceiptOpen(true)}
+          >
+            {t('receipt.open')}
           </button>
         )}
         {NAV.map((n) => (
@@ -75,6 +87,9 @@ export function AppShell() {
         <Outlet />
       </main>
       {spendOpen && base && <SpendEntry base={base} locale={locale} onClose={() => setSpendOpen(false)} />}
+      {receiptOpen && base && (
+        <ReceiptEntry base={base} locale={locale} onClose={() => setReceiptOpen(false)} />
+      )}
     </div>
   );
 }

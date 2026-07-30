@@ -27,6 +27,7 @@ import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
 import { forecastRoute } from './routes/forecast.ts';
+import { receiptsRoute } from './routes/receipts.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
 
@@ -247,6 +248,9 @@ app.route('/v1', exchangeRoute);
 
 // Прогноз-таймлайн (Спринт 4): /v1/forecast
 app.route('/v1', forecastRoute);
+
+// Чеки: QR-путь и подтверждение раскладки (Спринт 5): /v1/receipts
+app.route('/v1', receiptsRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);
