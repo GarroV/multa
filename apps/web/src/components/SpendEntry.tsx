@@ -1,4 +1,4 @@
-import { fromMajor } from '@multa/core';
+import { fromMajor, parseEntry, toMajorString, money } from '@multa/core';
 import { useState } from 'react';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -75,6 +75,32 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState('');
   const [badAmount, setBadAmount] = useState(false);
+  const [smart, setSmart] = useState('');
+
+  /**
+   * Умное поле (04-web-ux §Ввод): разбираем строку в ядре и раскладываем по полям формы,
+   * а не отправляем сразу — пользователь видит, как его поняли, и может поправить.
+   */
+  const applySmart = () => {
+    const line = smart.trim();
+    if (!line) return;
+    const parsed = parseEntry(line, {
+      baseCurrency: base,
+      today: todayISO(),
+      categories: categories.map((c) => c.name),
+    });
+    if (parsed.amountMinor === null) {
+      setBadAmount(true);
+      return;
+    }
+    setBadAmount(false);
+    setKind(parsed.kind);
+    setAmount(toMajorString(money(parsed.amountMinor, parsed.currency)));
+    setOccurredOn(parsed.occurredOn);
+    setNote(parsed.note ?? '');
+    const hit = parsed.categoryName ? categories.find((c) => c.name === parsed.categoryName) : undefined;
+    setCategoryId(parsed.kind === 'income' ? undefined : hit?.id);
+  };
 
   const submit = () => {
     const minor = parseMinor(amount, base);
@@ -134,6 +160,23 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
               {t(k === 'income' ? 'spend.kind.income' : 'spend.kind.expense')}
             </button>
           ))}
+        </div>
+
+        <div style={{ display: 'grid', gap: 6 }}>
+          <input
+            className="field"
+            placeholder={t('spend.smart.placeholder')}
+            value={smart}
+            onChange={(e) => setSmart(e.target.value)}
+            onBlur={applySmart}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                applySmart();
+              }
+            }}
+          />
+          <span className="dim" style={{ fontSize: 12 }}>{t('spend.smart.hint')}</span>
         </div>
 
         <div style={{ display: 'grid', gap: 8 }}>
