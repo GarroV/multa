@@ -28,6 +28,7 @@ import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
 import { forecastRoute } from './routes/forecast.ts';
 import { receiptsRoute } from './routes/receipts.ts';
+import { recurringRoute } from './routes/recurring.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
 
@@ -251,6 +252,9 @@ app.route('/v1', forecastRoute);
 
 // Чеки: QR-путь и подтверждение раскладки (Спринт 5): /v1/receipts
 app.route('/v1', receiptsRoute);
+
+// Регулярные платежи вне обязательств (#21): /v1/recurring-items
+app.route('/v1', recurringRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

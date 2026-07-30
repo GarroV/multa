@@ -207,6 +207,7 @@ export const en = {
   'forecast.goalReached': '{name} is funded',
   'forecast.goalRisk': '{name}: {amount} short at this pace',
   'forecast.empty': 'Nothing on the horizon yet',
+  'forecast.dueSoon': 'Coming up this period',
   'receipt.open': 'Receipt',
   'receipt.title': 'Add a receipt',
   'receipt.qrHint': 'Paste the QR contents — that path is free and exact.',

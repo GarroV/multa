@@ -221,6 +221,33 @@ export const rebalanceApplySchema = z.object({
   amountMinor: positiveMinor,
 });
 
+// --- Регулярные платежи вне обязательств (#21) ---
+
+/** Расписание платежа. Доходы описываются своей схемой — здесь только расходы и взносы. */
+export const recurringScheduleSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('monthly-days'), days: monthDays }),
+  z.object({ kind: z.literal('every-weeks'), weeks: z.number().int().min(1).max(12), startsOn: isoDate }),
+  z.object({ kind: z.literal('one-off'), date: isoDate }),
+  z.object({ kind: z.literal('irregular') }),
+]);
+
+export const recurringCreateSchema = z.object({
+  kind: z.enum(['expense', 'envelope', 'goal', 'debt']).default('expense'),
+  name: z.string().min(1).max(60),
+  amountMinor: positiveMinor,
+  currency: ccy,
+  schedule: recurringScheduleSchema,
+  targetId: z.string().uuid().optional(),
+});
+
+export const recurringPatchSchema = z.object({
+  name: z.string().min(1).max(60).optional(),
+  amountMinor: positiveMinor.optional(),
+  currency: ccy.optional(),
+  schedule: recurringScheduleSchema.optional(),
+  active: z.boolean().optional(),
+});
+
 // --- Чеки (Спринт 5). QR пробуется первым, он бесплатный. ---
 
 /** Содержимое QR. totalMinor — на случай, когда сумма живёт в фискальном сервисе (Сербия). */
