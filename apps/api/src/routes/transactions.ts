@@ -1,5 +1,5 @@
 import { convert, money, periodForDate, type PeriodConfig } from '@multa/core';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
@@ -70,7 +70,7 @@ transactionsRoute.get('/transactions', async (c) => {
       and(
         eq(transactions.workspaceId, ws.id),
         gte(transactions.occurredOn, range.from),
-        lte(transactions.occurredOn, range.to),
+        lt(transactions.occurredOn, range.to),
       ),
     )
     .orderBy(desc(transactions.occurredOn), desc(transactions.id));

@@ -31,7 +31,7 @@ import {
   type TargetKind,
   type WeekendRule,
 } from '@multa/core';
-import { and, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
 import {
   categories,
@@ -339,7 +339,7 @@ interface PeriodSpending {
   readonly livingMinor: bigint;
 }
 
-async function loadPeriodSpending(ws: Workspace, periodId: string): Promise<PeriodSpending> {
+async function loadPeriodSpending(ws: Workspace, period: PayPeriod): Promise<PeriodSpending> {
   const rows = await db
     .select({
       targetKind: transactions.targetKind,
@@ -350,7 +350,11 @@ async function loadPeriodSpending(ws: Workspace, periodId: string): Promise<Peri
     .where(
       and(
         eq(transactions.workspaceId, ws.id),
-        eq(transactions.periodId, periodId),
+        // По датам, а не по period_id: границы периода подвижны (правка ритма, правило выходных),
+        // и при сдвиге появляется новая строка pay_periods — привязка по id теряла бы весь факт.
+        // Полуинтервал [startsOn, endsOn) — как у событий дохода, иначе день выплаты попал бы в два периода.
+        gte(transactions.occurredOn, period.startsOn),
+        lt(transactions.occurredOn, period.endsOn),
         eq(transactions.kind, 'expense'),
       ),
     )
@@ -439,7 +443,7 @@ async function assembleForPeriod(
   for (const r of resolved) desc.set(`${r.targetKind}:${r.targetId}`, { name: r.name, sourceCurrency: r.sourceCurrency, sourceMinor: r.sourceMinor, ...(r.toCurrency ? { toCurrency: r.toCurrency } : {}) });
   for (const c of cats) desc.set(`category:${c.targetId}`, { name: c.name, sourceCurrency: ws.baseCurrency, sourceMinor: c.baseMinor });
 
-  const spending = await loadPeriodSpending(ws, periodId);
+  const spending = await loadPeriodSpending(ws, period);
   const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
 
   const allocations: PlanAllocationDto[] = result.allocations.map((a) => {
