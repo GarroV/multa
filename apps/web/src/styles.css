@@ -1,31 +1,51 @@
 @import 'tailwindcss';
 
-/* Neon Ledger — токены (docs/06-design-system). Dark-only в MVP. */
+/* Шрифты self-hosted (профиль $0, без CDN): Inter — интерфейс и деньги, у него табличные
+   цифры по умолчанию; JetBrains Mono — только курсы, id и технические строки. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * «Ведомость» — визуальный язык Multa (docs/06-design-system).
+ *
+ * Три правила, из которых выведено всё остальное:
+ * 1. Плотность отвечает за доверие. Финансовый инструмент читают, а не рассматривают: строки
+ *    32px, hairline-разделители, минимум хрома. Пустое место — не «воздух», а необоснованный
+ *    пиксель.
+ * 2. Один акцент. Насыщенный цвет означает действие или сигнал; всё остальное живёт в градациях
+ *    серого. Свечения и стекла нет вовсе: в интерфейсе про деньги они читаются как несерьёзность.
+ * 3. Цифры — табличные всегда. Колонки сумм обязаны совпадать по разрядам, иначе сравнение
+ *    глазами не работает.
+ */
 :root {
   color-scheme: dark;
 
-  --bg-void: #07090f;
-  --bg-panel: #0d1220;
-  --bg-raised: #131a2e;
-  --line: #1e2a45;
+  /* Чернильные серые, не «космос»: цвет фона не должен спорить с цифрами. */
+  --bg-void: #0e1013;
+  --bg-panel: #15181d;
+  --bg-raised: #1b1f26;
+  --line: #262b33;
+  --line-strong: #333a45;
 
-  --text-hi: #eaf2ff;
-  --text-mid: #93a4c3;
-  --text-dim: #55648a;
+  --text-hi: #e8eaed;
+  --text-mid: #9aa1ad;
+  --text-dim: #6b7280;
 
-  --neon-cyan: #00e5ff;
-  --neon-magenta: #ff2e97;
-  --neon-lime: #b6ff2e;
-  --neon-amber: #ffb020;
-  --neon-violet: #8b5cf6;
+  /* Единственный насыщенный цвет — действие и «сейчас». */
+  --accent: #6a8cff;
+  --accent-quiet: #2b3a63;
+  /* Семантика статусов: три цвета, каждый со своим смыслом, декоративных нет. */
+  --ok: #4ea87a;
+  --warn: #d8a03d;
+  --over: #d1685c;
 
-  --glow-cyan: 0 0 12px rgba(0, 229, 255, 0.35);
-  --radius: 12px;
-  --radius-lg: 20px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --row: 32px;
 
-  --font-ui: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
-  --font-brand: 'Space Grotesk', var(--font-ui);
+  --font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', monospace;
+  --font-brand: var(--font-ui);
 }
 
 * {
@@ -41,7 +61,12 @@ body {
   background: var(--bg-void);
   color: var(--text-hi);
   font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  /* Табличные цифры глобально: суммы сравнивают взглядом по колонке. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
 }
 
 .mono {
@@ -49,13 +74,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .brand {
-  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 15px;
   letter-spacing: -0.01em;
+  padding: 0 10px 12px;
+  color: var(--text-hi);
 }
 .micro {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-dim);
 }
 .dim {
@@ -66,20 +94,19 @@ body {
   background: var(--bg-panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 14px 16px;
 }
 
 .btn {
   font: inherit;
+  font-weight: 500;
+  color: var(--text-hi);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 12px;
   cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--neon-cyan);
-  color: var(--neon-cyan);
-  border-radius: var(--radius);
-  padding: 10px 18px;
-  transition:
-    background 0.15s,
-    box-shadow 0.15s;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 .btn:hover:not(:disabled) {
   background: color-mix(in oklab, var(--neon-cyan) 10%, transparent);
@@ -111,25 +138,26 @@ body {
 }
 
 .field {
-  width: 100%;
-  background: var(--bg-void);
-  border: 1px solid var(--line);
-  color: var(--text-hi);
-  border-radius: var(--radius);
-  padding: 12px 14px;
   font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+  background: var(--bg-void);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 10px;
 }
 .field:focus {
-  outline: 2px solid var(--neon-cyan);
-  outline-offset: 2px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
 }
 
 .hero-number {
-  font-family: var(--font-mono);
-  font-size: clamp(48px, 8vw, 64px);
-  font-weight: 500;
+  font-family: var(--font-ui);
+  font-size: clamp(30px, 4vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--text-hi);
-  text-shadow: var(--glow-cyan);
   line-height: 1;
 }
 
@@ -148,28 +176,43 @@ a {
   min-height: 100%;
 }
 .sidebar {
-  border-right: 1px solid var(--line);
-  padding: 20px 14px;
+  width: 216px;
+  flex: 0 0 216px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-.nav-item {
-  display: block;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  color: var(--text-mid);
-  border: 1px solid transparent;
-  transition: all 0.15s;
-}
-.nav-item:hover {
-  color: var(--text-hi);
+  gap: 1px;
+  padding: 16px 8px 12px;
+  border-right: 1px solid var(--line);
   background: var(--bg-panel);
 }
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text-mid);
+  text-decoration: none;
+  font-size: 13px;
+}
+.nav-item:hover {
+  background: var(--bg-raised);
+  color: var(--text-hi);
+}
 .nav-active {
-  color: var(--neon-cyan);
-  border-color: var(--neon-cyan);
-  box-shadow: var(--glow-cyan);
+  background: var(--bg-raised);
+  color: var(--text-hi);
+}
+.nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 @media (max-width: 720px) {
   .app-shell {
@@ -197,9 +240,11 @@ a {
 }
 .list-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--row);
+  padding: 4px 0;
   border-bottom: 1px solid var(--line);
 }
 .list-item:last-child {
@@ -254,12 +299,12 @@ a {
   padding: 2px 8px;
 }
 .note-band {
-  border-left: 2px solid var(--neon-amber);
-  padding: 10px 14px;
-  background: color-mix(in oklab, var(--neon-amber) 8%, transparent);
+  border-left: 2px solid var(--warn);
+  padding: 8px 12px;
+  background: var(--bg-panel);
   border-radius: 0 var(--radius) var(--radius) 0;
   color: var(--text-mid);
-  font-size: 14px;
+  font-size: 13px;
 }
 .note-band.info {
   border-left-color: var(--neon-violet);
@@ -305,4 +350,139 @@ a {
 .fact-bar.over > span {
   background: var(--neon-amber);
   box-shadow: none;
+}
+
+/* --- Ведомость: числа, сетка обзора и сигнатурная полоса периода --- */
+
+/* Колонка сумм: моноширинные табличные цифры, выравнивание по правому краю. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  text-align: right;
+  white-space: nowrap;
+}
+.num-dim {
+  color: var(--text-mid);
+  font-size: 12px;
+}
+
+/* Обзор — bento: важнейшее занимает больше клеток, остальное равными плитками. */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.tile {
+  grid-column: span 2;
+  /* Плитки не растягиваются под соседа: пустое место внизу карточки — необоснованный пиксель. */
+  align-self: start;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  min-width: 0;
+}
+.tile-wide {
+  grid-column: span 4;
+}
+.tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 900px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tile,
+  .tile-wide {
+    grid-column: span 2;
+  }
+}
+
+/*
+ * Сигнатура интерфейса — полоса периода. Продукт живёт от выплаты до выплаты, а не по
+ * календарю, поэтому шкала показывает именно отрезок между выплатами: сколько уже потрачено,
+ * где «сегодня» и на каком дне при текущем темпе деньги кончатся. Ни один дашборд общего
+ * назначения такого элемента не имеет — он про ритм зарплаты, а не про месяц.
+ */
+.period-bar {
+  position: relative;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--line) 0,
+      var(--line) 1px,
+      transparent 1px,
+      transparent calc(100% / var(--days, 16))
+    );
+  overflow: hidden;
+}
+.period-bar > .spent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-quiet);
+}
+.period-bar > .runout {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--over);
+}
+.period-bar > .today {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--text-hi);
+}
+.period-bar > .caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--text-mid);
+}
+
+/* Статусы исполнения и остатков — цветом, но без заливок. */
+.st-ok { color: var(--ok); }
+.st-warn { color: var(--warn); }
+.st-over { color: var(--over); }
+
+/* Быстрые действия — одна компактная строка над обзором: ввод не должен искать себя. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.actions > button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-mid);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.actions > button:hover {
+  color: var(--text-hi);
+  border-color: var(--line-strong);
+}
+.actions > button.primary {
+  color: var(--text-hi);
+  border-color: var(--accent-quiet);
+  background: var(--accent-quiet);
 }
