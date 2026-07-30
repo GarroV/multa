@@ -6,7 +6,8 @@ import { db } from '../db/client.ts';
 import { categories, receipts, transactions } from '../db/schema/domain.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
 import { ensurePeriodForDate } from '../plan/assemble.ts';
-import { receiptQrSchema, receiptConfirmSchema } from '../validation.ts';
+import { recognizeReceipt } from '../receipts/vision.ts';
+import { receiptConfirmSchema, receiptPhotoSchema, receiptQrSchema } from '../validation.ts';
 
 /**
  * Чеки (Спринт 5). Пайплайн из спеки: **QR всегда первым** — он бесплатный и точный;
@@ -146,4 +147,53 @@ receiptsRoute.post('/receipts/:id/confirm', async (c) => {
 
   await db.update(receipts).set({ status: 'parsed' }).where(eq(receipts.id, receipt.id));
   return c.json({ ok: true, transactions: body.split.length });
+});
+
+/**
+ * Фото чека — платный путь, включается только если QR не сработал (клиент сначала пробует QR).
+ * Модель может ошибиться, поэтому раскладка всё равно уходит на ревью, а не в транзакции.
+ */
+receiptsRoute.post('/receipts/photo', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = receiptPhotoSchema.parse(await c.req.json());
+
+  const recognized = await recognizeReceipt(body.imageUrl);
+  if (!recognized) return c.json({ error: 'vision_failed' }, 422);
+
+  const { list, fallbackId } = await splitCategories(ws);
+  if (!fallbackId) return c.json({ error: 'no_categories' }, 409);
+
+  const split = splitReceipt({
+    items: recognized.items,
+    categories: list,
+    fallbackCategoryId: fallbackId,
+    totalMinor: recognized.totalMinor,
+  });
+
+  const inserted = await db
+    .insert(receipts)
+    .values({
+      workspaceId: ws.id,
+      status: split.confidence === 'high' ? 'parsed' : 'fallback',
+      method: 'vision',
+      ...(recognized.merchant ? { merchant: recognized.merchant } : {}),
+      totalMinor: recognized.totalMinor,
+      currency: recognized.currency,
+      ...(recognized.purchasedOn ? { purchasedAt: new Date(`${recognized.purchasedOn}T12:00:00Z`) } : {}),
+      items: recognized.items.map((i) => ({ name: i.name, amountMinor: i.amountMinor.toString() })),
+    })
+    .returning();
+
+  return c.json(
+    {
+      receipt: { id: inserted[0]!.id, status: inserted[0]!.status, method: 'vision' },
+      merchant: recognized.merchant,
+      currency: recognized.currency,
+      totalMinor: recognized.totalMinor.toString(),
+      confidence: split.confidence,
+      items: recognized.items.map((i) => ({ name: i.name, amountMinor: i.amountMinor.toString() })),
+      split: split.byCategory.map((a) => ({ categoryId: a.categoryId, amountMinor: a.amountMinor.toString() })),
+    },
+    201,
+  );
 });

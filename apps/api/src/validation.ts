@@ -230,6 +230,15 @@ export const receiptQrSchema = z.object({
   currency: ccy.optional(),
 });
 
+/** Фото чека: data URL или https-ссылка. Ограничение длины — защита от гигантских payload. */
+export const receiptPhotoSchema = z.object({
+  imageUrl: z
+    .string()
+    .min(20)
+    .max(8_000_000)
+    .refine((v) => v.startsWith('data:image/') || v.startsWith('https://'), 'ожидается data:image/... или https://'),
+});
+
 /** Подтверждение раскладки чека: суммы по категориям, как их видит пользователь. */
 export const receiptConfirmSchema = z.object({
   split: z

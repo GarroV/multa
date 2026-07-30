@@ -12,6 +12,9 @@ const schema = z.object({
   BETTER_AUTH_URL: z.string().url().default('http://localhost:3000'),
   API_PORT: z.coerce.number().int().positive().default(3000),
   WEB_ORIGIN: z.string().url().default('http://localhost:5173'),
+  // Единственный платный ключ в продукте (CLAUDE.md): vision-фоллбэк чеков и позже Whisper.
+  // Не обязателен: без него QR-путь работает, а нераспознанный чек уходит в «Общее».
+  OPENAI_API_KEY: z.string().min(20).optional(),
 });
 
 export const env = schema.parse(process.env);
