@@ -35,7 +35,17 @@
    ```bash
    ssh -o ServerAliveInterval=30 muspelheim 'C:\projects\multa\deploy.cmd'
    ```
-   Миграции Drizzle применяются самим api при старте (он ждёт healthy-postgres; в логах видно `applying migrations`). Первые строки логов api могут содержать `the database system is starting up` — это нормальный retry, не ошибка.
+   Миграции Drizzle применяются самим api при старте (он ждёт healthy-postgres): в логах видно `[api] миграции применены (migrations)`, и только после этого поднимается сервер. Первые строки логов api могут содержать `the database system is starting up` — это нормальный retry, не ошибка.
+
+   Готовность api видна по healthcheck: `docker ps` показывает `health: starting` пока идут миграции и `healthy` после. `multa-web-1` ждёт именно healthy-api, поэтому первый заход не отдаёт 502.
+
+### Что внутри прод-образа api
+
+Образ двухстейджевый (`apps/api/Dockerfile`): в сборочном стейдже ставится весь монорепо и собирается бандл (`node build.mjs` → `dist/server.js`, `dist/migrate.js`), в рантайм уезжают только `dist/`, SQL-миграции и прод-зависимости (`pnpm deploy --prod --legacy`). В рантайме нет ни devDependencies, ни `tsx`, ни `drizzle-kit`, ни исходников; процесс работает под пользователем `node`.
+
+Внутрь бандла вбираются только наши workspace-пакеты (`@multa/core`, `@multa/i18n`). Полный бандлинг зависимостей не годится: `pg` — CJS и падает в ESM-бандле как `Dynamic require of "events" is not supported`.
+
+Миграции накатывает `dist/migrate.js` (тот же `drizzle-orm`-мигратор, что в интеграционных тестах), а не `drizzle-kit` — сборочный инструмент в прод-образе не нужен. Генерация новых миграций осталась локальной: `pnpm --filter @multa/api db:generate`.
 
 ## Смоук после деплоя (обязательный)
 
@@ -52,6 +62,7 @@ curl -s http://muspelheim.tail48dfee.ts.net/ | grep -o '/assets/[^"]*js'  # им
 - **Проброс портов Docker Desktop залипает после рестарта WSL.** Симптом: TCP-соединение устанавливается, но сервер сразу закрывает его («Empty reply from server») — и снаружи, и с самого сервера через `localhost`; при этом `docker exec <web> wget http://localhost/` внутри контейнера отвечает 200. Причина: `com.docker.backend` держит слушателя на `0.0.0.0:80`, но форвардинг в пересозданный контейнер не восстановился. Лечение: `docker restart multa-web-1`. Проверять после любого рестарта WSL/Docker.
 - **`VITE_API_URL` в проде пустой** (`apps/web/Dockerfile`) — фронт и api за одним Caddy. Пустое значение обязано оставаться валидным: better-auth падает на относительном `baseURL`, поэтому клиент собирается через `authClientOptions()` (`apps/web/src/lib/`), а не прямой подстановкой.
 - **`index.html` нельзя кэшировать.** Иначе после деплоя браузер грузит старый html со ссылкой на исчезнувший бандл и показывает белый экран. Заголовки заданы в `Caddyfile.prod`; при отладке проверяй, какой бандл реально исполнился (`document.scripts`), а не какой отдаёт сервер.
+- **`-e` в docker-командах через ssh → powershell превращается в «Access is denied».** PowerShell забирает `-e` себе как сокращение `-EncodedCommand` (кавычки съедаются слоями), и вместо контейнера получается попытка декодировать мусор. Писать `--env KEY=value` полностью. Там же: `docker run -d` из SSH-сессии капризничает — надёжнее `docker create ... ; docker start <name>`.
 - **Квотинг через ssh → cmd/powershell.** Кавычки в SQL и `-N ""` у `ssh-keygen` съедаются слоями. Надёжный путь для SQL — stdin: `ssh muspelheim 'docker exec -i multa-postgres-1 psql -U multa -d multa' < script.sql`. Для остального — `powershell -NoProfile -Command "..."` и минимум вложенных кавычек.
 - **Долгие процессы из SSH умирают вместе с сессией** (см. CLAUDE.md по MUSPELHEIM). Сборку держать в живой сессии (`ServerAliveInterval`) или запускать одноразовой `schtasks`-задачей.
 - **Бэкап-задача сервера ругается на `supabase-meta`/`supabase-rest`** («2 failed» в отчёте) — это чужие контейнеры с меткой `backup.pgdump`, к Multa отношения не имеют. `multa-postgres-1` дампится штатно.

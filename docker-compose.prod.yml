@@ -17,6 +17,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    security_opt:
+      - no-new-privileges:true
+    # Домашний сервер: логи не должны съесть диск между визитами.
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   api:
     build:
@@ -29,6 +37,29 @@ services:
         condition: service_healthy
     expose:
       - '3000'
+    # PID 1 отдаём init: он хоронит зомби и корректно раздаёт сигналы при docker stop.
+    init: true
+    # Тот же healthcheck, что в образе, но с явными таймингами стека: миграции при старте
+    # занимают время, и до их конца контейнер не должен считаться живым.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   web:
     build:
@@ -36,6 +67,16 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        # Caddy поднимется и без api, но тогда первый заход отдаёт 502 — ждём готовности.
+        condition: service_healthy
     ports:
       - '80:80'
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
