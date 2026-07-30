@@ -337,11 +337,14 @@ async function incomeForPeriod(
 interface PeriodSpending {
   readonly byCategory: ReadonlyMap<string, bigint>;
   readonly livingMinor: bigint;
+  /** Внеплановые приходы периода (side hustle): их нет в источниках, поэтому идут отдельно. */
+  readonly extraIncomeMinor: bigint;
 }
 
 async function loadPeriodSpending(ws: Workspace, period: PayPeriod): Promise<PeriodSpending> {
   const rows = await db
     .select({
+      kind: transactions.kind,
       targetKind: transactions.targetKind,
       targetId: transactions.targetId,
       total: sql<string>`sum(${transactions.baseAmountMinor})`,
@@ -355,23 +358,26 @@ async function loadPeriodSpending(ws: Workspace, period: PayPeriod): Promise<Per
         // Полуинтервал [startsOn, endsOn) — как у событий дохода, иначе день выплаты попал бы в два периода.
         gte(transactions.occurredOn, period.startsOn),
         lt(transactions.occurredOn, period.endsOn),
-        eq(transactions.kind, 'expense'),
+        inArray(transactions.kind, ['expense', 'income']),
       ),
     )
-    .groupBy(transactions.targetKind, transactions.targetId);
+    .groupBy(transactions.kind, transactions.targetKind, transactions.targetId);
 
   const byCategory = new Map<string, bigint>();
   let livingMinor = 0n;
+  let extraIncomeMinor = 0n;
   for (const row of rows) {
     const total = BigInt(row.total ?? '0');
-    if (row.targetKind === 'category' && row.targetId) {
+    if (row.kind === 'income') {
+      extraIncomeMinor += total;
+    } else if (row.targetKind === 'category' && row.targetId) {
       byCategory.set(row.targetId, (byCategory.get(row.targetId) ?? 0n) + total);
       livingMinor += total;
     } else if (row.targetKind == null) {
       livingMinor += total; // трата без категории тоже съедает деньги на жизнь
     }
   }
-  return { byCategory, livingMinor };
+  return { byCategory, livingMinor, extraIncomeMinor };
 }
 
 export interface PlanAllocationDto {
@@ -394,7 +400,10 @@ export interface PlanDto {
   daysInPeriod: number;
   daysLeft: number;
   baseCurrency: string;
+  /** Доход периода = ожидаемый по источникам + внеплановые приходы, уже зафиксированные фактом. */
   incomeMinor: string;
+  /** Сколько из дохода пришло вне плана (side hustle) — показываем отдельной строкой. */
+  extraIncomeMinor: string;
   totalPlannedMinor: string;
   totalAllocatedMinor: string;
   compressedMinor: string;
@@ -421,7 +430,10 @@ async function assembleForPeriod(
   asOf: string,
 ): Promise<PlanDto> {
   const income = await incomeForPeriod(ws, sources, period, asOf);
-  const incomeMinor = income.incomeMinor;
+  const spending = await loadPeriodSpending(ws, period);
+  // Внеплановый приход раздаётся тем же каскадом, что и зарплата: деньги пришли — им нужно
+  // место в плане. Поэтому он входит в доход периода до каскада, а не «сверху» после него.
+  const incomeMinor = income.incomeMinor + spending.extraIncomeMinor;
   const { id: periodId, created } = await ensurePeriodRow(ws, period, incomeMinor);
   // Перенос — только при рождении периода: очистку бюджетов в существующем периоде не затираем.
   if (created) await carryOverCategories(ws, periodId, period.startsOn);
@@ -443,7 +455,6 @@ async function assembleForPeriod(
   for (const r of resolved) desc.set(`${r.targetKind}:${r.targetId}`, { name: r.name, sourceCurrency: r.sourceCurrency, sourceMinor: r.sourceMinor, ...(r.toCurrency ? { toCurrency: r.toCurrency } : {}) });
   for (const c of cats) desc.set(`category:${c.targetId}`, { name: c.name, sourceCurrency: ws.baseCurrency, sourceMinor: c.baseMinor });
 
-  const spending = await loadPeriodSpending(ws, period);
   const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
 
   const allocations: PlanAllocationDto[] = result.allocations.map((a) => {
@@ -509,6 +520,7 @@ async function assembleForPeriod(
     daysLeft: daysLeftInPeriod(period, asOf),
     baseCurrency: ws.baseCurrency,
     incomeMinor: incomeMinor.toString(),
+    extraIncomeMinor: spending.extraIncomeMinor.toString(),
     totalPlannedMinor: result.totalPlannedMinor.toString(),
     totalAllocatedMinor: result.totalAllocatedMinor.toString(),
     compressedMinor: result.compressedMinor.toString(),

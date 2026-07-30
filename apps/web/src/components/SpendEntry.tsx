@@ -69,6 +69,7 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
   const { data: txs } = useTransactions();
   const create = useCreateSpend();
 
+  const [kind, setKind] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
   const [occurredOn, setOccurredOn] = useState(todayISO());
@@ -84,9 +85,10 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
     setBadAmount(false);
     create.mutate(
       {
+        kind,
         amountMinor: minor,
         currency: base,
-        ...(categoryId ? { categoryId } : {}),
+        ...(kind === 'expense' && categoryId ? { categoryId } : {}),
         occurredOn,
         ...(note.trim() ? { note: note.trim() } : {}),
       },
@@ -100,18 +102,38 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
   };
 
   const rateMissing = create.error instanceof ApiError && create.error.code === 'rate_unavailable';
+  const isIncome = kind === 'income';
 
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t('spend.title')}>
       <div className="sheet">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>{t('spend.title')}</div>
-            <div className="dim" style={{ marginTop: 4, fontSize: 13 }}>{t('spend.subtitle')}</div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>
+              {t(isIncome ? 'spend.titleIncome' : 'spend.title')}
+            </div>
+            <div className="dim" style={{ marginTop: 4, fontSize: 13 }}>
+              {t(isIncome ? 'spend.subtitleIncome' : 'spend.subtitle')}
+            </div>
           </div>
           <button type="button" className="btn btn-ghost" onClick={onClose} title={t('common.cancel')}>
             ✕
           </button>
+        </div>
+
+        {/* Трата или приход: один ввод на оба случая — «пришло сегодня» так же частый жест, как трата. */}
+        <div className="row" style={{ gap: 8 }}>
+          {(['expense', 'income'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              className="chip"
+              aria-pressed={kind === k}
+              onClick={() => setKind(k)}
+            >
+              {t(k === 'income' ? 'spend.kind.income' : 'spend.kind.expense')}
+            </button>
+          ))}
         </div>
 
         <div style={{ display: 'grid', gap: 8 }}>
@@ -132,6 +154,7 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
           {badAmount && <span className="danger" style={{ fontSize: 13 }}>{t('spend.badAmount')}</span>}
         </div>
 
+        {!isIncome && (
         <div style={{ display: 'grid', gap: 8 }}>
           <span className="micro">{t('spend.category')}</span>
           <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -156,6 +179,7 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
             ))}
           </div>
         </div>
+        )}
 
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <div style={{ display: 'grid', gap: 8 }}>
@@ -181,7 +205,7 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
         </div>
 
         <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
-          {create.isPending ? t('common.loading') : t('spend.submit')}
+          {create.isPending ? t('common.loading') : t(isIncome ? 'spend.submitIncome' : 'spend.submit')}
         </button>
 
         {create.isError && (

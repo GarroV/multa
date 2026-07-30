@@ -84,6 +84,7 @@ export interface PlanDto {
   freeMinor: string;
   toExchangeMinor: string;
   canSpendPerDayMinor: string;
+  extraIncomeMinor: string;
   livingMinor: string;
   spentLivingMinor: string;
   remainingLivingMinor: string;
@@ -332,6 +333,8 @@ export function useTransactions() {
 }
 
 export interface SpendInput {
+  /** 'expense' — трата, 'income' — внеплановый приход (side hustle). */
+  kind?: 'expense' | 'income';
   amountMinor: string;
   currency: string;
   categoryId?: string;

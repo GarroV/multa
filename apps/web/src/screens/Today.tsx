@@ -108,6 +108,12 @@ function Dashboard({ plan }: { plan: PlanDto }) {
             <span className="dim">{t('plan.summary.income')}</span>
             <span className="mono">{fmt(plan.incomeMinor)}</span>
           </div>
+          {BigInt(plan.extraIncomeMinor) > 0n && (
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="dim">{t('plan.summary.extraIncome')}</span>
+              <span className="mono" style={{ color: 'var(--neon-lime)' }}>+{fmt(plan.extraIncomeMinor)}</span>
+            </div>
+          )}
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <span className="dim">{t('plan.summary.free')}</span>
             <span className="mono" style={BigInt(plan.freeMinor) < 0n ? { color: 'var(--neon-amber)' } : undefined}>

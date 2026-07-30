@@ -97,6 +97,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           value={fmt(plan.canSpendPerDayMinor)}
           tone="accent"
         />
+        {BigInt(plan.extraIncomeMinor) > 0n && (
+          <Stat label={t('plan.summary.extraIncome')} value={fmt(plan.extraIncomeMinor)} tone="accent" />
+        )}
         {BigInt(plan.spentLivingMinor) > 0n && (
           <>
             <Stat label={t('plan.summary.spent')} value={fmt(plan.spentLivingMinor)} />
