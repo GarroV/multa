@@ -221,6 +221,22 @@ export const rebalanceApplySchema = z.object({
   amountMinor: positiveMinor,
 });
 
+// --- Чеки (Спринт 5). QR пробуется первым, он бесплатный. ---
+
+/** Содержимое QR. totalMinor — на случай, когда сумма живёт в фискальном сервисе (Сербия). */
+export const receiptQrSchema = z.object({
+  payload: z.string().min(4).max(1000),
+  totalMinor: positiveMinor.optional(),
+  currency: ccy.optional(),
+});
+
+/** Подтверждение раскладки чека: суммы по категориям, как их видит пользователь. */
+export const receiptConfirmSchema = z.object({
+  split: z
+    .array(z.object({ categoryId: z.string().uuid(), amountMinor: positiveMinor }))
+    .min(1),
+});
+
 /** Фильтр списка транзакций. Без параметров — текущий период. */
 export const transactionListSchema = z.object({
   from: isoDate.optional(),
