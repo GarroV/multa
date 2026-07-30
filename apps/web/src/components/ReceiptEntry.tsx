@@ -40,7 +40,7 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t('receipt.title')}>
       <div className="sheet">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>{t('receipt.title')}</div>
+          <div style={{ fontWeight: 600 }}>{t('receipt.title')}</div>
           <button type="button" className="btn btn-ghost" onClick={onClose} title={t('common.cancel')}>
             ✕
           </button>
@@ -56,7 +56,7 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
                 value={payload}
                 onChange={(e) => setPayload(e.target.value)}
               />
-              <span className="dim" style={{ fontSize: 12 }}>{t('receipt.qrHint')}</span>
+              <span className="sub">{t('receipt.qrHint')}</span>
               <button
                 type="button"
                 className="btn"
@@ -80,8 +80,8 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
                   photo.mutate(dataUrl, { onSuccess: setParsed });
                 }}
               />
-              <span className="dim" style={{ fontSize: 12 }}>{t('receipt.photoHint')}</span>
-              {photo.isPending && <span className="dim">{t('common.loading')}</span>}
+              <span className="sub">{t('receipt.photoHint')}</span>
+              {photo.isPending && <span className="sub">{t('common.loading')}</span>}
             </div>
 
             {failed && <div className="note-band">{t('receipt.failed')}</div>}
@@ -91,27 +91,27 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
         {parsed && (
           <>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span className="dim">
+              <span className="sub">
                 {t('receipt.total')}
                 {parsed.merchant ? ` · ${parsed.merchant}` : ''}
               </span>
-              <span className="mono">
+              <span className="num">
                 {formatMinor(parsed.totalMinor, parsed.currency, locale)} {parsed.currency}
               </span>
             </div>
 
             {parsed.confidence === 'low' && <div className="note-band">{t('receipt.lowConfidence')}</div>}
 
-            <div className="card">
+            <section className="tile">
               {parsed.split.map((row) => (
                 <div key={row.categoryId} className="list-item">
                   <span>{nameOf(row.categoryId)}</span>
-                  <span className="mono">
+                  <span className="num">
                     {formatMinor(row.amountMinor, parsed.currency, locale)} {parsed.currency}
                   </span>
                 </div>
               ))}
-            </div>
+            </section>
 
             <button
               type="button"
@@ -123,7 +123,7 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
             >
               {confirm.isPending ? t('common.loading') : t('receipt.confirm')}
             </button>
-            {confirm.isError && <div className="danger" style={{ fontSize: 13 }}>⚠ {t('common.error')}</div>}
+            {confirm.isError && <div className="sub danger">⚠ {t('common.error')}</div>}
           </>
         )}
       </div>

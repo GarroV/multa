@@ -31,18 +31,16 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
   return (
     <div className="list-item">
       <span className="row" style={{ gap: 8 }}>
-        <span className="dim mono" style={{ fontSize: 13 }}>{tx.occurredOn.slice(5)}</span>
+        <span className="sub num">{tx.occurredOn.slice(5)}</span>
         <span>{catName ?? t('spend.noCategory')}</span>
-        {tx.note && <span className="dim" style={{ fontSize: 13 }}>· {tx.note}</span>}
-        {del.isError && <span className="danger" style={{ fontSize: 13 }}>⚠ {t('common.error')}</span>}
+        {tx.note && <span className="sub">· {tx.note}</span>}
+        {del.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
       </span>
       <span className="row" style={{ gap: 10 }}>
-        <span className="mono">
+        <span className="num">
           {formatMinor(tx.amountMinor, tx.currency, locale)} {tx.currency}
           {converted && (
-            <span className="dim" style={{ fontSize: 13 }}>
-              {' '}= {formatMinor(tx.baseAmountMinor, base, locale)} {base}
-            </span>
+            <span className="sub"> = {formatMinor(tx.baseAmountMinor, base, locale)} {base}</span>
           )}
         </span>
         <button
@@ -148,10 +146,10 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
       <div className="sheet">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>
+            <div style={{ fontWeight: 600 }}>
               {t(isIncome ? 'spend.titleIncome' : 'spend.title')}
             </div>
-            <div className="dim" style={{ marginTop: 4, fontSize: 13 }}>
+            <div className="sub" style={{ marginTop: 2 }}>
               {t(isIncome ? 'spend.subtitleIncome' : 'spend.subtitle')}
             </div>
           </div>
@@ -189,14 +187,14 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
               }
             }}
           />
-          <span className="dim" style={{ fontSize: 12 }}>{t('spend.smart.hint')}</span>
+          <span className="sub">{t('spend.smart.hint')}</span>
         </div>
 
         <div style={{ display: 'grid', gap: 8 }}>
           <span className="micro">{t('spend.amount')}</span>
           <div className="row" style={{ gap: 8 }}>
             <input
-              className="field mono"
+              className="field num"
               style={{ flex: 1, fontSize: 20 }}
               inputMode="decimal"
               autoFocus
@@ -205,9 +203,9 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
               onChange={(e) => setAmount(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
             />
-            <span className="dim mono">{base}</span>
+            <span className="sub num">{base}</span>
           </div>
-          {badAmount && <span className="danger" style={{ fontSize: 13 }}>{t('spend.badAmount')}</span>}
+          {badAmount && <span className="sub danger">{t('spend.badAmount')}</span>}
         </div>
 
         {!isIncome && (
@@ -241,7 +239,7 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
           <div style={{ display: 'grid', gap: 8 }}>
             <span className="micro">{t('spend.date')}</span>
             <input
-              className="field mono"
+              className="field num"
               type="date"
               value={occurredOn}
               max={todayISO()}
@@ -265,16 +263,16 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
         </button>
 
         {create.isError && (
-          <div className="danger" style={{ fontSize: 13 }}>
+          <div className="sub danger">
             ⚠ {rateMissing ? t('spend.rateUnavailable') : t('common.error')}
           </div>
         )}
 
-        <div className="card" style={{ marginTop: 4 }}>
-          <div className="plan-group-head">
+        <section className="tile">
+          <div className="tile-head">
             <span className="micro">{t('spend.recent')}</span>
             {txs && txs.transactions.length > 0 && (
-              <span className="dim mono" style={{ fontSize: 13 }}>
+              <span className="num num-dim">
                 {formatMinor(
                   txs.transactions.reduce((acc, tx) => acc + BigInt(tx.baseAmountMinor), 0n).toString(),
                   base,
@@ -286,8 +284,8 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
           </div>
           {txs?.transactions.length
             ? txs.transactions.map((tx) => <SpendRow key={tx.id} tx={tx} base={base} locale={locale} />)
-            : <div className="dim" style={{ fontSize: 13 }}>{t('spend.empty')}</div>}
-        </div>
+            : <div className="sub">{t('spend.empty')}</div>}
+        </section>
       </div>
     </div>
   );
