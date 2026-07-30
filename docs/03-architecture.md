@@ -136,6 +136,7 @@ Sentry (web+api), структурные логи Hono, аудит plan_revision
 | `GET/POST/PATCH/DELETE /v1/categories` | категории | 2 |
 | `GET/POST/DELETE /v1/transactions` | факт: траты и внеплановые приходы | 3 |
 | `POST /v1/transactions/parse` | разбор фразы: regex ядра, за ним LLM-фоллбэк | 5 |
+| `POST /v1/transactions/voice` | голосовая заметка → Whisper → тот же разбор фразы | 5 |
 | `GET/POST/PATCH/DELETE /v1/recurring-items` | регулярные платежи вне обязательств | 5 |
 | `GET/POST/DELETE /v1/exchange-ops` | размены, фактический курс и спред | 3 |
 | `GET /v1/receipts`, `POST /v1/receipts/qr`, `/photo`, `/:id/confirm` | чеки: QR-путь, vision-фоллбэк, подтверждение раскладки | 5 |
