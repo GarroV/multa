@@ -499,3 +499,22 @@ export function useApplyRebalance() {
     },
   });
 }
+
+// --- Прогноз-таймлайн (Спринт 4) ---
+
+export interface ForecastEvent {
+  kind: 'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk';
+  targetId: string;
+  name: string;
+  on: string;
+  periodsAway: number;
+  amountMinor: string | null;
+}
+
+export function useForecast() {
+  return useQuery({
+    queryKey: ['forecast'],
+    retry: false,
+    queryFn: () => api<{ horizonPeriods: number; events: ForecastEvent[] }>('/v1/forecast'),
+  });
+}

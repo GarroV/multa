@@ -26,6 +26,7 @@ import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
+import { forecastRoute } from './routes/forecast.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
 
@@ -243,6 +244,9 @@ app.route('/v1', transactionsRoute);
 
 // Размен валюты со спредом (Спринт 3): /v1/exchange-ops
 app.route('/v1', exchangeRoute);
+
+// Прогноз-таймлайн (Спринт 4): /v1/forecast
+app.route('/v1', forecastRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);
