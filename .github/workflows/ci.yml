@@ -48,9 +48,9 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # Прод-сборка web без VITE_API_URL — ровно та конфигурация, что уезжает на сервер.
-      - name: Build web (prod)
-        run: pnpm --filter @multa/web build
+      # Прод-сборки: web без VITE_API_URL (как за Caddy) и бандл api, который уезжает в образ.
+      - name: Build (prod)
+        run: pnpm build
 
       # Смоук собранного бандла: логин однажды умер падением на уровне модуля, которое
       # тесты по исходникам не видят (у них своя сборка и свой env).
