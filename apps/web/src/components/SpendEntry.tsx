@@ -6,6 +6,7 @@ import { ApiError } from '../lib/api.ts';
 import {
   useCategories,
   useCreateSpend,
+  useParseEntry,
   useDeleteSpend,
   useTransactions,
   type Transaction,
@@ -68,6 +69,7 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
   const { data: categories = [] } = useCategories();
   const { data: txs } = useTransactions();
   const create = useCreateSpend();
+  const parseRemote = useParseEntry();
 
   const [kind, setKind] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
@@ -90,7 +92,18 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
       categories: categories.map((c) => c.name),
     });
     if (parsed.amountMinor === null) {
-      setBadAmount(true);
+      // Локальный парсер не понял — просим сервер (там regex, а за ним LLM-фоллбэк).
+      parseRemote.mutate(line, {
+        onSuccess: (remote) => {
+          setBadAmount(false);
+          setKind(remote.kind);
+          setAmount(toMajorString(money(BigInt(remote.amountMinor), remote.currency)));
+          setOccurredOn(remote.occurredOn);
+          setNote(remote.note ?? '');
+          setCategoryId(remote.kind === 'income' ? undefined : (remote.categoryId ?? undefined));
+        },
+        onError: () => setBadAmount(true),
+      });
       return;
     }
     setBadAmount(false);

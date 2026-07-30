@@ -575,3 +575,22 @@ export function useConfirmReceipt() {
     },
   });
 }
+
+/** Разбор фразы на сервере: сначала regex, затем LLM — решает api. */
+export interface ParsedEntryDto {
+  source: 'regex' | 'llm';
+  kind: 'expense' | 'income';
+  amountMinor: string;
+  currency: string;
+  occurredOn: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  note: string | null;
+}
+
+export function useParseEntry() {
+  return useMutation({
+    mutationFn: (text: string) =>
+      api<ParsedEntryDto>('/v1/transactions/parse', { method: 'POST', body: JSON.stringify({ text }) }),
+  });
+}
