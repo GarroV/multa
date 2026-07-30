@@ -518,3 +518,51 @@ export function useForecast() {
     queryFn: () => api<{ horizonPeriods: number; events: ForecastEvent[] }>('/v1/forecast'),
   });
 }
+
+// --- Чеки (Спринт 5) ---
+
+export interface ReceiptSplitRow {
+  categoryId: string;
+  amountMinor: string;
+}
+
+export interface ReceiptParsed {
+  receipt: { id: string; status: string; method: string | null };
+  merchant?: string | null;
+  currency: string;
+  totalMinor: string;
+  confidence: 'high' | 'low';
+  items?: { name: string; amountMinor: string }[];
+  split: ReceiptSplitRow[];
+}
+
+/** QR — бесплатный путь, пробуем первым. */
+export function useParseReceiptQr() {
+  return useMutation({
+    mutationFn: (payload: string) =>
+      api<ReceiptParsed>('/v1/receipts/qr', { method: 'POST', body: JSON.stringify({ payload }) }),
+  });
+}
+
+/** Фото — платный путь, только если QR не дал результата. */
+export function useParseReceiptPhoto() {
+  return useMutation({
+    mutationFn: (imageUrl: string) =>
+      api<ReceiptParsed>('/v1/receipts/photo', { method: 'POST', body: JSON.stringify({ imageUrl }) }),
+  });
+}
+
+export function useConfirmReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, split }: { id: string; split: ReceiptSplitRow[] }) =>
+      api<{ ok: boolean; transactions: number }>(`/v1/receipts/${id}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({ split }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
