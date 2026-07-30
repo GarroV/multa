@@ -108,6 +108,27 @@ function CategoryRow({
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
         <span className="dim mono" style={{ fontSize: 13, width: 34 }}>{base}</span>
+        {budget?.advice && (
+          <span className="row" style={{ gap: 6 }}>
+            <span className="dim" style={{ fontSize: 12 }}>
+              {t(budget.advice.kind === 'raise' ? 'advice.raise' : 'advice.lower', {
+                amount: `${formatMinor(budget.advice.suggestedMinor, base, locale)} ${base}`,
+                periods: budget.advice.periods,
+              })}
+            </span>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '2px 8px', fontSize: 12 }}
+              onClick={() => {
+                const next = budget.advice!.suggestedMinor;
+                setVal(toMajorString(money(BigInt(next), base)));
+                setBudget.mutate({ id: cat.id, plannedMinor: next });
+              }}
+            >
+              {t('advice.apply', { amount: formatMinor(budget.advice.suggestedMinor, base, locale) })}
+            </button>
+          </span>
+        )}
         {overspent && budget && (
           <button
             className="btn btn-ghost"

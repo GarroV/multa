@@ -13,6 +13,7 @@
 
 import {
   assemblePlan,
+  budgetAdvice,
   burnRate,
   categorySpending,
   convert,
@@ -87,6 +88,45 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
   return rows
     .filter((r) => r.plannedMinor > 0n)
     .map((r) => ({ targetId: r.targetId, name: r.name, isProtected: r.isProtected, baseMinor: r.plannedMinor }));
+}
+
+/**
+ * Факт по категориям за прошлые периоды — на нём учится совет по бюджету.
+ * Берём последние 6 закрытых периодов: год истории для «привычки» не нужен, а сезонность
+ * (декабрь) не должна тянуть совет через полгода.
+ */
+async function loadCategoryHistory(ws: Workspace, beforeStartsOn: string): Promise<Map<string, bigint[]>> {
+  const rows = await db
+    .select({
+      targetId: transactions.targetId,
+      startsOn: payPeriods.startsOn,
+      total: sql<string>`sum(${transactions.baseAmountMinor})`,
+    })
+    .from(transactions)
+    .innerJoin(payPeriods, eq(payPeriods.id, transactions.periodId))
+    .where(
+      and(
+        eq(transactions.workspaceId, ws.id),
+        eq(transactions.kind, 'expense'),
+        eq(transactions.targetKind, 'category'),
+        lt(payPeriods.startsOn, beforeStartsOn),
+      ),
+    )
+    .groupBy(transactions.targetId, payPeriods.startsOn)
+    .orderBy(desc(payPeriods.startsOn))
+    .limit(200);
+
+  const byCategory = new Map<string, bigint[]>();
+  const seenPeriods = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.targetId) continue;
+    const periods = seenPeriods.get(row.targetId) ?? new Set<string>();
+    if (periods.size >= 6 && !periods.has(row.startsOn)) continue;
+    periods.add(row.startsOn);
+    seenPeriods.set(row.targetId, periods);
+    byCategory.set(row.targetId, [...(byCategory.get(row.targetId) ?? []), BigInt(row.total ?? '0')]);
+  }
+  return byCategory;
 }
 
 /** Статусы исполнения плановых строк периода: ключ `kind:id`. */
@@ -421,6 +461,8 @@ export interface PlanAllocationDto {
   remainderMinor: string;
   /** Защищённая категория: автоматика её не режет, только явный выбор пользователя. */
   protectedCategory?: boolean;
+  /** Совет по бюджету на основе факта прошлых периодов (Спринт 4): поднять или опустить. */
+  advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number };
 }
 
 export interface PlanDto {
@@ -472,6 +514,20 @@ function executionFields(
   };
 }
 
+/** Совет по бюджету категории; для обязательств советов нет — их суммы задаёт договор. */
+function adviceFields(
+  targetKind: TargetKind,
+  plannedMinor: bigint,
+  history: bigint[] | undefined,
+): { advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number } } {
+  if (targetKind !== 'category' || !history) return {};
+  const advice = budgetAdvice({ plannedMinor, history });
+  if (!advice) return {};
+  return {
+    advice: { kind: advice.kind, suggestedMinor: advice.suggestedMinor.toString(), periods: advice.periods },
+  };
+}
+
 /** Собирает и сохраняет план одного периода, возвращает DTO. */
 async function assembleForPeriod(
   ws: Workspace,
@@ -507,6 +563,7 @@ async function assembleForPeriod(
 
   const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
   const executions = await loadExecutions(periodId);
+  const history = await loadCategoryHistory(ws, period.startsOn);
   const burn = burnRate({
     livingMinor: summary.livingMinor,
     spentLivingMinor: spending.livingMinor,
@@ -535,6 +592,7 @@ async function assembleForPeriod(
       ...(a.targetKind === 'category'
         ? { protectedCategory: cats.find((c) => c.targetId === a.targetId)?.isProtected === true }
         : {}),
+      ...adviceFields(a.targetKind, a.allocatedMinor, history.get(a.targetId)),
     };
   });
 

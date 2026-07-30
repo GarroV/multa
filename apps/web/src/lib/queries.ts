@@ -61,6 +61,8 @@ export interface PlanAllocation {
   spentMinor: string; // факт периода, base
   remainingMinor: string; // allocated − spent, может быть отрицательным
   overspentMinor: string;
+  advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number };
+  protectedCategory?: boolean;
   executionStatus: 'pending' | 'confirmed' | 'partial' | 'skipped' | 'n_a';
   executedMinor: string;
   remainderMinor: string;
