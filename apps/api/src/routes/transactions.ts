@@ -1,4 +1,4 @@
-import { convert, money, periodForDate, type PeriodConfig } from '@multa/core';
+import { convert, money, parseEntry, periodForDate, type PeriodConfig } from '@multa/core';
 import { and, desc, eq, gte, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
@@ -7,7 +7,8 @@ import { categories, transactions } from '../db/schema/domain.ts';
 import { getRate } from '../fx/service.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
 import { ensurePeriodForDate } from '../plan/assemble.ts';
-import { transactionCreateSchema, transactionListSchema } from '../validation.ts';
+import { parseEntryWithLlm } from '../receipts/textLlm.ts';
+import { textEntrySchema, transactionCreateSchema, transactionListSchema } from '../validation.ts';
 
 /**
  * Факт трат (Спринт 3). Транзакция хранит триаду: сумма в своей валюте + `base_amount_minor`
@@ -135,4 +136,52 @@ transactionsRoute.delete('/transactions/:id', async (c) => {
     .returning({ id: transactions.id });
   if (!deleted[0]) return c.json({ error: 'not_found' }, 404);
   return c.body(null, 204);
+});
+
+/**
+ * Разбор свободной фразы: «250 продукты», «кофе 4.5 eur вчера».
+ *
+ * Порядок как у чеков: сначала бесплатный regex-парсер ядра, и только если он не нашёл суммы —
+ * платный LLM (единственный внешний ключ в продукте). Ничего не записываем: отдаём разбор, чтобы
+ * пользователь увидел, как его поняли, и подтвердил. Не разобрали — 422, а не случайная трата.
+ */
+transactionsRoute.post('/transactions/parse', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = textEntrySchema.parse(await c.req.json());
+
+  const catRows = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(and(eq(categories.workspaceId, ws.id), eq(categories.archived, false)));
+  const names = catRows.map((c2) => c2.name);
+  const ctx = { baseCurrency: ws.baseCurrency, today: today(ws.timezone), categories: names };
+
+  const local = parseEntry(body.text, ctx);
+  if (local.amountMinor !== null) {
+    const hit = local.categoryName ? catRows.find((c2) => c2.name === local.categoryName) : undefined;
+    return c.json({
+      source: 'regex',
+      kind: local.kind,
+      amountMinor: local.amountMinor.toString(),
+      currency: local.currency,
+      occurredOn: local.occurredOn,
+      categoryId: hit?.id ?? null,
+      categoryName: local.categoryName ?? null,
+      note: local.note ?? null,
+    });
+  }
+
+  const llm = await parseEntryWithLlm(body.text, ctx);
+  if (!llm) return c.json({ error: 'not_understood' }, 422);
+  const hit = llm.categoryName ? catRows.find((c2) => c2.name === llm.categoryName) : undefined;
+  return c.json({
+    source: 'llm',
+    kind: llm.kind,
+    amountMinor: llm.amountMinor.toString(),
+    currency: llm.currency,
+    occurredOn: llm.occurredOn,
+    categoryId: hit?.id ?? null,
+    categoryName: llm.categoryName,
+    note: llm.note,
+  });
 });

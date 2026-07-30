@@ -207,6 +207,11 @@ export const exchangeCreateSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+/** Свободная фраза для разбора: «250 продукты», «кофе 4.5 eur вчера». */
+export const textEntrySchema = z.object({
+  text: z.string().min(1).max(300),
+});
+
 /** Запрос вариантов пересборки: какой строке и сколько нужно добавить. */
 export const rebalanceQuerySchema = z.object({
   targetId: z.string().uuid(),
