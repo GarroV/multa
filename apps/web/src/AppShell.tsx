@@ -30,27 +30,6 @@ export function AppShell() {
         <div className="brand" style={{ fontWeight: 600, fontSize: 20, padding: '8px 16px 16px' }}>
           multa
         </div>
-        {/* Ввод факта доступен с любого экрана (04-web-ux §Ввод: «глобальная кнопка +»). */}
-        {base && (
-          <button
-            type="button"
-            className="btn"
-            style={{ margin: '0 16px 12px' }}
-            onClick={() => setSpendOpen(true)}
-          >
-            + {t('spend.open')}
-          </button>
-        )}
-        {base && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ margin: '0 16px 12px' }}
-            onClick={() => setReceiptOpen(true)}
-          >
-            {t('receipt.open')}
-          </button>
-        )}
         {NAV.map((n) => (
           <Link key={n.to} to={n.to} className="nav-item" activeProps={{ className: 'nav-item nav-active' }}>
             {t(n.key)}
@@ -84,6 +63,20 @@ export function AppShell() {
         </div>
       </aside>
       <main style={{ minWidth: 0 }}>
+        {/* Действия живут над содержимым: ввод факта нужен на любом экране (04-web-ux §Ввод). */}
+        {base && (
+          <div
+            className="actions"
+            style={{ maxWidth: 960, margin: '0 auto', padding: '16px 24px 0' }}
+          >
+            <button type="button" className="primary" onClick={() => setSpendOpen(true)}>
+              {t('spend.open')}
+            </button>
+            <button type="button" onClick={() => setReceiptOpen(true)}>
+              {t('receipt.open')}
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
       {spendOpen && base && <SpendEntry base={base} locale={locale} onClose={() => setSpendOpen(false)} />}

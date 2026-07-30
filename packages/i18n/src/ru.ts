@@ -67,6 +67,7 @@ export const ru: Record<TranslationKey, string> = {
   'plan.hero.perDay': '/день',
   'plan.today.periodLabel': 'ПЕРИОД',
   'plan.today.until': 'до {date} · осталось дней: {days}',
+  'plan.today.daysLeft': 'до выплаты дней: {days}',
   'plan.today.expected': 'Ожидаемый доход периода',
 
   // План периода — автосборка каскадом (Спринт 2)
@@ -76,6 +77,7 @@ export const ru: Record<TranslationKey, string> = {
   'plan.groups.category': 'Категории',
   'plan.groups.goal': 'Цели',
   'plan.summary.income': 'Доход периода',
+  'plan.money': 'Деньги периода',
   'plan.summary.committed': 'Расписано',
   'plan.summary.free': 'Свободно к концу периода',
   'plan.summary.perDay': 'На жизнь, в день',

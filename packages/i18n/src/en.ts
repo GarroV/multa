@@ -69,6 +69,7 @@ export const en = {
   'plan.hero.perDay': '/day',
   'plan.today.periodLabel': 'THIS PERIOD',
   'plan.today.until': 'until {date} · {days} days left',
+  'plan.today.daysLeft': '{days} days to payday',
   'plan.today.expected': 'Expected this period',
 
   // План периода — автосборка каскадом (Спринт 2)
@@ -78,6 +79,7 @@ export const en = {
   'plan.groups.category': 'Categories',
   'plan.groups.goal': 'Goals',
   'plan.summary.income': 'Income this period',
+  'plan.money': 'Money this period',
   'plan.summary.committed': 'Committed',
   'plan.summary.free': 'Free at period end',
   'plan.summary.perDay': 'To live on, per day',
