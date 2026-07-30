@@ -19,7 +19,7 @@ function Centered({ children }: { children: ReactNode }) {
 function ForecastCard({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
   const { data } = useForecast();
-  if (!data || data.events.length === 0) return null;
+  if (!data || (data.events.length === 0 && data.dueSoon.length === 0)) return null;
 
   const label = (e: ForecastEvent): string => {
     const amount = e.amountMinor ? `${formatMinor(e.amountMinor, base, locale)} ${base}` : '';
@@ -34,6 +34,17 @@ function ForecastCard({ base, locale }: { base: string; locale: string }) {
       <div className="plan-group-head">
         <span className="micro">{t('forecast.title')}</span>
       </div>
+      {data.dueSoon.slice(0, 5).map((d) => (
+        <div key={d.id} className="list-item">
+          <span>
+            {d.name}
+            <span className="dim" style={{ fontSize: 12 }}> · {t('forecast.dueSoon')}</span>
+          </span>
+          <span className="mono dim" style={{ fontSize: 13 }}>
+            {formatMinor(d.amountMinor, d.currency, locale)} {d.currency} · {d.on.slice(5)}
+          </span>
+        </div>
+      ))}
       {data.events.slice(0, 6).map((e) => (
         <div key={`${e.kind}:${e.targetId}`} className="list-item">
           <span style={e.kind === 'goal_at_risk' ? { color: 'var(--neon-amber)' } : undefined}>{label(e)}</span>

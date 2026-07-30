@@ -511,11 +511,20 @@ export interface ForecastEvent {
   amountMinor: string | null;
 }
 
+export interface RecurringDue {
+  id: string;
+  name: string;
+  amountMinor: string;
+  currency: string;
+  on: string;
+}
+
 export function useForecast() {
   return useQuery({
     queryKey: ['forecast'],
     retry: false,
-    queryFn: () => api<{ horizonPeriods: number; events: ForecastEvent[] }>('/v1/forecast'),
+    queryFn: () =>
+      api<{ horizonPeriods: number; dueSoon: RecurringDue[]; events: ForecastEvent[] }>('/v1/forecast'),
   });
 }
 

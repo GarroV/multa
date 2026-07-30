@@ -205,6 +205,7 @@ export const ru: Record<TranslationKey, string> = {
   'forecast.goalReached': '{name} собрана',
   'forecast.goalRisk': '{name}: при таком темпе не хватит {amount}',
   'forecast.empty': 'На горизонте пока пусто',
+  'forecast.dueSoon': 'Списания в этом периоде',
   'receipt.open': 'Чек',
   'receipt.title': 'Добавить чек',
   'receipt.qrHint': 'Вставь содержимое QR — этот путь бесплатный и точный.',
