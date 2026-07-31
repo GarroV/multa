@@ -830,6 +830,10 @@ a {
   position: relative;
   padding: 18px 24px 26px;
   border-bottom: 1px solid var(--line);
+  /* clip, а не hidden: подпись у края оси не должна распирать страницу, но и скролл-контейнер
+     здесь не нужен. Ширина текста зависит от рендеринга шрифтов, поэтому на Linux-раннере
+     подпись вылезала на 7px там, где на macOS помещалась (пойман браузерным E2E). */
+  overflow-x: clip;
 }
 .pmap-line {
   position: relative;
@@ -1316,6 +1320,12 @@ a {
 /* На телефоне переполнение давали суммы в одну строку: колонка «факт / план» и подписи корзин
    не сжимались (E2E: 30px на 375px). Разрешаем переносы и отдаём суммам всю ширину строки. */
 @media (max-width: 560px) {
+  /* На телефоне подпись события не обязана быть одной строкой: важнее, чтобы ось влезала. */
+  .pmap-cap {
+    white-space: normal;
+    max-width: 38vw;
+    text-align: center;
+  }
   .prow {
     grid-template-columns: auto minmax(0, 1fr) auto;
     row-gap: 2px;
