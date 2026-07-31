@@ -115,6 +115,59 @@ export const incomeReceiptSchema = z.object({
  * Горизонт аналитики (issue #51). Диапазон ограничен: один период — не история, а десятки периодов
  * превращают спарклайн в кашу. Мусор отклоняем, а не подменяем дефолтом молча.
  */
+/**
+ * Настройки воркспейса (issue #49). Каждая группа со своими дефолтами, поэтому чтение старой записи
+ * без части полей даёт полный объект — миграции данных на каждое новое поле не нужны.
+ *
+ * Порядок сжатия ограничен режущимися уровнями: долги и валютные корзины автоматика не трогает ни
+ * при какой настройке (железное правило 3), и протащить их сюда нельзя даже запросом.
+ */
+export const compressibleKind = z.enum(['goal', 'envelope', 'category']);
+
+const periodsSettings = z.object({
+  /** Предлагать поднять заниженные статьи (советы по медиане факта). */
+  suggestRaises: z.boolean().default(true),
+});
+
+const currencySettings = z.object({
+  rateSource: z.enum(['cbr', 'ecb', 'manual']).default('cbr'),
+  /** Спред по умолчанию в базисных пунктах: 150 = 1,5%. */
+  defaultSpreadBp: z.number().int().min(0).max(2000).default(0),
+  defaultProvider: z.string().min(1).max(40).nullable().default(null),
+});
+
+const cascadeSettings = z.object({
+  /** Доля остатка, которую не включаем в дневной темп. Больше половины — уже вторая заначка. */
+  bufferPct: z.number().int().min(0).max(50).default(0),
+  compressOrder: z.array(compressibleKind).min(1).max(3).default(['goal', 'envelope', 'category']),
+});
+
+const signalsSettings = z.object({
+  /** За сколько дней до конца периода считать «деньги кончатся раньше» тревогой. */
+  burnThresholdDays: z.number().int().min(1).max(14).default(3),
+  /** Сколько прошлых периодов берём в медиану: меньше двух — не история. */
+  medianPeriods: z.number().int().min(2).max(24).default(6),
+});
+
+export const workspaceSettingsSchema = z
+  .object({
+    periods: periodsSettings.default({}),
+    currency: currencySettings.default({}),
+    cascade: cascadeSettings.default({}),
+    signals: signalsSettings.default({}),
+  })
+  .default({});
+
+/** Частичная правка: тронутые группы сливаются с сохранёнными, остальное остаётся как было. */
+export const workspaceSettingsPatchSchema = z.object({
+  periods: periodsSettings.partial().optional(),
+  currency: currencySettings.partial().optional(),
+  cascade: cascadeSettings.partial().optional(),
+  signals: signalsSettings.partial().optional(),
+});
+
+export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
+
 export const analyticsQuerySchema = z.object({
   periods: z.coerce.number().int().min(2).max(24).default(6),
 });

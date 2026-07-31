@@ -6,6 +6,7 @@ import { db } from '../db/client.ts';
 import { categories, payPeriods, plannedItems, transactions } from '../db/schema/domain.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import { currentPeriodFor } from '../plan/assemble.ts';
+import { settingsOf } from '../settings/store.ts';
 import { analyticsQuerySchema } from '../validation.ts';
 
 /**
@@ -27,7 +28,10 @@ interface SeriesPoint {
 
 analyticsRoute.get('/analytics/categories', async (c) => {
   const ws = c.get('workspace')!;
-  const { periods } = analyticsQuerySchema.parse(c.req.query());
+  // Горизонт: параметр запроса важнее настройки (экран может попросить другой), настройка —
+  // значение по умолчанию для этого воркспейса (issue #49).
+  const requested = analyticsQuerySchema.parse(c.req.query());
+  const periods = c.req.query('periods') ? requested.periods : settingsOf(ws).signals.medianPeriods;
   const period = currentPeriodFor(ws, today(ws.timezone));
 
   const [catRows, factRows, plannedRows] = await Promise.all([

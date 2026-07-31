@@ -1,7 +1,7 @@
 import { fromMajor } from '@multa/core';
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
-import { useCreateExchange, useMe } from '../lib/queries.ts';
+import { useCreateExchange, useMe, useSettings } from '../lib/queries.ts';
 
 /**
  * Ввод размена: обе стороны сделки руками, курс и спред считает сервер. Смысл — копилка потерь:
@@ -23,6 +23,8 @@ export function ExchangeEntry() {
   const { data: me } = useMe();
   const base = me?.workspace?.baseCurrency ?? 'RUB';
   const create = useCreateExchange();
+  // Провайдер из настроек: его набирают каждый раз один и тот же (issue #49).
+  const { data: settings } = useSettings();
 
   const [fromCurrency, setFromCurrency] = useState(base);
   const [toCurrency, setToCurrency] = useState(base === 'RUB' ? 'RSD' : 'RUB');
@@ -30,6 +32,7 @@ export function ExchangeEntry() {
   const [toValue, setToValue] = useState('');
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState('');
+  const providerHint = settings?.currency.defaultProvider ?? '';
   const [invalid, setInvalid] = useState(false);
 
   const sameCurrency = fromCurrency.toUpperCase() === toCurrency.toUpperCase();
@@ -49,7 +52,8 @@ export function ExchangeEntry() {
         fromMinor,
         toMinor,
         occurredOn,
-        ...(note.trim() ? { note: note.trim() } : {}),
+        // Пустое поле означает «как обычно»: подставляем провайдера из настроек.
+        ...(note.trim() || providerHint ? { note: note.trim() || providerHint } : {}),
       },
       {
         onSuccess: () => {
@@ -109,7 +113,7 @@ export function ExchangeEntry() {
         />
         <input
           className="field grow"
-          placeholder="—"
+          placeholder={providerHint || '—'}
           aria-label={t('fx.provider')}
           value={note}
           onChange={(e) => setNote(e.target.value)}

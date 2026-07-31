@@ -182,3 +182,49 @@ describe('executionOf — исполнение плановой строки (С
     expect(executionOf(0n, 0n)).toEqual({ status: 'n_a', remainderMinor: 0n });
   });
 });
+
+describe('буфер цифры дня', () => {
+  // Полноценный результат каскада, а не его обрезок: сводка читает и суммы плана тоже.
+  const result = cascade(30_000_00n, [
+    { targetKind: 'category', targetId: 'c', plannedMinor: 30_000_00n },
+  ]);
+
+  it('без буфера цифра дня — весь остаток, поделённый на дни', () => {
+    const summary = summarizePlan(result, { daysInPeriod: 10 });
+    const fact = summarizeFact(summary, { spentLivingMinor: 0n, daysLeft: 10 });
+    expect(fact.canSpendPerDayMinor).toBe(30_000_00n / 10n);
+    expect(fact.bufferMinor).toBe(0n);
+  });
+
+  it('буфер 10% откладывается от остатка, а не от плана', () => {
+    const summary = summarizePlan(result, { daysInPeriod: 10 });
+    const fact = summarizeFact(summary, {
+      spentLivingMinor: 10_000_00n,
+      daysLeft: 5,
+      bufferPct: 10,
+    });
+    // Остаток 20 000; буфер 2 000; на день = 18 000 / 5.
+    expect(fact.bufferMinor).toBe(2_000_00n);
+    expect(fact.canSpendPerDayMinor).toBe(18_000_00n / 5n);
+    // Сам остаток буфер не уменьшает: он про темп, а не про исчезновение денег.
+    expect(fact.remainingLivingMinor).toBe(20_000_00n);
+  });
+
+  it('при перерасходе буфер не выдумывается', () => {
+    const summary = summarizePlan(result, { daysInPeriod: 10 });
+    const fact = summarizeFact(summary, {
+      spentLivingMinor: 35_000_00n,
+      daysLeft: 3,
+      bufferPct: 10,
+    });
+    expect(fact.bufferMinor).toBe(0n);
+    expect(fact.canSpendPerDayMinor).toBe(0n);
+  });
+
+  it('буфер вне диапазона 0–50% отвергается как ошибка настройки', () => {
+    const summary = summarizePlan(result, { daysInPeriod: 10 });
+    expect(() =>
+      summarizeFact(summary, { spentLivingMinor: 0n, daysLeft: 5, bufferPct: 80 }),
+    ).toThrow();
+  });
+});
