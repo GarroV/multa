@@ -15,8 +15,10 @@ import {
   useCancelIncomeReceipt,
   useConfirmExecution,
   useForecast,
+  useRevisions,
   usePlan,
   useSkipExecution,
+  useUndoRevision,
   type ForecastEvent,
   type IncomeEventDto,
   type PlanAllocation,
@@ -176,6 +178,59 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
           <span />
         </div>
       ))}
+    </Panel>
+  );
+}
+
+/**
+ * История правок периода (issue #52): что перенесли, откуда и когда. Откат доступен, пока деньги
+ * не ушли дальше; если ушли — говорим прямо, а не молча ничего не делаем.
+ */
+function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
+  const { t } = useI18n();
+  const { data = [] } = useRevisions();
+  const undo = useUndoRevision();
+  if (data.length === 0) return null;
+
+  return (
+    <Panel
+      label={t('rev.title')}
+      accent="amber"
+      foot={undo.isError ? <span className="sub danger">{t('rev.cantUndo')}</span> : undefined}
+    >
+      {data.map((rev) => {
+        const first = rev.moves[0];
+        return (
+          <div className="prow" key={rev.id}>
+            <span className="prow-day">{rev.createdAt.slice(5, 10)}</span>
+            <span className="prow-name">
+              <span>
+                {first
+                  ? t('rev.move', {
+                      amount: `${formatMinor(first.amountMinor, base, locale)} ${base}`,
+                      to: first.toName ?? '—',
+                      from: first.fromName ?? '—',
+                    })
+                  : rev.reason}
+              </span>
+              {rev.undone && <Tag>{t('rev.undone')}</Tag>}
+            </span>
+            <span className="prow-num" />
+            {rev.undone ? (
+              <span />
+            ) : (
+              <button
+                type="button"
+                className="act"
+                disabled={undo.isPending}
+                onClick={() => undo.mutate(rev.id)}
+              >
+                {t('rev.undo')}
+              </button>
+            )}
+          </div>
+        );
+      })}
     </Panel>
   );
 }
@@ -468,6 +523,8 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               </div>
             </Panel>
           )}
+
+          <RevisionsPanel base={base} locale={locale} />
 
           <ForecastPanel base={base} locale={locale} />
 

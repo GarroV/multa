@@ -30,7 +30,12 @@ import {
 import {
   applyRebalance,
   getCurrentPlan,
+  listRevisions,
   rebalanceSuggestions,
+  RevisionAlreadyUndone,
+  RevisionNotFound,
+  undoRevision,
+  UndoWouldGoNegative,
   setCategoryBudget,
   setExecution,
 } from './plan/assemble.ts';
@@ -218,6 +223,31 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
     throw err;
   }
 }
+
+/**
+ * История ревизий периода и откат (issue #52). Откат — тоже ревизия: история дописывается, а не
+ * переписывается, потому что по ней считается «как обычно» в подсказках пересборки.
+ */
+app.get('/v1/plan/current/revisions', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  return c.json(await listRevisions(ws, today(ws.timezone)));
+});
+
+app.post('/v1/plan/current/revisions/:id/undo', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const id = c.req.param('id');
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+  try {
+    return c.json(await undoRevision(ws, today(ws.timezone), id));
+  } catch (err) {
+    if (err instanceof RevisionNotFound) return c.json({ error: 'not_found' }, 404);
+    if (err instanceof RevisionAlreadyUndone) return c.json({ error: 'already_undone' }, 409);
+    if (err instanceof UndoWouldGoNegative) return c.json({ error: 'undo_would_go_negative' }, 422);
+    throw err;
+  }
+});
 
 // Пересборка плана: варианты «откуда добавим» и применение выбранного (Спринт 4).
 app.get('/v1/plan/current/rebalance', requireWorkspace, async (c) => {

@@ -379,6 +379,46 @@ export function useCancelIncomeReceipt() {
   });
 }
 
+// --- История ревизий (issue #52) ---
+
+export interface RevisionMoveDto {
+  fromKind: string;
+  fromId: string;
+  fromName: string | null;
+  toKind: string;
+  toId: string;
+  toName: string | null;
+  amountMinor: string;
+}
+
+export interface RevisionDto {
+  id: string;
+  reason: string;
+  createdAt: string;
+  undone: boolean;
+  moves: RevisionMoveDto[];
+}
+
+export function useRevisions() {
+  return useQuery({
+    queryKey: ['revisions'],
+    retry: false,
+    queryFn: () => api<RevisionDto[]>('/v1/plan/current/revisions'),
+  });
+}
+
+/** Откат правки. История при этом дописывается, а не переписывается — так решено в бэкенде. */
+export function useUndoRevision() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api(`/v1/plan/current/revisions/${id}/undo`, { method: 'POST' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['revisions'] });
+    },
+  });
+}
+
 // --- Счета и остатки (issue #45) ---
 
 export interface AccountDto {
