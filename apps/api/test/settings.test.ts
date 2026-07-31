@@ -138,6 +138,37 @@ describe('настройки воркспейса', () => {
     expect(rows.find((r) => r.categoryId === food)!.series).toHaveLength(2);
   });
 
+  test('горизонт из настроек и горизонт советов в плане — один и тот же', async () => {
+    // Расхождение здесь означало бы два разных вердикта по одной категории на двух экранах:
+    // «Статистика» просила ровно шесть периодов, пока настройка говорила другое (найдено аудитом).
+    const client = await onboarded();
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '1000000' }),
+    );
+    for (const day of PAST_DAYS) {
+      await expectOk(
+        await client.post('/v1/transactions', {
+          amountMinor: '2400000',
+          currency: 'RUB',
+          categoryId: food,
+          occurredOn: day,
+        }),
+        201,
+      );
+    }
+
+    await patch(client, { signals: { medianPeriods: 3 } });
+    const plan = await getPlan(client);
+    const advice = plan.allocations.find((a) => a.targetId === food)?.advice;
+    const rows = await expectOk<{ categoryId: string; periods: number }[]>(
+      await client.get('/v1/analytics/categories'),
+    );
+    const row = rows.find((r) => r.categoryId === food)!;
+    expect(advice?.periods).toBe(3);
+    expect(row.periods).toBe(3);
+  });
+
   test('выключенные советы перестают приходить в план', async () => {
     const client = await onboarded();
     const food = await categoryId(client, 'Продукты');
