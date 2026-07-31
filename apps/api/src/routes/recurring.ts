@@ -1,4 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
+import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { recurringItems } from '../db/schema/domain.ts';
@@ -56,6 +57,7 @@ recurringRoute.post('/recurring-items', async (c) => {
 
 recurringRoute.patch('/recurring-items/:id', async (c) => {
   const ws = c.get('workspace')!;
+  if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
   const body = recurringPatchSchema.parse(await c.req.json());
   const updated = await db
     .update(recurringItems)
@@ -74,6 +76,7 @@ recurringRoute.patch('/recurring-items/:id', async (c) => {
 
 recurringRoute.delete('/recurring-items/:id', async (c) => {
   const ws = c.get('workspace')!;
+  if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
   const deleted = await db
     .delete(recurringItems)
     .where(and(eq(recurringItems.id, c.req.param('id')), eq(recurringItems.workspaceId, ws.id)))

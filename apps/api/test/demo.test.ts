@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { anonymous, expectOk, onboarded, type PlanDto } from './client.ts';
+import { anonymous, expectOk, onboarded, seedRate, type PlanDto } from './client.ts';
 
 /**
  * Демо без регистрации (issue #56). Проверяется ровно то, что обещано смотрящему: один запрос —
@@ -58,6 +58,23 @@ describe('вход в демо', () => {
     // Итог обязан считаться: «—» вместо суммы означало бы, что курсов демо нет.
     expect(balances.unresolved).toEqual([]);
     expect(BigInt(balances.totalMinor ?? '0')).toBeGreaterThan(0n);
+  });
+
+  test('демо показывает подтверждённый доход и правку плана, а не пустые панели', async () => {
+    const guest = anonymous();
+    await expectOk(await guest.post('/v1/demo/enter'));
+
+    // Правило продукта: новая фича обязана быть видна в демо, иначе показывать нечего.
+    const plan = await expectOk<PlanDto & { income: { events: { status: string }[] } }>(
+      await guest.get('/v1/plan/current'),
+    );
+    expect(plan.income.events.some((e) => e.status === 'received')).toBe(true);
+
+    const revisions = await expectOk<{ kind: string; moves: { amountMinor: string }[] }[]>(
+      await guest.get('/v1/plan/current/revisions'),
+    );
+    expect(revisions.length).toBeGreaterThan(0);
+    expect(revisions[0]?.moves[0]?.amountMinor).toBe('50000');
   });
 
   test('данные демо на английском', async () => {
@@ -144,6 +161,25 @@ describe('вход в демо', () => {
       await guest.get('/v1/transactions'),
     );
     expect(clean.transactions.some((t) => t.note === 'спонтанная трата смотрящего')).toBe(false);
+  });
+
+  test('вход в демо не подменяет курсы другим воркспейсам', async () => {
+    // Демо-курсы — личные курсы демо-воркспейса. Пока они лежали в глобальном fx_rates с
+    // source=manual, вход в демо переопределял курс всем: транзакция в EUR считалась по демо-курсу
+    // вместо котировки ЦБ (найдено адверсарным аудитом).
+    const alice = await onboarded();
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+
+    await expectOk(await anonymous().post('/v1/demo/enter'));
+
+    const tx = await expectOk<{ rate: string; rateSource: string; baseAmountMinor: string }>(
+      await alice.post('/v1/transactions', { amountMinor: '10000', currency: 'EUR' }),
+      201,
+    );
+    expect(tx.rateSource).toBe('cbr');
+    // 100 EUR по курсу 100 = 10 000 RUB, а не 9 090 по демо-курсу 90.9.
+    expect(tx.baseAmountMinor).toBe('1000000');
   });
 
   test('демо-сессия не видит чужой воркспейс', async () => {

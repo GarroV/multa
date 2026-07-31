@@ -1,4 +1,5 @@
 import { convert, money, parseEntry, periodForDate, type PeriodConfig } from '@multa/core';
+import { isUuid } from '../http/ids.ts';
 import { and, desc, eq, gte, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
@@ -138,6 +139,7 @@ transactionsRoute.post('/transactions', async (c) => {
 
 transactionsRoute.delete('/transactions/:id', async (c) => {
   const ws = c.get('workspace')!;
+  if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
   const deleted = await db
     .delete(transactions)
     .where(and(eq(transactions.id, c.req.param('id')), eq(transactions.workspaceId, ws.id)))

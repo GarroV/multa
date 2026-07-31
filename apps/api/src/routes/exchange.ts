@@ -1,4 +1,5 @@
 import { exchangeResult } from '@multa/core';
+import { isUuid } from '../http/ids.ts';
 import { and, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
@@ -98,6 +99,7 @@ exchangeRoute.post('/exchange-ops', async (c) => {
 
 exchangeRoute.delete('/exchange-ops/:id', async (c) => {
   const ws = c.get('workspace')!;
+  if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
   const deleted = await db
     .delete(exchangeOps)
     .where(and(eq(exchangeOps.id, c.req.param('id')), eq(exchangeOps.workspaceId, ws.id)))

@@ -1,4 +1,5 @@
 import type { TargetKind } from '@multa/core';
+import { isUuid } from './http/ids.ts';
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -180,7 +181,7 @@ app.get('/v1/plan/current', requireWorkspace, async (c) => {
 async function handleCategoryBudget(c: Context<{ Variables: AppVariables }>, plannedMinor: bigint) {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
-  if (!id) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
   try {
     const plan = await setCategoryBudget(ws, today(ws.timezone), id, plannedMinor);
     return c.json(plan);
@@ -205,7 +206,7 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
   const ws = c.get('workspace')!;
   const targetKind = c.req.param('kind') as TargetKind;
   const targetId = c.req.param('id');
-  if (!targetId) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(targetId)) return c.json({ error: 'not_found' }, 404);
   const body =
     mode === 'confirm' ? executionSchema.parse(await c.req.json().catch(() => ({}))) : {};
   try {
@@ -255,7 +256,7 @@ for (const [suffix, frozen] of [
     const ws = c.get('workspace')!;
     const kind = c.req.param('kind') as TargetKind;
     const id = c.req.param('id');
-    if (!id || !UUID_PATH_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+    if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
     try {
       return c.json(await setGoalFreeze(ws, today(ws.timezone), kind, id, frozen));
     } catch (err) {

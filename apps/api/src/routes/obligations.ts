@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { currencyBuckets, debts, envelopes, goals } from '../db/schema/domain.ts';
@@ -46,6 +47,7 @@ for (const { path, table, schema } of ENTITIES) {
 
   obligations.delete(`/${path}/:id`, async (c) => {
     const ws = c.get('workspace')!;
+    if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
     await db
       .delete(table)
       .where(and(eq(table.id, c.req.param('id')), eq(table.workspaceId, ws.id)));
