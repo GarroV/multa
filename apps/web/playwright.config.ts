@@ -15,6 +15,8 @@ const WEB_PORT = 4173;
 const DB =
   process.env.E2E_DATABASE_URL ?? 'postgres://multa:multa_dev_password@localhost:5432/multa_e2e';
 
+process.env.E2E_API_URL ??= `http://localhost:${API_PORT}`;
+
 export default defineConfig({
   testDir: './e2e',
   // Демо — общий воркспейс, его пересеивает каждый вход: параллельные файлы гонялись бы по одним

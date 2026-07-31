@@ -4,10 +4,12 @@ import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
+  useAccounts,
   useCreateEntity,
   useDeleteEntity,
   useEntities,
   useMe,
+  useSaveAccount,
   type Bucket,
   type Debt,
   type Envelope,
@@ -97,6 +99,124 @@ function Section({
         rows
       )}
     </Panel>
+  );
+}
+
+function AccountsSection({ base }: SectionProps) {
+  const { t, locale } = useI18n();
+  const { data = [], isError, refetch } = useAccounts();
+  const save = useSaveAccount();
+  const [name, setName] = useState('');
+  const [ccy, setCcy] = useState(base);
+  const [kind, setKind] = useState<'cash' | 'card' | 'savings' | 'other'>('cash');
+  const [balance, setBalance] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const add = () => {
+    const balanceMinor = balance.trim() === '' ? '0' : toMinor(balance, ccy);
+    if (!name.trim()) return setError(t('obl.needName'));
+    if (!isCurrency(ccy)) return setError(t('obl.badCurrency'));
+    if (balanceMinor === null) return setError(t('spend.badAmount'));
+    setError(null);
+    save.mutate(
+      { name: name.trim(), currency: ccy, kind, balanceMinor },
+      {
+        onSuccess: () => {
+          setName('');
+          setBalance('');
+        },
+      },
+    );
+  };
+
+  return (
+    <Section
+      label={t('acc.title')}
+      accent="cyan"
+      isError={isError}
+      onRetry={() => void refetch()}
+      formError={error}
+      mutationError={save.isError}
+      rows={
+        data.length === 0 ? (
+          <div className="prow">
+            <span />
+            <span className="dim">{t('common.empty')}</span>
+            <span />
+            <span />
+          </div>
+        ) : (
+          data.map((a) => (
+            <div className="prow" key={a.id}>
+              <span className="prow-day" aria-hidden />
+              <span className="prow-name">
+                <span>{a.name}</span>
+                <Tag>{t(`acc.kind.${a.kind}`)}</Tag>
+                {a.currency !== base && <Tag tone="vio">{a.currency}</Tag>}
+              </span>
+              <span className="prow-num">
+                <b>
+                  {formatMinor(a.balanceMinor, a.currency, locale)} {a.currency}
+                </b>
+              </span>
+              {/* Архивация, а не удаление: к счёту привязана история трат. */}
+              <button
+                type="button"
+                className="act"
+                title={t('acc.archive')}
+                disabled={save.isPending}
+                onClick={() => save.mutate({ id: a.id, archived: true })}
+              >
+                {t('acc.archive')}
+              </button>
+            </div>
+          ))
+        )
+      }
+      form={
+        <>
+          <div className="form-row">
+            <input
+              className="field grow"
+              placeholder={t('common.name')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              className="field mono field-ccy"
+              maxLength={3}
+              aria-label={t('common.currency')}
+              value={ccy}
+              onChange={(e) => setCcy(e.target.value.toUpperCase())}
+            />
+          </div>
+          <div className="form-row">
+            <select
+              className="field"
+              aria-label={t('acc.title')}
+              value={kind}
+              onChange={(e) => setKind(e.target.value as typeof kind)}
+            >
+              {(['cash', 'card', 'savings', 'other'] as const).map((k) => (
+                <option key={k} value={k}>
+                  {t(`acc.kind.${k}`)}
+                </option>
+              ))}
+            </select>
+            <input
+              className="field mono field-sm"
+              inputMode="decimal"
+              placeholder={t('acc.balance')}
+              value={balance}
+              onChange={(e) => setBalance(e.target.value)}
+            />
+            <button type="button" className="btn" disabled={save.isPending} onClick={add}>
+              {t('common.add')}
+            </button>
+          </div>
+        </>
+      }
+    />
   );
 }
 
@@ -597,6 +717,7 @@ export function Obligations() {
       {/* Четыре вида обязательств равнозначны: две колонки, ни один не главнее. */}
       <div className="panels">
         <div className="col">
+          <AccountsSection base={base} />
           <DebtsSection base={base} />
           <GoalsSection base={base} />
         </div>

@@ -35,6 +35,7 @@ import {
   setExecution,
 } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
+import { accountsRoute } from './routes/accounts.ts';
 import { demoRoute } from './routes/demo.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
@@ -280,6 +281,8 @@ app.get('/v1/fx/rate', requireAuth, async (c) => {
 // а в Hono такой middleware из подключённого роутера действует на все пути /v1/*, смонтированные
 // после него, — публичный роут ниже получал бы 401 ещё до своего хендлера.
 app.route('/v1', demoRoute);
+// Счета и мультивалютные остатки (#45): «сколько всего денег есть».
+app.route('/v1', accountsRoute);
 
 // CRUD обязательств (Спринт 2): /v1/debts, /v1/envelopes, /v1/goals, /v1/buckets
 app.route('/v1', obligations);

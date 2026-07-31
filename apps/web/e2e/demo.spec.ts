@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { enterDemo, resetDemo } from './helpers.ts';
 
 /**
  * Демо и план — то, что видит смотрящий за первый клик (issues #56, #30). Если этот файл красный,
@@ -7,7 +8,7 @@ import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   // Каждый тест начинает с одинакового наполнения: демо — общий воркспейс, его пачкают траты.
-  await page.request.post('/v1/demo/reset').catch(() => undefined);
+  await resetDemo(page);
 });
 
 test('вход в демо без регистрации открывает наполненный план', async ({ page }) => {
@@ -18,6 +19,12 @@ test('вход в демо без регистрации открывает на
   const canSpend = page.locator('.kpi', { hasText: /YOU CAN SPEND|МОЖНО ТРАТИТЬ/ });
   await expect(canSpend).toBeVisible();
   await expect(canSpend.locator('.kpi-value')).toContainText(/\d/);
+
+  // «Сколько всего денег» — первый блок прототипа (issue #45): три валюты и общий итог.
+  const onHand = page.locator('.kpi', { hasText: /MONEY ON HAND|ВСЕГО ДЕНЕГ/ });
+  await expect(onHand).toBeVisible();
+  await expect(onHand.locator('.kpi-value')).toContainText(/\d/);
+  await expect(onHand.locator('.kpi-rows > div')).toHaveCount(3);
 
   // Каскад: все пять групп раздачи, иначе показ демонстрирует пустой продукт.
   const legend = page.locator('.legend');

@@ -379,6 +379,55 @@ export function useCancelIncomeReceipt() {
   });
 }
 
+// --- Счета и остатки (issue #45) ---
+
+export interface AccountDto {
+  id: string;
+  name: string;
+  currency: string;
+  kind: 'cash' | 'card' | 'savings' | 'other';
+  balanceMinor: string;
+  archived: boolean;
+}
+
+export interface BalancesDto {
+  baseCurrency: string;
+  /** null — по какой-то валюте нет курса: сумму без части денег показывать нельзя. */
+  totalMinor: string | null;
+  byCurrency: { currency: string; minor: string; baseMinor: string | null }[];
+  unresolved: string[];
+}
+
+export function useAccounts(includeArchived = false) {
+  return useQuery({
+    queryKey: ['accounts', includeArchived],
+    queryFn: () => api<AccountDto[]>(`/v1/accounts${includeArchived ? '?includeArchived=1' : ''}`),
+  });
+}
+
+export function useBalances() {
+  return useQuery({
+    queryKey: ['balances'],
+    queryFn: () => api<BalancesDto>('/v1/accounts/balances'),
+  });
+}
+
+export function useSaveAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string } & Partial<AccountDto>) => {
+      const { id, ...body } = input;
+      return id
+        ? api<AccountDto>(`/v1/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+        : api<AccountDto>('/v1/accounts', { method: 'POST', body: JSON.stringify(body) });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['accounts'] });
+      void qc.invalidateQueries({ queryKey: ['balances'] });
+    },
+  });
+}
+
 // --- Факт трат (Спринт 3) ---
 
 export interface Transaction {

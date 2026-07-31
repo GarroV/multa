@@ -158,28 +158,30 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 > `/v1/auth/*` и `/v1/demo/*`, требуют сессии; скоуп workspace берётся из токена, клиент его не передаёт
 > (правило 7) — демо-сессия здесь не исключение, она такой же ограниченный воркспейс.
 
-| Метод и путь                                                         | Что делает                                                      | Спринт |
-| -------------------------------------------------------------------- | --------------------------------------------------------------- | ------ |
-| `GET /v1/health`                                                     | живость + свежесть курсов                                       | 1      |
-| `* /v1/auth/*`                                                       | better-auth (email+password, TOTP)                              | 1      |
-| `GET /v1/me`                                                         | пользователь + его workspace                                    | 1      |
-| `POST /v1/workspace`, `PATCH /v1/workspace`                          | создание и правка воркспейса                                    | 1      |
-| `POST /v1/onboarding/income`                                         | ритм + источники дохода одним шагом                             | доход  |
-| `POST /v1/onboarding/skip`                                           | пропустить обучение, войти с пустым планом                      | доход  |
-| `GET/POST/PATCH/DELETE /v1/income-sources`                           | источники дохода                                                | доход  |
-| `GET /v1/plan/current`                                               | план периода: каскад, факт, сигнал burn-rate                    | 2–4    |
-| `PUT/DELETE /v1/plan/current/categories/:id`                         | бюджет категории на период                                      | 2      |
-| `POST /v1/plan/current/items/:kind/:id/confirm`, `/skip`             | исполнение плановой строки                                      | 3      |
-| `GET/POST /v1/plan/current/rebalance`                                | варианты пересборки и применение                                | 4      |
-| `GET /v1/forecast`                                                   | таймлайн: закрытие долгов, цели, риски                          | 4      |
-| `GET/POST/DELETE /v1/debts`, `/envelopes`, `/goals`, `/buckets`      | обязательства                                                   | 2      |
-| `GET/POST/PATCH/DELETE /v1/categories`                               | категории                                                       | 2      |
-| `GET/POST/DELETE /v1/transactions`                                   | факт: траты и внеплановые приходы                               | 3      |
-| `POST /v1/transactions/parse`                                        | разбор фразы: regex ядра, за ним LLM-фоллбэк                    | 5      |
-| `POST /v1/transactions/voice`                                        | голосовая заметка → Whisper → тот же разбор фразы               | 5      |
-| `GET/POST/PATCH/DELETE /v1/recurring-items`                          | регулярные платежи вне обязательств                             | 5      |
-| `GET/POST/DELETE /v1/exchange-ops`                                   | размены, фактический курс и спред                               | 3      |
-| `GET /v1/receipts`, `POST /v1/receipts/qr`, `/photo`, `/:id/confirm` | чеки: QR-путь, vision-фоллбэк, подтверждение раскладки          | 5      |
-| `GET /v1/fx/rate`                                                    | курс пары на дату                                               | 1      |
-| `POST /v1/demo/enter`                                                | вход в демо без регистрации: сессия + наполненный воркспейс     | 6      |
-| `POST /v1/demo/reset`                                                | возврат демо к исходному наполнению (то же делает часовой cron) | 6      |
+| Метод и путь                                                         | Что делает                                                       | Спринт |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------- | ------ |
+| `GET /v1/health`                                                     | живость + свежесть курсов                                        | 1      |
+| `* /v1/auth/*`                                                       | better-auth (email+password, TOTP)                               | 1      |
+| `GET /v1/me`                                                         | пользователь + его workspace                                     | 1      |
+| `POST /v1/workspace`, `PATCH /v1/workspace`                          | создание и правка воркспейса                                     | 1      |
+| `POST /v1/onboarding/income`                                         | ритм + источники дохода одним шагом                              | доход  |
+| `POST /v1/onboarding/skip`                                           | пропустить обучение, войти с пустым планом                       | доход  |
+| `GET/POST/PATCH/DELETE /v1/income-sources`                           | источники дохода                                                 | доход  |
+| `GET /v1/plan/current`                                               | план периода: каскад, факт, сигнал burn-rate                     | 2–4    |
+| `PUT/DELETE /v1/plan/current/categories/:id`                         | бюджет категории на период                                       | 2      |
+| `POST /v1/plan/current/items/:kind/:id/confirm`, `/skip`             | исполнение плановой строки                                       | 3      |
+| `GET/POST /v1/plan/current/rebalance`                                | варианты пересборки и применение                                 | 4      |
+| `GET /v1/forecast`                                                   | таймлайн: закрытие долгов, цели, риски                           | 4      |
+| `GET/POST/PATCH/DELETE /v1/accounts`                                 | счета: наличные, карты, накопительные; архивация вместо удаления | 6      |
+| `GET /v1/accounts/balances`                                          | «сколько всего денег»: суммы по валютам + итог в базовой         | 6      |
+| `GET/POST/DELETE /v1/debts`, `/envelopes`, `/goals`, `/buckets`      | обязательства                                                    | 2      |
+| `GET/POST/PATCH/DELETE /v1/categories`                               | категории                                                        | 2      |
+| `GET/POST/DELETE /v1/transactions`                                   | факт: траты и внеплановые приходы                                | 3      |
+| `POST /v1/transactions/parse`                                        | разбор фразы: regex ядра, за ним LLM-фоллбэк                     | 5      |
+| `POST /v1/transactions/voice`                                        | голосовая заметка → Whisper → тот же разбор фразы                | 5      |
+| `GET/POST/PATCH/DELETE /v1/recurring-items`                          | регулярные платежи вне обязательств                              | 5      |
+| `GET/POST/DELETE /v1/exchange-ops`                                   | размены, фактический курс и спред                                | 3      |
+| `GET /v1/receipts`, `POST /v1/receipts/qr`, `/photo`, `/:id/confirm` | чеки: QR-путь, vision-фоллбэк, подтверждение раскладки           | 5      |
+| `GET /v1/fx/rate`                                                    | курс пары на дату                                                | 1      |
+| `POST /v1/demo/enter`                                                | вход в демо без регистрации: сессия + наполненный воркспейс      | 6      |
+| `POST /v1/demo/reset`                                                | возврат демо к исходному наполнению (то же делает часовой cron)  | 6      |
