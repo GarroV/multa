@@ -1036,6 +1036,13 @@ a {
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* Выбранное состояние: раньше оно жило только в aria-pressed, то есть было слышно скринридеру и
+   невидимо глазом — в группах на `.act` (порядок сжатия, тумблеры) выбор было не отличить. */
+.act[aria-pressed='true'] {
+  color: var(--ink);
+  border-color: rgba(var(--cyan-rgb), 0.5);
+  background: rgba(var(--cyan-rgb), 0.16);
+}
 
 /* --- Строка ведомости --- */
 .prow {

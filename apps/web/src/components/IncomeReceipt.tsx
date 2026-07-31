@@ -37,11 +37,18 @@ export function IncomeReceipt({
     if (rate.trim() !== '' && !/^\d+(\.\d+)?$/.test(rate.trim().replace(',', '.'))) {
       return setError(t('income.badRate'));
     }
+    let amountMinor: string;
+    try {
+      amountMinor = fromMajor(clean, event.currency).minor.toString();
+    } catch {
+      // Лишние знаки после точки: сообщаем, а не падаем молча после setError(null) (находка аудита).
+      return setError(t('spend.badAmount'));
+    }
     setError(null);
     confirm.mutate(
       {
         sourceId: event.sourceId,
-        amountMinor: fromMajor(clean, event.currency).minor.toString(),
+        amountMinor,
         currency: event.currency,
         occurredOn,
         ...(rate.trim() ? { rate: rate.trim().replace(',', '.') } : {}),

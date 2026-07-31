@@ -1,7 +1,7 @@
 import { useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { AppShell } from './AppShell.tsx';
-import { useI18n } from './lib/i18n.tsx';
+import { hasChosenLocale, useI18n } from './lib/i18n.tsx';
 import { useMe } from './lib/queries.ts';
 import { Demo } from './screens/Demo.tsx';
 import { Login } from './screens/Login.tsx';
@@ -20,6 +20,12 @@ export function App() {
   useEffect(() => {
     if (localeApplied.current || !wsLocale) return;
     localeApplied.current = true;
+    /*
+     * Локаль воркспейса — стартовое значение, а не приказ: если человек уже переключал язык сам,
+     * его выбор сильнее. Иначе перезагрузка возвращала язык воркспейса и «переключил на русский»
+     * не выживало (найдено браузерным E2E по следам аудита).
+     */
+    if (hasChosenLocale()) return;
     setLocale(wsLocale);
   }, [wsLocale, setLocale]);
 

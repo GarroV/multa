@@ -62,6 +62,8 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
   const skip = useSkipExecution();
   const freeze = useGoalFreeze();
   const busy = confirm.isPending || skip.isPending;
+  // Провал денежной мутации обязан быть виден: иначе он читается как «кнопка не сработала».
+  const failed = confirm.isError || skip.isError || freeze.isError;
   const done = a.executionStatus === 'confirmed';
   const skipped = a.executionStatus === 'skipped';
   const trimmed = BigInt(a.shortfallMinor) > 0n;
@@ -125,6 +127,7 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
           ⤫
         </button>
       </span>
+      {failed && <span className="prow-note danger">⚠ {t('common.error')}</span>}
     </div>
   );
 }
@@ -180,6 +183,22 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
 
   return (
     <Panel label={t('forecast.title')} accent="amber">
+      {/* Списания периода: они и так учтены в условии показа панели, значит должны быть видны. */}
+      {data.dueSoon.slice(0, 4).map((d) => (
+        <div className="prow" key={`due:${d.id}:${d.on}`}>
+          <span className="prow-day">{d.on.slice(8, 10)}</span>
+          <span className="prow-name">
+            <span>{d.name}</span>
+            <Tag>{t('forecast.dueSoon')}</Tag>
+          </span>
+          <span className="prow-num">
+            <b>
+              {formatMinor(d.amountMinor, d.currency, locale)} {d.currency}
+            </b>
+          </span>
+          <span />
+        </div>
+      ))}
       {data.events.slice(0, 6).map((e) => (
         <div className="prow" key={`${e.kind}:${e.targetId}`}>
           <span className="prow-day" aria-hidden />
@@ -462,6 +481,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                   >
                     {t('income.cancelReceipt')}
                   </button>
+                )}
+                {cancelReceipt.isError && (
+                  <span className="prow-note danger">⚠ {t('common.error')}</span>
                 )}
               </div>
             ))}

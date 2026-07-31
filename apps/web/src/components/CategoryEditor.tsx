@@ -18,7 +18,13 @@ import {
 function parseMinor(value: string, ccy: string): string | null {
   const s = value.trim().replace(',', '.');
   if (!/^\d+(\.\d+)?$/.test(s)) return null;
-  return fromMajor(s, ccy).minor.toString();
+  try {
+    return fromMajor(s, ccy).minor.toString();
+  } catch {
+    // fromMajor бросает на лишних знаках после точки (у JPY их нет вовсе, у RUB два). Без catch
+    // исключение вылетало из обработчика, и кнопка просто «не срабатывала» (найдено аудитом).
+    return null;
+  }
 }
 
 function CategoryRow({
@@ -39,6 +45,8 @@ function CategoryRow({
   const del = useDeleteCategory();
   // Строка может прийти без бюджета (только с фактом) — поле оставляем пустым, а не «0».
   const [rebalancing, setRebalancing] = useState(false);
+  // Невалидная сумма: показываем это словом, а не «кнопка не сработала» (находка аудита).
+  const [badInput, setBadInput] = useState(false);
   const [val, setVal] = useState(
     budget && budget.plannedMinor !== '0'
       ? toMajorString(money(BigInt(budget.plannedMinor), base))
@@ -52,7 +60,12 @@ function CategoryRow({
       return;
     }
     const minor = parseMinor(s, base);
-    if (minor === null) return; // невалидный ввод — не трогаем, не подставляем 0
+    // Невалидный ввод не трогаем и не подставляем 0 — но и не молчим: строка подсвечивается.
+    if (minor === null) {
+      setBadInput(true);
+      return;
+    }
+    setBadInput(false);
     if (!budget || minor !== budget.plannedMinor)
       setBudget.mutate({ id: cat.id, plannedMinor: minor });
   };
@@ -101,6 +114,7 @@ function CategoryRow({
             ⚠ {t('common.retry')}
           </span>
         )}
+        {badInput && <span className="sub danger">{t('spend.badAmount')}</span>}
       </span>
       <span className="row" style={{ gap: 8 }}>
         <input
