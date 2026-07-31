@@ -263,7 +263,7 @@ function DebtsSection({ base }: SectionProps) {
       isError={isError}
       onRetry={() => void refetch()}
       formError={error}
-      mutationError={create.isError}
+      mutationError={create.isError || del.isError}
       rows={
         data.length === 0 ? (
           <div className="prow">
@@ -397,7 +397,7 @@ function EnvelopesSection({ base }: SectionProps) {
       isError={isError}
       onRetry={() => void refetch()}
       formError={error}
-      mutationError={create.isError}
+      mutationError={create.isError || del.isError}
       rows={
         data.length === 0 ? (
           <div className="prow">
@@ -513,7 +513,7 @@ function GoalsSection({ base }: SectionProps) {
       isError={isError}
       onRetry={() => void refetch()}
       formError={error}
-      mutationError={create.isError}
+      mutationError={create.isError || del.isError}
       rows={
         data.length === 0 ? (
           <div className="prow">
@@ -630,7 +630,7 @@ function BucketsSection({ base }: SectionProps) {
       isError={isError}
       onRetry={() => void refetch()}
       formError={error}
-      mutationError={create.isError}
+      mutationError={create.isError || del.isError}
       rows={
         data.length === 0 ? (
           <div className="prow">

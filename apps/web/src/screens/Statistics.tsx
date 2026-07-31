@@ -66,13 +66,15 @@ function Signal({
   detail?: string;
   amount?: string;
 }) {
+  const { t } = useI18n();
   const tag = tone === 'risk' ? 'mag' : tone === 'attention' ? 'amber' : 'lime';
   return (
     <div className="prow">
       <span className="prow-day" aria-hidden />
       <span className="prow-name">
         <span>{title}</span>
-        <Tag tone={tag}>{tone}</Tag>
+        {/* Через словарь: сырой литерал 'risk' был единственным хардкодом строки в вебе. */}
+        <Tag tone={tag}>{t(`stats.tone.${tone}`)}</Tag>
       </span>
       <span className="prow-num">{amount && <b>{amount}</b>}</span>
       <span />
@@ -182,10 +184,27 @@ function CategoryAnalyticsPanel({ base, locale }: { base: string; locale: string
   const { t } = useI18n();
   // Горизонт не передаём: сервер берёт его из настроек воркспейса (issue #49). Иначе экран просил
   // бы шесть периодов даже при другой настройке, и вердикт здесь расходился бы с советом в плане.
-  const { data = [] } = useCategoryAnalytics();
+  const { data = [], isError, refetch } = useCategoryAnalytics();
   const { data: settings } = useSettings();
   const horizon = settings?.signals.medianPeriods ?? 6;
   const withHistory = data.filter((r) => r.series.length > 0);
+  // При сбое загрузки панель не исчезает молча: пустота и ошибка — разные сообщения.
+  if (isError) {
+    return (
+      <Panel label={t('stats.byPeriods', { periods: horizon })} accent="cyan">
+        <div className="prow">
+          <span className="prow-day" aria-hidden />
+          <span className="prow-name">
+            <span className="danger">{t('obl.loadFailed')}</span>
+          </span>
+          <span className="prow-num" />
+          <button type="button" className="act" onClick={() => void refetch()}>
+            {t('common.retry')}
+          </button>
+        </div>
+      </Panel>
+    );
+  }
   if (withHistory.length === 0) return null;
   const hasVolatile = withHistory.some((r) => r.verdict === 'volatile');
 
@@ -424,16 +443,29 @@ function StatsBody({ plan }: { plan: PlanDto }) {
           </Panel>
 
           <Panel label={t('fx.history')} accent="cyan">
-            {fx.data?.ops.length ? (
+            {/* Сбой загрузки — не «разменов не было»: иначе копилка потерь молча показывает ноль. */}
+            {fx.isError && (
+              <div className="prow">
+                <span className="prow-day" aria-hidden />
+                <span className="prow-name">
+                  <span className="danger">{t('obl.loadFailed')}</span>
+                </span>
+                <span className="prow-num" />
+                <button type="button" className="act" onClick={() => void fx.refetch()}>
+                  {t('common.retry')}
+                </button>
+              </div>
+            )}
+            {!fx.isError && fx.data?.ops.length ? (
               fx.data.ops.map((op) => <ExchangeRow key={op.id} op={op} locale={locale} />)
-            ) : (
+            ) : !fx.isError ? (
               <div className="prow">
                 <span />
                 <span className="dim">{t('fx.empty')}</span>
                 <span />
                 <span />
               </div>
-            )}
+            ) : null}
           </Panel>
         </div>
       </div>

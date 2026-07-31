@@ -15,7 +15,12 @@ const todayISO = (): string => new Date().toISOString().slice(0, 10);
 function parseMinor(value: string, ccy: string): string | null {
   const s = value.trim().replace(',', '.').replace(/[\s ]/g, '');
   if (!/^\d+(\.\d+)?$/.test(s) || Number(s) <= 0) return null;
-  return fromMajor(s, ccy).minor.toString();
+  try {
+    return fromMajor(s, ccy).minor.toString();
+  } catch {
+    // Лишние знаки после точки для валюты (RSD и JPY — целые): показываем ошибку, а не молчим.
+    return null;
+  }
 }
 
 export function ExchangeEntry() {

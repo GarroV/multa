@@ -16,7 +16,13 @@ import {
 function parseMinor(value: string, ccy: string): string | null {
   const s = value.trim().replace(',', '.');
   if (!/^\d+(\.\d+)?$/.test(s) || Number(s) <= 0) return null;
-  return fromMajor(s, ccy).minor.toString();
+  try {
+    return fromMajor(s, ccy).minor.toString();
+  } catch {
+    // Лишние знаки после точки (у JPY их нет вовсе): без catch исключение вылетало из submit до
+    // установки признака ошибки, и кнопка «записать» просто ничего не делала (находка аудита).
+    return null;
+  }
 }
 
 const todayISO = (): string => new Date().toISOString().slice(0, 10);

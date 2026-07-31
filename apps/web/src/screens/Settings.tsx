@@ -75,7 +75,11 @@ export function Settings() {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const ws = me?.workspace;
-  const { data: sources = [] } = useIncomeSources(Boolean(ws));
+  const {
+    data: sources = [],
+    isError: sourcesFailed,
+    refetch: refetchSources,
+  } = useIncomeSources(Boolean(ws));
   const removeSource = useDeleteIncomeSource();
   const addSource = useCreateIncomeSource();
 
@@ -252,7 +256,20 @@ export function Settings() {
             </div>
           }
         >
-          {sources.length === 0 && (
+          {/* Сбой загрузки не выдаём за «пусто»: иначе человек заведёт источник дохода второй раз. */}
+          {sourcesFailed && (
+            <div className="prow">
+              <span className="prow-day" aria-hidden />
+              <span className="prow-name">
+                <span className="danger">{t('obl.loadFailed')}</span>
+              </span>
+              <span className="prow-num" />
+              <button type="button" className="act" onClick={() => void refetchSources()}>
+                {t('common.retry')}
+              </button>
+            </div>
+          )}
+          {!sourcesFailed && sources.length === 0 && (
             <div className="prow">
               <span />
               <span className="dim">{t('common.empty')}</span>

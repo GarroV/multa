@@ -94,3 +94,45 @@ for (const width of [375, 768, 1024, 1440]) {
     }
   });
 }
+
+test('язык запоминается между визитами и попадает в <html lang> (находка аудита)', async ({
+  page,
+}) => {
+  await page.locator('.seg-btn', { hasText: 'RU' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+
+  await page.reload();
+  // Раньше язык сбрасывался на русский по умолчанию при каждом визите, хотя тема персистилась.
+  await expect(page.locator('.tab').first()).toHaveText('План');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+
+  await page.locator('.seg-btn', { hasText: 'EN' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('сбой загрузки в статистике не выдаётся за пустоту (находка аудита)', async ({ page }) => {
+  await page.route('**/v1/exchange-ops', (route) => route.fulfill({ status: 500, body: '{}' }));
+  await page.locator('.tab', { hasText: 'Statistics' }).click();
+  await expect(page).toHaveURL(/\/statistics$/);
+
+  const history = page.locator('.panel', { hasText: 'HISTORY' });
+  await expect(history.getByText(/Could not load/i)).toBeVisible();
+  await expect(history.getByText(/No exchanges yet|Разменов пока нет/)).toHaveCount(0);
+});
+
+test('выбранный вариант в группе виден глазом, а не только скринридеру (находка аудита)', async ({
+  page,
+}) => {
+  await page.locator('.tab', { hasText: 'Settings' }).click();
+  const pressed = page.locator('.act[aria-pressed="true"]').first();
+  await expect(pressed).toBeVisible();
+  // Фон выбранной кнопки отличается от невыбранной — раньше состояние было только в aria.
+  const [selectedBg, plainBg] = await Promise.all([
+    pressed.evaluate((el) => getComputedStyle(el).backgroundColor),
+    page
+      .locator('.act[aria-pressed="false"]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ]);
+  expect(selectedBg).not.toBe(plainBg);
+});

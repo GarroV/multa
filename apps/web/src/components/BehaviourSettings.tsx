@@ -117,7 +117,7 @@ export function BehaviourSettings() {
           disabled={patch.isPending}
           onClick={() => patch.mutate({ periods: { suggestRaises: !data.periods.suggestRaises } })}
         >
-          {data.periods.suggestRaises ? t('common.done') : t('common.skip')}
+          {data.periods.suggestRaises ? t('common.on') : t('common.off')}
         </button>
       </div>
 
