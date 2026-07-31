@@ -7,9 +7,15 @@ import { SpendEntry } from './components/SpendEntry.tsx';
 import { authClient } from './lib/authClient.ts';
 import { useI18n } from './lib/i18n.tsx';
 import { useMe } from './lib/queries.ts';
+import { useTheme } from './lib/theme.ts';
+
+/**
+ * Оболочка по прототипу (issue #30): навигация сверху, а не сайдбаром. Причина не в моде —
+ * сайдбар забирал 216px ширины у ведомости, а плотный экран живёт шириной колонок. Табы, ввод
+ * факта, тема и язык стоят в одной строке: всё управление в 48px высоты.
+ */
 
 const NAV: { to: string; key: TranslationKey }[] = [
-  { to: '/today', key: 'nav.today' },
   { to: '/plan', key: 'nav.plan' },
   { to: '/exchange', key: 'nav.exchange' },
   { to: '/obligations', key: 'nav.obligations' },
@@ -20,39 +26,64 @@ export function AppShell() {
   const { t, locale, setLocale } = useI18n();
   const qc = useQueryClient();
   const { data: me } = useMe();
+  const { theme, setTheme } = useTheme();
   const [spendOpen, setSpendOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const base = me?.workspace?.baseCurrency;
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand" style={{ fontWeight: 600, fontSize: 20, padding: '8px 16px 16px' }}>
-          multa
-        </div>
-        {NAV.map((n) => (
-          <Link key={n.to} to={n.to} className="nav-item" activeProps={{ className: 'nav-item nav-active' }}>
-            {t(n.key)}
-          </Link>
-        ))}
-        <div style={{ marginTop: 'auto', display: 'flex', gap: 8, padding: '12px 16px', alignItems: 'center' }}>
-          {(['en', 'ru'] as const).map((l) => (
-            <button
-              key={l}
-              type="button"
-              className="chip"
-              aria-pressed={locale === l}
-              style={{ padding: '4px 10px', fontSize: 12 }}
-              onClick={() => setLocale(l)}
-            >
-              {l.toUpperCase()}
-            </button>
+    <div className="app-frame">
+      <header className="topbar">
+        <span className="topbar-brand">multa</span>
+        <nav className="tabs" aria-label={t('nav.plan')}>
+          {NAV.map((n) => (
+            <Link key={n.to} to={n.to} className="tab" activeProps={{ className: 'tab tab-active' }}>
+              {t(n.key)}
+            </Link>
           ))}
+        </nav>
+        <div className="topbar-right">
+          {/* Ввод факта доступен с любого экрана: трату записывают на ходу (04-web-ux §Ввод). */}
+          {base && (
+            <>
+              <button type="button" className="act" onClick={() => setSpendOpen(true)}>
+                {t('spend.open')}
+              </button>
+              <button type="button" className="act" onClick={() => setReceiptOpen(true)}>
+                {t('receipt.open')}
+              </button>
+            </>
+          )}
+          <span className="seg" role="group" aria-label={t('settings.theme')}>
+            {(['dark', 'light'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                className="seg-btn"
+                aria-pressed={theme === v}
+                onClick={() => setTheme(v)}
+              >
+                {t(v === 'dark' ? 'settings.theme.dark' : 'settings.theme.light')}
+              </button>
+            ))}
+          </span>
+          <span className="seg" role="group" aria-label={t('settings.language')}>
+            {(['en', 'ru'] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                className="seg-btn"
+                aria-pressed={locale === l}
+                onClick={() => setLocale(l)}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </span>
           <button
             type="button"
-            className="btn btn-ghost"
-            style={{ padding: '6px 10px' }}
-            title="logout"
+            className="act"
+            title={t('settings.signOut')}
             onClick={async () => {
               await authClient.signOut();
               await qc.invalidateQueries();
@@ -61,22 +92,8 @@ export function AppShell() {
             ⎋
           </button>
         </div>
-      </aside>
-      <main style={{ minWidth: 0 }}>
-        {/* Действия живут над содержимым: ввод факта нужен на любом экране (04-web-ux §Ввод). */}
-        {base && (
-          <div
-            className="actions"
-            style={{ maxWidth: 960, margin: '0 auto', padding: '16px 24px 0' }}
-          >
-            <button type="button" className="primary" onClick={() => setSpendOpen(true)}>
-              {t('spend.open')}
-            </button>
-            <button type="button" onClick={() => setReceiptOpen(true)}>
-              {t('receipt.open')}
-            </button>
-          </div>
-        )}
+      </header>
+      <main className="app-main">
         <Outlet />
       </main>
       {spendOpen && base && <SpendEntry base={base} locale={locale} onClose={() => setSpendOpen(false)} />}

@@ -4,7 +4,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from './lib/i18n.tsx';
 import { router } from './router.tsx';
+import { applyTheme, initialTheme } from './lib/theme.ts';
 import './styles.css';
+
+// До первого кадра: сохранённая тема не должна мигать тёмной на загрузке.
+applyTheme(initialTheme());
 
 const queryClient = new QueryClient({
   // Мутации инвалидируют свои запросы сами; авто-рефетч (фокус/реконнект) не нужен и мог бы

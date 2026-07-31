@@ -1,93 +1,104 @@
 import type { TranslationKey } from '@multa/i18n';
 import { Link } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
+import { Bar, Panel, Tag, type Accent } from '../components/ui/Panel.tsx';
+import { CascadeDonut } from '../components/ui/CascadeDonut.tsx';
+import { PeriodMap } from '../components/ui/PeriodMap.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   isOnboardingIncomplete,
   useConfirmExecution,
+  useForecast,
   usePlan,
   useSkipExecution,
+  type ForecastEvent,
   type PlanAllocation,
   type PlanDto,
   type PlanTargetKind,
 } from '../lib/queries.ts';
 
-// Категории редактируются отдельным блоком (CategoryEditor); в read-only лентах — только обязательства.
-const GROUP_ORDER: PlanTargetKind[] = ['debt', 'bucket', 'envelope', 'goal'];
+/**
+ * План периода — главный экран (прототип, issue #30). Плотная ведомость вместо набора карточек:
+ * сверху четыре ответа («сколько осталось», «сколько в день», «сколько менять», «куда ушла
+ * выплата»), под ними ось периода, дальше — панели по группам каскада. Всё числовое приходит из
+ * `GET /v1/plan/current`: экран ничего не досчитывает, кроме долей для доната и позиций на оси.
+ */
+
 const GROUP_LABEL: Record<PlanTargetKind, TranslationKey> = {
   debt: 'plan.groups.debt',
-  bucket: 'plan.groups.bucket',
+  bucket: 'obl.buckets',
   envelope: 'plan.groups.envelope',
   category: 'plan.groups.category',
   goal: 'plan.groups.goal',
+};
+
+/** Засечка панели = роль раздела: долги — риск, корзины — другая валюта, цели — накопление. */
+const GROUP_ACCENT: Record<PlanTargetKind, Accent> = {
+  debt: 'mag',
+  bucket: 'vio',
+  envelope: 'cyan',
+  category: 'cyan',
+  goal: 'lime',
 };
 
 function Centered({ children }: { children: ReactNode }) {
   return <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>{children}</div>;
 }
 
+/** Строка обязательства: имя и валюта слева, сумма в колонке, исполнение — вручную. */
 function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; locale: string }) {
   const { t } = useI18n();
   const confirm = useConfirmExecution();
   const skip = useSkipExecution();
-  const allocated = `${formatMinor(a.allocatedMinor, base, locale)} ${base}`;
-  const trimmed = BigInt(a.shortfallMinor) > 0n;
-  const done = a.executionStatus === 'confirmed';
   const busy = confirm.isPending || skip.isPending;
-  const statusLabel =
-    a.executionStatus === 'partial'
-      ? t('exec.status.partial', { amount: `${formatMinor(a.remainderMinor, base, locale)} ${base}` })
-      : a.executionStatus === 'confirmed'
-        ? t('exec.status.confirmed')
-        : a.executionStatus === 'skipped'
-          ? t('exec.status.skipped')
-          : t('exec.status.pending');
-  // Вторичная строка: исходная валюта, если отличается от базовой (корзины — всегда, с назначением).
+  const done = a.executionStatus === 'confirmed';
+  const skipped = a.executionStatus === 'skipped';
+  const trimmed = BigInt(a.shortfallMinor) > 0n;
   const secondary =
     a.targetKind === 'bucket'
       ? `${formatMinor(a.sourceMinor, a.sourceCurrency, locale)} ${a.sourceCurrency} → ${a.toCurrency ?? ''}`
       : a.sourceCurrency !== base
         ? `${formatMinor(a.sourceMinor, a.sourceCurrency, locale)} ${a.sourceCurrency}`
         : null;
+
   return (
-    <div className="list-item">
-      <span>
-        {a.name}
-        {secondary && <span className="dim mono" style={{ marginLeft: 8, fontSize: 13 }}>· {secondary}</span>}
-      </span>
-      <span className="row" style={{ gap: 12 }}>
+    <div className="prow">
+      <span className="prow-day" aria-hidden />
+      <span className="prow-name">
+        <span>{a.name}</span>
+        {a.sourceCurrency !== base && <Tag tone="vio">{a.sourceCurrency}</Tag>}
         {trimmed && (
-          <span className="badge-trim">
-            {t('plan.row.trimmed', { amount: `${formatMinor(a.shortfallMinor, base, locale)} ${base}` })}
-          </span>
+          <Tag tone="amber">
+            {t('plan.row.trimmed', { amount: formatMinor(a.shortfallMinor, base, locale) })}
+          </Tag>
         )}
-        <span className={`micro${done ? ' st-ok' : a.executionStatus === 'partial' ? ' st-warn' : ''}`}>
-          {statusLabel}
-        </span>
-        <span className="num" style={done ? { textDecoration: 'line-through', opacity: 0.55 } : undefined}>
-          {allocated}
-        </span>
-        {/* Исполнение — вручную по умолчанию: кредит банку тоже переводят руками. */}
+        {a.protectedCategory && <Tag tone="cyan">{t('plan.tag.protected')}</Tag>}
+      </span>
+      <span className="prow-num">
+        <b className={done || skipped ? 'dim' : undefined}>
+          {formatMinor(a.allocatedMinor, base, locale)} {base}
+        </b>
+        {secondary && <i>{secondary}</i>}
+      </span>
+      <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        {/* Исполнение вручную по умолчанию: кредит банку тоже переводят руками. */}
         <button
           type="button"
-          className="btn btn-ghost"
-          style={{ padding: '4px 10px' }}
+          className="act"
           disabled={busy}
           aria-pressed={done}
-          title={t('exec.confirm')}
           onClick={() => confirm.mutate({ targetKind: a.targetKind, targetId: a.targetId })}
         >
-          ✓
+          {done ? t('exec.status.confirmed') : t('plan.act.pay')}
         </button>
         <button
           type="button"
-          className="btn btn-ghost"
-          style={{ padding: '4px 10px' }}
+          className="act"
           disabled={busy}
-          aria-pressed={a.executionStatus === 'skipped'}
+          aria-pressed={skipped}
           title={t('exec.skip')}
           onClick={() => skip.mutate({ targetKind: a.targetKind, targetId: a.targetId })}
         >
@@ -98,11 +109,86 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'accent' | 'warn' }) {
+/** Строка категории: полоса факт/план под именем — перерасход виден без чтения цифр. */
+function CategoryRow({ a, base, locale }: { a: PlanAllocation; base: string; locale: string }) {
+  const planned = BigInt(a.allocatedMinor);
+  const spent = BigInt(a.spentMinor);
+  const over = BigInt(a.overspentMinor) > 0n;
+  const share = planned > 0n ? Number((spent * 1000n) / planned) / 10 : spent > 0n ? 100 : 0;
+
   return (
-    <div>
-      <span className="micro">{label}</span>
-      <span className={`stat${tone ? ` ${tone}` : ''}`}>{value}</span>
+    <div className="prow">
+      <span className="prow-day" aria-hidden />
+      <span className="prow-name">
+        <span>{a.name}</span>
+        {a.protectedCategory && <Tag tone="cyan">🔒</Tag>}
+      </span>
+      <span className="prow-num">
+        <b className={over ? 'st-over' : undefined}>
+          {formatMinor(a.spentMinor, base, locale)} / {formatMinor(a.allocatedMinor, base, locale)}
+        </b>
+      </span>
+      <span />
+      <span className="prow-bar">
+        <Bar share={share} tone={over ? 'mag' : share > 85 ? 'amber' : 'cyan'} label={a.name} />
+        <span className="prow-num">
+          <i>{formatMinor(a.remainingMinor, base, locale)} {base}</i>
+        </span>
+      </span>
+    </div>
+  );
+}
+
+
+/**
+ * Что впереди: горизонт за границей периода. Карта периода отвечает «что успеет случиться до
+ * выплаты», эта панель — «что дальше»: когда закроется долг, что освободится, где цель не успеет.
+ */
+function ForecastPanel({ base, locale }: { base: string; locale: string }) {
+  const { t } = useI18n();
+  const { data } = useForecast();
+  if (!data || (data.dueSoon.length === 0 && data.events.length === 0)) return null;
+
+  const label = (e: ForecastEvent): string => {
+    const amount = e.amountMinor ? `${formatMinor(e.amountMinor, base, locale)} ${base}` : '';
+    if (e.kind === 'debt_closed') return t('forecast.debtClosed', { name: e.name });
+    if (e.kind === 'freed_money') return t('forecast.freed', { amount });
+    if (e.kind === 'goal_reached') return t('forecast.goalReached', { name: e.name });
+    return t('forecast.goalRisk', { name: e.name, amount });
+  };
+
+  return (
+    <Panel label={t('forecast.title')} accent="amber">
+      {data.events.slice(0, 6).map((e) => (
+        <div className="prow" key={`${e.kind}:${e.targetId}`}>
+          <span className="prow-day" aria-hidden />
+          <span className="prow-name">
+            <span className={e.kind === 'goal_at_risk' ? 'st-warn' : undefined}>{label(e)}</span>
+          </span>
+          <span className="prow-num"><i>{e.on}</i></span>
+          <span />
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+function Kpi({
+  label,
+  tag,
+  children,
+}: {
+  label: string;
+  tag?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="kpi">
+      <span className="kpi-label">
+        {label}
+        {tag}
+      </span>
+      {children}
     </div>
   );
 }
@@ -110,99 +196,204 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'ac
 function PlanBody({ plan }: { plan: PlanDto }) {
   const { t, locale } = useI18n();
   const base = plan.baseCurrency;
-  const fmt = (m: string) => `${formatMinor(m, base, locale)} ${base}`;
-  const hasNothing = plan.allocations.length === 0 && plan.unresolved.length === 0;
-  const compressed = BigInt(plan.compressedMinor) > 0n;
+  const forecast = useForecast();
+  // Пересборка живёт в строке категории (там известно, сколько не хватает), поэтому баннер
+  // риска не открывает свой модал, а раскрывает редактор категорий — оттуда один шаг до варианта.
+  const [editingCats, setEditingCats] = useState(false);
 
-  const groups = GROUP_ORDER.map((kind) => ({
-    kind,
-    rows: plan.allocations.filter((a) => a.targetKind === kind),
-  })).filter((g) => g.rows.length > 0);
+  const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
+  const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
+
+  const buckets = plan.allocations.filter((a) => a.targetKind === 'bucket');
+  const categories = plan.allocations.filter((a) => a.targetKind === 'category');
+  const compressed = BigInt(plan.compressedMinor) > 0n;
+  const living = BigInt(plan.livingMinor);
+  const spentShare = living > 0n ? Number((BigInt(plan.spentLivingMinor) * 1000n) / living) / 10 : 0;
+  const risky = !plan.burn.willLast && plan.burn.runsOutOn;
+
+  const obligationGroups = (['debt', 'envelope', 'goal', 'bucket'] as const)
+    .map((kind) => ({ kind, rows: plan.allocations.filter((a) => a.targetKind === kind) }))
+    .filter((g) => g.rows.length > 0);
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <h1 className="page-title">{t('nav.plan')}</h1>
-        <span className="micro num">{plan.period.startsOn} → {plan.period.endsOn}</span>
-      </div>
+    <div className="dense">
+      <div className="kpi-strip">
+        <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })}>
+          <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
+            {withCcy(plan.remainingLivingMinor)}
+          </span>
+          <Bar share={spentShare} tone={BigInt(plan.overspentMinor) > 0n ? 'mag' : 'cyan'} />
+          <span className="kpi-sub">
+            {t('spend.spentOfPlan', { spent: fmt(plan.spentLivingMinor), plan: fmt(plan.livingMinor) })}
+          </span>
+        </Kpi>
 
-      <div className="stats">
-        <Stat label={t('plan.summary.income')} value={fmt(plan.incomeMinor)} />
-        <Stat label={t('plan.summary.committed')} value={fmt(plan.totalAllocatedMinor)} />
-        <Stat
-          label={t('plan.summary.free')}
-          value={fmt(plan.freeMinor)}
-          tone={BigInt(plan.freeMinor) < 0n ? 'warn' : undefined}
-        />
-        <Stat
-          label={t('plan.summary.perDay')}
-          value={fmt(plan.canSpendPerDayMinor)}
-          tone="accent"
-        />
-        {BigInt(plan.extraIncomeMinor) > 0n && (
-          <Stat label={t('plan.summary.extraIncome')} value={fmt(plan.extraIncomeMinor)} tone="accent" />
-        )}
-        {BigInt(plan.spentLivingMinor) > 0n && (
-          <>
-            <Stat label={t('plan.summary.spent')} value={fmt(plan.spentLivingMinor)} />
-            <Stat
-              label={t('plan.summary.remaining')}
-              value={fmt(plan.remainingLivingMinor)}
-              tone={BigInt(plan.remainingLivingMinor) < 0n ? 'warn' : undefined}
-            />
-          </>
-        )}
-      </div>
+        <Kpi label={t('plan.kpi.canSpend')}>
+          <span className="kpi-value accent">
+            {fmt(plan.canSpendPerDayMinor)} <span className="kpi-sub">{t('plan.kpi.perDay')}</span>
+          </span>
+          <span className="kpi-sub">
+            {t('plan.today.until', { date: plan.period.endsOn.slice(5), days: plan.daysLeft })}
+          </span>
+        </Kpi>
 
-      {plan.unresolved.length > 0 && (
-        <div className="note-band">{t('plan.unresolved.affectsHero')}</div>
-      )}
-
-      {compressed && (
-        <div className="note-band">
-          {t('plan.compressed.note', { amount: formatMinor(plan.compressedMinor, base, locale), ccy: base })}
-        </div>
-      )}
-
-      {hasNothing && (
-        <div className="card">
-          <div style={{ fontWeight: 600 }}>{t('plan.empty.title')}</div>
-          <div className="sub" style={{ marginTop: 4 }}>{t('plan.empty.noPlan')}</div>
-          <Link to="/obligations" className="btn" style={{ display: 'inline-block', marginTop: 12 }}>
-            {t('nav.obligations')}
-          </Link>
-        </div>
-      )}
-
-      <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
-
-      {groups.map((g) => {
-        const groupTotal = g.rows.reduce((acc, r) => acc + BigInt(r.allocatedMinor), 0n);
-        return (
-          <section key={g.kind} className="tile tile-wide" aria-label={t(GROUP_LABEL[g.kind])}>
-            <div className="tile-head">
-              <span className="micro">{t(GROUP_LABEL[g.kind])}</span>
-              <span className="num num-dim">{fmt(groupTotal.toString())}</span>
-            </div>
-            {g.rows.map((a) => (
-              <AllocationRow key={a.targetId} a={a} base={base} locale={locale} />
+        <Kpi label={t('plan.summary.toExchange')} tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}>
+          {buckets.length === 0 && <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>}
+          <div className="kpi-rows">
+            {buckets.map((b) => (
+              <div key={b.targetId}>
+                <span>{withCcy(b.allocatedMinor)} → {b.toCurrency ?? b.sourceCurrency}</span>
+                <span className="dim">{b.name}</span>
+              </div>
             ))}
-          </section>
-        );
-      })}
+          </div>
+        </Kpi>
+
+        <Kpi label={t('plan.kpi.cascade', { amount: withCcy(plan.incomeMinor) })}>
+          <CascadeDonut plan={plan} />
+          <span className="kpi-sub">
+            {t('plan.kpi.leftToLive')} <b className="mono">{withCcy(plan.livingMinor)}</b>
+          </span>
+        </Kpi>
+      </div>
+
+      {risky && (
+        <div className="risk-band">
+          <span className="risk-text">
+            {t('signal.burn.title', { date: plan.burn.runsOutOn!.slice(5) })} ·{' '}
+            {t('signal.burn.body', {
+              perDay: withCcy(plan.burn.perDayMinor),
+              perDayPlan: withCcy(plan.canSpendPerDayMinor),
+            })}
+          </span>
+          <button type="button" className="act" onClick={() => setEditingCats(true)}>
+            {t('signal.burn.action')}
+          </button>
+        </div>
+      )}
+
+      {compressed && !risky && (
+        <div className="risk-band info">
+          <span className="risk-text">
+            {t('plan.compressed.note', { amount: fmt(plan.compressedMinor), ccy: base })}
+          </span>
+        </div>
+      )}
 
       {plan.unresolved.length > 0 && (
-        <section className="tile tile-wide" aria-label={t('plan.unresolved.title')}>
-          <span className="micro st-warn">{t('plan.unresolved.title')}</span>
-          {plan.unresolved.map((u) => (
-            <div key={`${u.targetKind}:${u.targetId}`} className="list-item">
-              <span>{u.name}</span>
-              <span className="num num-dim">{formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}</span>
-            </div>
-          ))}
-          <div className="sub">{t('plan.unresolved.hint')}</div>
-        </section>
+        <div className="risk-band info">
+          <span className="risk-text">{t('plan.unresolved.affectsHero')}</span>
+          <span className="panel-sum">
+            {plan.unresolved.map((u) => u.name).join(' · ')}
+          </span>
+        </div>
       )}
+
+      <PeriodMap plan={plan} dueSoon={forecast.data?.dueSoon} events={forecast.data?.events} />
+
+      <div className="panels">
+        <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+          <Panel
+            label={t('plan.panel.income')}
+            sum={withCcy(plan.incomeMinor)}
+            accent="lime"
+            tools={<Link className="act" to="/settings">{t('plan.act.edit')}</Link>}
+          >
+            {plan.income.events.length === 0 && (
+              <div className="prow"><span /><span className="dim">{t('common.empty')}</span></div>
+            )}
+            {plan.income.events.map((e) => (
+              <div className="prow" key={`${e.sourceId}:${e.date}`}>
+                <span className="prow-day">{e.date.slice(8, 10)}</span>
+                <span className="prow-name">
+                  <span>{e.label}</span>
+                  {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
+                </span>
+                <span className="prow-num">
+                  <b>{formatMinor(e.amountMinor, e.currency, locale)} {e.currency}</b>
+                </span>
+                <span />
+              </div>
+            ))}
+            {BigInt(plan.extraIncomeMinor) > 0n && (
+              <div className="prow">
+                <span className="prow-day" aria-hidden />
+                <span className="prow-name"><span>{t('plan.summary.extraIncome')}</span></span>
+                <span className="prow-num"><b className="st-ok">{withCcy(plan.extraIncomeMinor)}</b></span>
+                <span />
+              </div>
+            )}
+          </Panel>
+
+          <Panel
+            label={t('plan.groups.category')}
+            sum={t('plan.panel.perPeriod', { amount: withCcy(categories.reduce((s, c) => s + BigInt(c.allocatedMinor), 0n)) })}
+            tools={
+              <button type="button" className="act" aria-pressed={editingCats} onClick={() => setEditingCats((v) => !v)}>
+                {t('plan.act.edit')}
+              </button>
+            }
+          >
+            {categories.length === 0 && !editingCats && (
+              <div className="prow"><span /><span className="dim">{t('common.empty')}</span></div>
+            )}
+            {!editingCats && categories.map((a) => (
+              <CategoryRow key={a.targetId} a={a} base={base} locale={locale} />
+            ))}
+            {editingCats && (
+              <div style={{ padding: '10px 14px' }}>
+                <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+          {obligationGroups.map((g) => (
+            <Panel
+              key={g.kind}
+              label={t(GROUP_LABEL[g.kind])}
+              accent={GROUP_ACCENT[g.kind]}
+              sum={t('plan.panel.perPeriod', {
+                amount: withCcy(g.rows.reduce((s, r) => s + BigInt(r.allocatedMinor), 0n)),
+              })}
+              tools={<Link className="act" to="/obligations">{t('plan.act.edit')}</Link>}
+            >
+              {g.rows.map((a) => (
+                <AllocationRow key={a.targetId} a={a} base={base} locale={locale} />
+              ))}
+            </Panel>
+          ))}
+
+          {obligationGroups.length === 0 && (
+            <Panel label={t('plan.empty.title')} accent="amber">
+              <div className="prow">
+                <span />
+                <span className="dim">{t('plan.empty.noPlan')}</span>
+                <Link className="act" to="/obligations">{t('nav.obligations')}</Link>
+                <span />
+              </div>
+            </Panel>
+          )}
+
+          <ForecastPanel base={base} locale={locale} />
+
+          {plan.unresolved.length > 0 && (
+            <Panel label={t('plan.unresolved.title')} accent="amber" foot={<span className="sub">{t('plan.unresolved.hint')}</span>}>
+              {plan.unresolved.map((u) => (
+                <div className="prow" key={`${u.targetKind}:${u.targetId}`}>
+                  <span className="prow-day" aria-hidden />
+                  <span className="prow-name"><span>{u.name}</span></span>
+                  <span className="prow-num">
+                    <b>{formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}</b>
+                  </span>
+                  <span />
+                </div>
+              ))}
+            </Panel>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

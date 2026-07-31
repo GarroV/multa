@@ -23,7 +23,7 @@ export function Demo() {
     void api<{ ok: boolean }>('/v1/demo/enter', { method: 'POST' })
       .then(() => {
         // Полная перезагрузка, а не router-переход: клиенту нужно перечитать сессию с нуля.
-        window.location.replace('/today');
+        window.location.replace('/plan');
       })
       .catch(() => setFailed(true));
   }, [navigate]);
