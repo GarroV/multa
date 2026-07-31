@@ -168,6 +168,8 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 | `POST /v1/onboarding/income`                                         | ритм + источники дохода одним шагом                                                           | доход  |
 | `POST /v1/onboarding/skip`                                           | пропустить обучение, войти с пустым планом                                                    | доход  |
 | `GET/POST/PATCH/DELETE /v1/income-sources`                           | источники дохода                                                                              | доход  |
+| `POST /v1/income-sources/:id/received`                               | подтверждение поступления: факт и курс дня выплаты                                            | 6      |
+| `DELETE /v1/income-receipts/:id`                                     | отмена подтверждения: план возвращается к плановой сумме, личный курс снимается               | 6      |
 | `GET /v1/plan/current`                                               | план периода: каскад, факт, сигнал burn-rate                                                  | 2–4    |
 | `PUT/DELETE /v1/plan/current/categories/:id`                         | бюджет категории на период                                                                    | 2      |
 | `POST /v1/plan/current/items/:kind/:id/confirm`, `/skip`             | исполнение плановой строки                                                                    | 3      |

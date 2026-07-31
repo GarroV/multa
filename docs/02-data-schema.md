@@ -149,6 +149,7 @@ create table planned_items (
   executed_minor bigint not null default 0,  -- подтвержденная сумма (для partial)
   auto boolean not null default false,       -- автоплатеж: подтверждается сам в дату
   frozen boolean not null default false,  -- осознанный пропуск взноса в цель на этот период (#54)
+  overridden boolean not null default false, -- сумму правил человек (пересборка): сборка её не пересчитывает (#52)
   unique (period_id, target_kind, target_id)
 );
 -- транзакция подтверждения ссылается на строку плана:
@@ -203,16 +204,20 @@ create table receipts (
 create table exchange_ops (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces on delete cascade,
-  bucket_id uuid references currency_buckets,
-  from_account uuid not null references accounts,
-  to_account uuid not null references accounts,
+  bucket_id uuid references currency_buckets,   -- принадлежность корзины проверяет роут (правило 7)
+  from_account uuid references accounts,        -- nullable: счета появились позже разменов (#45)
+  to_account uuid references accounts,
+  from_currency char(3) not null,               -- валюты пары: размен возможен и без счетов
+  to_currency char(3) not null,
   from_minor bigint not null,
   to_minor bigint not null,
   actual_rate numeric(20,10) not null,     -- вычислен из сумм
-  official_rate numeric(20,10) not null,   -- снапшот на дату
-  official_source text not null,
-  spread_pct numeric(8,4) not null,        -- (actual/official - 1) * 100
-  occurred_on date not null
+  official_rate numeric(20,10),            -- снапшот на дату; null, если котировки на неё нет
+  official_source text,
+  spread_pct numeric(8,4),                 -- (actual/official - 1) * 100; null без официального курса
+  spread_minor bigint,                     -- потеря в валюте получения; отрицательная = выиграл
+  occurred_on date not null,
+  note text                                -- где меняли: по нему считается спред по провайдерам
 );
 
 create table recurring_items (     -- расходы и взносы; доходы живут в income_sources (одна правда о доходах)
