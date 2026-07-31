@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { App } from './App.tsx';
+import { Demo } from './screens/Demo.tsx';
 import { Exchange } from './screens/Exchange.tsx';
 import { Obligations } from './screens/Obligations.tsx';
 import { Plan } from './screens/Plan.tsx';
@@ -21,6 +22,8 @@ const planRoute = createRoute({ getParentRoute: () => rootRoute, path: '/plan', 
 const exchangeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/exchange', component: Exchange });
 const obligationsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/obligations', component: Obligations });
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/settings', component: Settings });
+// Демо без регистрации (#56): единственный экран, который не требует сессии — он её и получает.
+const demoRoute = createRoute({ getParentRoute: () => rootRoute, path: '/demo', component: Demo });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -29,6 +32,7 @@ const routeTree = rootRoute.addChildren([
   exchangeRoute,
   obligationsRoute,
   settingsRoute,
+  demoRoute,
 ]);
 
 export const router = createRouter({ routeTree });

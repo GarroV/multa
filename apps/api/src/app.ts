@@ -23,6 +23,7 @@ import { logger } from './logger.ts';
 import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
 import { applyRebalance, getCurrentPlan, rebalanceSuggestions, setCategoryBudget, setExecution } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
+import { demoRoute } from './routes/demo.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
@@ -234,6 +235,12 @@ app.get('/v1/fx/rate', requireAuth, async (c) => {
   return c.json(snap);
 });
 
+// Демо без регистрации (#56): /v1/demo/enter, /v1/demo/reset — единственные роуты вне сессии,
+// они её и выдают. Монтируются ДО остальных суброутеров: те объявляют `use('*', requireWorkspace)`,
+// а в Hono такой middleware из подключённого роутера действует на все пути /v1/*, смонтированные
+// после него, — публичный роут ниже получал бы 401 ещё до своего хендлера.
+app.route('/v1', demoRoute);
+
 // CRUD обязательств (Спринт 2): /v1/debts, /v1/envelopes, /v1/goals, /v1/buckets
 app.route('/v1', obligations);
 
@@ -257,6 +264,7 @@ app.route('/v1', receiptsRoute);
 
 // Регулярные платежи вне обязательств (#21): /v1/recurring-items
 app.route('/v1', recurringRoute);
+
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);
