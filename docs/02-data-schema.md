@@ -13,6 +13,7 @@ create table workspaces (
   payday_weekend_rule text not null default 'before'
     check (payday_weekend_rule in ('as-is','before','after')),  -- перенос выплаты с выходного; влияет на границы
   onboarding_skipped boolean not null default false,            -- «пропустить настройку»: в приложение с пустым планом
+  settings jsonb,                   -- настройки поведения (#49): буфер темпа, порядок сжатия, горизонт медианы; форма — в zod-схеме
   created_at timestamptz not null default now()
 );
 -- Ожидаемый доход периода здесь НЕ живёт: он считается по income_sources и хранится в pay_periods.

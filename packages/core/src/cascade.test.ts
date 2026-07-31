@@ -130,3 +130,58 @@ describe('cascade — пропорциональное дробление уро
     expect(r.compressedMinor).toBe(100n);
   });
 });
+
+describe('настраиваемый порядок сжатия (issue #49)', () => {
+  const plan: PlanItem[] = [
+    { targetKind: 'debt', targetId: 'd', plannedMinor: 10_000_00n },
+    { targetKind: 'bucket', targetId: 'b', plannedMinor: 10_000_00n },
+    { targetKind: 'envelope', targetId: 'e', plannedMinor: 10_000_00n },
+    { targetKind: 'category', targetId: 'c', plannedMinor: 10_000_00n },
+    { targetKind: 'goal', targetId: 'g', plannedMinor: 10_000_00n },
+  ];
+  const byId = (r: ReturnType<typeof cascade>, id: string) =>
+    r.allocations.find((a) => a.targetId === id)!.allocatedMinor;
+
+  it('по умолчанию первыми уступают цели, затем конверты, затем категории', () => {
+    const r = cascade(40_000_00n, plan);
+    expect(byId(r, 'g')).toBe(0n);
+    expect(byId(r, 'e')).toBe(10_000_00n);
+  });
+
+  it('порядок можно изменить: сначала категории, цели остаются целыми', () => {
+    const r = cascade(40_000_00n, plan, {
+      compressOrder: ['category', 'envelope', 'goal'],
+    });
+    expect(byId(r, 'c')).toBe(0n);
+    expect(byId(r, 'g')).toBe(10_000_00n);
+  });
+
+  it('долги и корзины не режутся ни при каком порядке — инвариант неснимаем', () => {
+    const r = cascade(5_000_00n, plan, {
+      // Даже если порядок попросит резать долги, каскад обязан их сохранить.
+      compressOrder: ['debt', 'bucket', 'goal', 'envelope', 'category'] as never,
+    });
+    expect(byId(r, 'd')).toBe(10_000_00n);
+    expect(byId(r, 'b')).toBe(10_000_00n);
+    // Нехватка честно уходит в минус свободного остатка, а не прячется срезом долга.
+    expect(r.freeMinor).toBeLessThan(0n);
+  });
+
+  it('неполный порядок дополняется остальными уровнями, а не теряет их', () => {
+    const r = cascade(20_000_00n, plan, { compressOrder: ['category'] });
+    // Категорию срезали первой, но дефицит больше — конверты и цели тоже уступили.
+    expect(byId(r, 'c')).toBe(0n);
+    expect(byId(r, 'e') + byId(r, 'g')).toBeLessThan(20_000_00n);
+  });
+
+  it('защищённая категория не режется даже когда порядок ставит категории первыми', () => {
+    const withProtected: PlanItem[] = [
+      { targetKind: 'category', targetId: 'p', plannedMinor: 10_000_00n, protected: true },
+      { targetKind: 'category', targetId: 'c', plannedMinor: 10_000_00n },
+      { targetKind: 'goal', targetId: 'g', plannedMinor: 10_000_00n },
+    ];
+    const r = cascade(20_000_00n, withProtected, { compressOrder: ['category', 'goal'] });
+    expect(byId(r, 'p')).toBe(10_000_00n);
+    expect(byId(r, 'c')).toBe(0n);
+  });
+});

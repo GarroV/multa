@@ -12,6 +12,7 @@ import {
   rateQuerySchema,
   rebalanceApplySchema,
   rebalanceQuerySchema,
+  workspaceSettingsPatchSchema,
 } from './validation.ts';
 import { auth } from './auth.ts';
 import { db } from './db/client.ts';
@@ -43,6 +44,7 @@ import {
   setExecution,
 } from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
+import { patchSettings, settingsOf } from './settings/store.ts';
 import { accountsRoute } from './routes/accounts.ts';
 import { analyticsRoute } from './routes/analytics.ts';
 import { demoRoute } from './routes/demo.ts';
@@ -287,6 +289,21 @@ app.post('/v1/plan/current/revisions/:id/undo', requireWorkspace, async (c) => {
     if (err instanceof UndoWouldGoNegative) return c.json({ error: 'undo_would_go_negative' }, 422);
     throw err;
   }
+});
+
+/**
+ * Настройки воркспейса (issue #49): что менять в поведении плана, аналитики и размена. Чтение
+ * всегда отдаёт полный объект с дефолтами, правка — частичная.
+ */
+app.get('/v1/workspace/settings', requireWorkspace, (c) => {
+  const ws = c.get('workspace')!;
+  return c.json(settingsOf(ws));
+});
+
+app.patch('/v1/workspace/settings', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const patch = workspaceSettingsPatchSchema.parse(await c.req.json());
+  return c.json(await patchSettings(ws, patch));
 });
 
 // Пересборка плана: варианты «откуда добавим» и применение выбранного (Спринт 4).

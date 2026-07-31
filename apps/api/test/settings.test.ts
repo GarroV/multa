@@ -1,0 +1,189 @@
+import { describe, expect, test } from 'vitest';
+import { categoryId, expectOk, getPlan, onboarded, type TestClient } from './client.ts';
+
+/**
+ * Настройки воркспейса (issue #49). Проверяется не «сохранилось ли поле», а то, что настройка
+ * **меняет поведение**: буфер уменьшает дневной темп, порядок сжатия меняет, кто уступает первым,
+ * горизонт медианы меняет аналитику, выключенные советы перестают приходить.
+ *
+ * Отдельно закреплён неснимаемый инвариант: какой бы порядок ни попросили, долги и валютные
+ * корзины автоматика не режет (железное правило 3).
+ */
+
+interface SettingsDto {
+  periods: { suggestRaises: boolean };
+  currency: {
+    rateSource: 'cbr' | 'ecb' | 'manual';
+    defaultSpreadBp: number;
+    defaultProvider: string | null;
+  };
+  cascade: { bufferPct: number; compressOrder: ('goal' | 'envelope' | 'category')[] };
+  signals: { burnThresholdDays: number; medianPeriods: number };
+}
+
+const PAST_DAYS = ['2026-06-26', '2026-06-11', '2026-05-27', '2026-05-12'];
+
+async function patch(client: TestClient, body: unknown): Promise<SettingsDto> {
+  return expectOk<SettingsDto>(await client.patch('/v1/workspace/settings', body));
+}
+
+describe('настройки воркспейса', () => {
+  test('дефолты отдаются сразу, до любой правки', async () => {
+    const client = await onboarded();
+    const settings = await expectOk<SettingsDto>(await client.get('/v1/workspace/settings'));
+    expect(settings.cascade.bufferPct).toBe(0);
+    // Порядок по умолчанию — решение основателя: первыми уступают цели.
+    expect(settings.cascade.compressOrder).toEqual(['goal', 'envelope', 'category']);
+    expect(settings.signals.medianPeriods).toBe(6);
+    expect(settings.periods.suggestRaises).toBe(true);
+  });
+
+  test('правка частичная: тронутое меняется, остальное остаётся', async () => {
+    const client = await onboarded();
+    const updated = await patch(client, { cascade: { bufferPct: 10 } });
+    expect(updated.cascade.bufferPct).toBe(10);
+    // Порядок сжатия не передавали — он обязан остаться дефолтным, а не обнулиться.
+    expect(updated.cascade.compressOrder).toEqual(['goal', 'envelope', 'category']);
+    expect(updated.signals.medianPeriods).toBe(6);
+  });
+
+  test('буфер уменьшает дневной темп, но не остаток', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const before = await getPlan(client);
+    const paceBefore = BigInt(before.canSpendPerDayMinor);
+    const livingBefore = BigInt(before.livingMinor);
+
+    await patch(client, { cascade: { bufferPct: 10 } });
+    const after = await getPlan(client);
+
+    expect(BigInt(after.canSpendPerDayMinor)).toBeLessThan(paceBefore);
+    // Деньги не исчезли: остаток на жизнь тот же, отложенное показано отдельным полем.
+    expect(BigInt(after.livingMinor)).toBe(livingBefore);
+    expect(BigInt(after.bufferMinor)).toBeGreaterThan(0n);
+  });
+
+  test('порядок сжатия меняет, кто уступает первым', async () => {
+    const client = await onboarded({ payoutMinor: '20000000' });
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '15000000' }),
+    );
+    await expectOk(
+      await client.post('/v1/goals', {
+        name: 'Мотоцикл',
+        currency: 'RUB',
+        targetMinor: '40000000',
+        plannedPerPeriodMinor: '15000000',
+      }),
+      201,
+    );
+
+    const byDefault = await getPlan(client);
+    const goalDefault = byDefault.allocations.find((a) => a.targetKind === 'goal')!;
+    const catDefault = byDefault.allocations.find((a) => a.targetId === food)!;
+    expect(BigInt(goalDefault.allocatedMinor)).toBeLessThan(BigInt(catDefault.allocatedMinor));
+
+    await patch(client, { cascade: { compressOrder: ['category', 'envelope', 'goal'] } });
+    const flipped = await getPlan(client);
+    const goalFlipped = flipped.allocations.find((a) => a.targetKind === 'goal')!;
+    const catFlipped = flipped.allocations.find((a) => a.targetId === food)!;
+    expect(BigInt(catFlipped.allocatedMinor)).toBeLessThan(BigInt(goalFlipped.allocatedMinor));
+  });
+
+  test('долг не режется даже если настройка просит резать его первым', async () => {
+    const client = await onboarded({ payoutMinor: '10000000' });
+    await expectOk(
+      await client.post('/v1/debts', {
+        name: 'Кредит',
+        currency: 'RUB',
+        principalMinor: '50000000',
+        remainingMinor: '50000000',
+        paymentMinor: '12000000',
+      }),
+      201,
+    );
+    // Пытаемся протащить неприкосновенный вид в порядок сжатия — схема обязана отказать.
+    expect(
+      (
+        await client.patch('/v1/workspace/settings', {
+          cascade: { compressOrder: ['debt', 'goal'] },
+        })
+      ).status,
+    ).toBe(400);
+
+    const plan = await getPlan(client);
+    const debt = plan.allocations.find((a) => a.targetKind === 'debt')!;
+    expect(BigInt(debt.allocatedMinor)).toBe(12_000_000n);
+  });
+
+  test('горизонт медианы из настроек применяется к аналитике', async () => {
+    const client = await onboarded();
+    const food = await categoryId(client, 'Продукты');
+    for (const day of PAST_DAYS) {
+      await expectOk(
+        await client.post('/v1/transactions', {
+          amountMinor: '1000000',
+          currency: 'RUB',
+          categoryId: food,
+          occurredOn: day,
+        }),
+        201,
+      );
+    }
+
+    await patch(client, { signals: { medianPeriods: 2 } });
+    const rows = await expectOk<{ categoryId: string; series: unknown[] }[]>(
+      await client.get('/v1/analytics/categories'),
+    );
+    expect(rows.find((r) => r.categoryId === food)!.series).toHaveLength(2);
+  });
+
+  test('выключенные советы перестают приходить в план', async () => {
+    const client = await onboarded();
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '1000000' }),
+    );
+    for (const day of PAST_DAYS.slice(0, 3)) {
+      await expectOk(
+        await client.post('/v1/transactions', {
+          amountMinor: '2400000',
+          currency: 'RUB',
+          categoryId: food,
+          occurredOn: day,
+        }),
+        201,
+      );
+    }
+    const withAdvice = await getPlan(client);
+    expect(withAdvice.allocations.find((a) => a.targetId === food)?.advice).toBeDefined();
+
+    await patch(client, { periods: { suggestRaises: false } });
+    const without = await getPlan(client);
+    expect(without.allocations.find((a) => a.targetId === food)?.advice).toBeUndefined();
+  });
+
+  test('мусор отклоняется: буфер вне диапазона, неизвестный источник курса', async () => {
+    const client = await onboarded();
+    expect(
+      (await client.patch('/v1/workspace/settings', { cascade: { bufferPct: 80 } })).status,
+    ).toBe(400);
+    expect(
+      (await client.patch('/v1/workspace/settings', { currency: { rateSource: 'coinbase' } }))
+        .status,
+    ).toBe(400);
+    expect(
+      (await client.patch('/v1/workspace/settings', { signals: { medianPeriods: 1 } })).status,
+    ).toBe(400);
+  });
+
+  test('настройки не протекают между воркспейсами', async () => {
+    const alice = await onboarded();
+    await patch(alice, { cascade: { bufferPct: 10 }, signals: { medianPeriods: 3 } });
+
+    const bob = await onboarded();
+    const bobSettings = await expectOk<SettingsDto>(await bob.get('/v1/workspace/settings'));
+    expect(bobSettings.cascade.bufferPct).toBe(0);
+    expect(bobSettings.signals.medianPeriods).toBe(6);
+  });
+});

@@ -40,6 +40,7 @@ function plan(over: Partial<PlanDto>): PlanDto {
     compressedMinor: '0',
     freeMinor: '0',
     toExchangeMinor: '0',
+    bufferMinor: '0',
     canSpendPerDayMinor: '0',
     extraIncomeMinor: '0',
     livingMinor: '0',

@@ -13,6 +13,7 @@ import {
   cascade,
   type Allocation,
   type CascadeResult,
+  type CompressibleKind,
   type PlanItem,
   type TargetKind,
 } from './cascade.ts';
@@ -87,7 +88,15 @@ export interface PlanFact {
   readonly overspentMinor: bigint;
   /** Герой-цифра: остаток ÷ дней, которые ОСТАЛОСЬ жить до выплаты (04-web-ux §Дашборд). */
   readonly canSpendPerDayMinor: bigint;
+  /**
+   * Сколько отложено «на всякий случай» и не вошло в дневной темп (issue #49). Остаток при этом не
+   * уменьшается: буфер про осторожность темпа, а не про исчезновение денег.
+   */
+  readonly bufferMinor: bigint;
 }
+
+/** Максимальный буфер: половина остатка — уже не осторожность, а вторая заначка. */
+const MAX_BUFFER_PCT = 50;
 
 /**
  * Накладывает факт периода на план: сколько осталось на жизнь и какой теперь дневной темп.
@@ -99,15 +108,31 @@ export interface PlanFact {
  */
 export function summarizeFact(
   summary: PlanSummary,
-  opts: { readonly spentLivingMinor: bigint; readonly daysLeft: number },
+  opts: {
+    readonly spentLivingMinor: bigint;
+    readonly daysLeft: number;
+    /**
+     * Доля остатка, которую не включаем в дневной темп (настройка воркспейса, issue #49). Нужна
+     * тем, кто предпочитает дойти до выплаты с запасом, а не ровно в ноль.
+     */
+    readonly bufferPct?: number;
+  },
 ): PlanFact {
+  const bufferPct = opts.bufferPct ?? 0;
+  if (!Number.isInteger(bufferPct) || bufferPct < 0 || bufferPct > MAX_BUFFER_PCT) {
+    throw new Error('buffer_pct_out_of_range');
+  }
   const remainingLivingMinor = summary.livingMinor - opts.spentLivingMinor;
   const spendable = remainingLivingMinor > 0n ? remainingLivingMinor : 0n;
+  // Буфер считается от остатка, а не от плана: в середине периода «10% плана» уже не запас.
+  const bufferMinor = (spendable * BigInt(bufferPct)) / 100n;
+  const pace = spendable - bufferMinor;
   return {
     spentLivingMinor: opts.spentLivingMinor,
     remainingLivingMinor,
     overspentMinor: remainingLivingMinor < 0n ? -remainingLivingMinor : 0n,
-    canSpendPerDayMinor: opts.daysLeft > 0 ? spendable / BigInt(opts.daysLeft) : 0n,
+    canSpendPerDayMinor: opts.daysLeft > 0 ? pace / BigInt(opts.daysLeft) : 0n,
+    bufferMinor,
   };
 }
 
@@ -162,9 +187,15 @@ export interface AssembledPlan {
 export function assemblePlan(
   incomeMinor: bigint,
   plan: readonly PlanItem[],
-  opts: { readonly daysInPeriod: number },
+  opts: {
+    readonly daysInPeriod: number;
+    /** Порядок сжатия из настроек воркспейса (issue #49); инвариант «долги целы» ядро держит само. */
+    readonly compressOrder?: readonly CompressibleKind[];
+  },
 ): AssembledPlan {
   const ordered = orderPlanItems(plan);
-  const result = cascade(incomeMinor, ordered);
+  const result = cascade(incomeMinor, ordered, {
+    ...(opts.compressOrder ? { compressOrder: opts.compressOrder } : {}),
+  });
   return { result, summary: summarizePlan(result, opts) };
 }

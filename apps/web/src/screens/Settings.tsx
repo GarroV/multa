@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { Panel, Tag } from '../components/ui/Panel.tsx';
 import { api } from '../lib/api.ts';
@@ -178,6 +179,8 @@ export function Settings() {
               </span>
             </div>
           </Panel>
+
+          <BehaviourSettings />
 
           <Panel label={t('settings.account')} accent="vio">
             <div className="prow">

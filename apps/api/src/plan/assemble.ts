@@ -53,6 +53,7 @@ import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { getRate } from '../fx/service.ts';
 import { receiptsForPeriod } from '../income/receipts.ts';
+import { settingsOf } from '../settings/store.ts';
 
 /**
  * targetKind, которыми управляет автосборка (пишет allocated, чистит исчезнувшие).
@@ -104,6 +105,8 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
 async function loadCategoryHistory(
   ws: Workspace,
   beforeStartsOn: string,
+  /** Сколько прошлых периодов брать: настройка воркспейса (issue #49), по умолчанию шесть. */
+  maxPeriods = 6,
 ): Promise<Map<string, bigint[]>> {
   const rows = await db
     .select({
@@ -130,7 +133,7 @@ async function loadCategoryHistory(
   for (const row of rows) {
     if (!row.targetId) continue;
     const periods = seenPeriods.get(row.targetId) ?? new Set<string>();
-    if (periods.size >= 6 && !periods.has(row.startsOn)) continue;
+    if (periods.size >= maxPeriods && !periods.has(row.startsOn)) continue;
     periods.add(row.startsOn);
     seenPeriods.set(row.targetId, periods);
     byCategory.set(row.targetId, [
@@ -650,6 +653,8 @@ export interface PlanDto {
   totalPlannedMinor: string;
   totalAllocatedMinor: string;
   compressedMinor: string;
+  /** Отложено буфером и не вошло в дневной темп (issue #49). */
+  bufferMinor: string;
   freeMinor: string;
   toExchangeMinor: string;
   /** Дневной темп с учётом факта: остаток на жизнь ÷ daysLeft. */
@@ -742,7 +747,11 @@ async function assembleForPeriod(
     })),
   ];
   const totalDays = daysInPeriod(period);
-  const { result, summary } = assemblePlan(incomeMinor, plan, { daysInPeriod: totalDays });
+  const settings = settingsOf(ws);
+  const { result, summary } = assemblePlan(incomeMinor, plan, {
+    daysInPeriod: totalDays,
+    compressOrder: settings.cascade.compressOrder,
+  });
 
   // Дескрипторы для обогащения (имя/исходная валюта). Категории — в base-валюте.
   const desc = new Map<
@@ -766,9 +775,11 @@ async function assembleForPeriod(
   const fact = summarizeFact(summary, {
     spentLivingMinor: spending.livingMinor,
     daysLeft: daysLeftInPeriod(period, asOf),
+    // Буфер: часть остатка не входит в дневной темп, чтобы дойти до выплаты с запасом (issue #49).
+    bufferPct: settings.cascade.bufferPct,
   });
   const executions = await loadExecutions(periodId);
-  const history = await loadCategoryHistory(ws, period.startsOn);
+  const history = await loadCategoryHistory(ws, period.startsOn, settings.signals.medianPeriods);
   const burn = burnRate({
     livingMinor: summary.livingMinor,
     spentLivingMinor: spending.livingMinor,
@@ -801,7 +812,9 @@ async function assembleForPeriod(
       ...(a.targetKind === 'category'
         ? { protectedCategory: cats.find((c) => c.targetId === a.targetId)?.isProtected === true }
         : {}),
-      ...adviceFields(a.targetKind, a.allocatedMinor, history.get(a.targetId)),
+      ...(settings.periods.suggestRaises
+        ? adviceFields(a.targetKind, a.allocatedMinor, history.get(a.targetId))
+        : {}),
       ...(a.targetKind === 'goal' ? { frozen: false } : {}),
     };
   });
@@ -895,6 +908,7 @@ async function assembleForPeriod(
     totalPlannedMinor: result.totalPlannedMinor.toString(),
     totalAllocatedMinor: result.totalAllocatedMinor.toString(),
     compressedMinor: result.compressedMinor.toString(),
+    bufferMinor: fact.bufferMinor.toString(),
     freeMinor: result.freeMinor.toString(),
     toExchangeMinor: summary.toExchangeMinor.toString(),
     canSpendPerDayMinor: fact.canSpendPerDayMinor.toString(),

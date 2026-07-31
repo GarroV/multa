@@ -350,6 +350,8 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           </span>
           <span className="kpi-sub">
             {t('plan.today.until', { date: plan.period.endsOn.slice(5), days: plan.daysLeft })}
+            {BigInt(plan.bufferMinor) > 0n &&
+              ` · ${t('plan.kpi.buffer', { amount: withCcy(plan.bufferMinor) })}`}
           </span>
         </Kpi>
 

@@ -94,6 +94,8 @@ export interface PlanDto {
   compressedMinor: string;
   freeMinor: string;
   toExchangeMinor: string;
+  /** Отложено буфером и не вошло в дневной темп (issue #49). */
+  bufferMinor: string;
   canSpendPerDayMinor: string;
   extraIncomeMinor: string;
   livingMinor: string;
@@ -380,6 +382,47 @@ export function useCancelIncomeReceipt() {
     },
   });
 }
+
+// --- Настройки воркспейса (issue #49) ---
+
+export interface WorkspaceSettingsDto {
+  periods: { suggestRaises: boolean };
+  currency: {
+    rateSource: 'cbr' | 'ecb' | 'manual';
+    defaultSpreadBp: number;
+    defaultProvider: string | null;
+  };
+  cascade: { bufferPct: number; compressOrder: ('goal' | 'envelope' | 'category')[] };
+  signals: { burnThresholdDays: number; medianPeriods: number };
+}
+
+export function useSettings() {
+  return useQuery({
+    queryKey: ['settings'],
+    retry: false,
+    queryFn: () => api<WorkspaceSettingsDto>('/v1/workspace/settings'),
+  });
+}
+
+/** Правка частичная: сервер сливает тронутое с сохранённым, остальное не сбрасывается. */
+export function usePatchSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: DeepPartial<WorkspaceSettingsDto>) =>
+      api<WorkspaceSettingsDto>('/v1/workspace/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings'] });
+      // Настройки меняют поведение плана и аналитики — их надо перечитать, а не оставить старыми.
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['analytics'] });
+    },
+  });
+}
+
+type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? Partial<T[K]> : T[K] };
 
 // --- Категорийная аналитика (issue #51) ---
 
