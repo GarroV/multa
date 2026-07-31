@@ -1,7 +1,7 @@
 import { resolveRate, type RateSnapshot } from '@multa/core';
-import { and, desc, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
-import { fxRates } from '../db/schema/domain.ts';
+import { fxManualRates, fxRates } from '../db/schema/domain.ts';
 import { logger } from '../logger.ts';
 import { fetchCbr, fetchFrankfurter } from './sources.ts';
 
@@ -43,7 +43,16 @@ export async function refreshRates(): Promise<number> {
 }
 
 /** Курс пары на дату через кэш fx_rates + резолвер ядра (прямая/обратная/кросс/выходные). */
-export async function getRate(from: string, to: string, on: string): Promise<RateSnapshot | null> {
+export async function getRate(
+  from: string,
+  to: string,
+  on: string,
+  /**
+   * Воркспейс, чьи личные курсы учитывать. Без него берутся только публичные котировки: ручной
+   * курс — личный факт, и подмешивать его в чужие расчёты нельзя (правило 7).
+   */
+  workspaceId?: string,
+): Promise<RateSnapshot | null> {
   const minDate = addDaysISO(on, -LOOKBACK_DAYS);
   const rows = await db
     .select()
@@ -56,6 +65,22 @@ export async function getRate(from: string, to: string, on: string): Promise<Rat
     source: r.source,
     date: r.onDate,
   }));
+  if (workspaceId) {
+    const manual = await db
+      .select()
+      .from(fxManualRates)
+      .where(
+        and(
+          eq(fxManualRates.workspaceId, workspaceId),
+          lte(fxManualRates.onDate, on),
+          gte(fxManualRates.onDate, minDate),
+        ),
+      );
+    // `manual` побеждает котировку на ту же дату — это правило живёт в ядре (`resolveRate`).
+    for (const r of manual) {
+      quotes.push({ from: r.base, to: r.quote, rate: r.rate, source: 'manual', date: r.onDate });
+    }
+  }
   return resolveRate(quotes, from.toUpperCase(), to.toUpperCase(), on, {
     maxLookbackDays: LOOKBACK_DAYS,
   });

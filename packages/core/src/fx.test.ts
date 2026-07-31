@@ -113,3 +113,36 @@ describe('resolveRate', () => {
     expect(resolveRate([], 'USD', 'RUB', '2026-07-19')).toBeNull();
   });
 });
+
+describe('приоритет ручного курса', () => {
+  const on = '2026-07-25';
+
+  it('ручной курс на ту же дату побеждает котировку источника', () => {
+    // Курс дня выплаты человек вводит руками, глядя на табло обменника: он ближе к реальности,
+    // чем котировка ЦБ на ту же дату (#48). Иначе «к размену» считается по чужому курсу.
+    const snap = resolveRate(
+      [
+        { from: 'EUR', to: 'RUB', rate: '90.0000000000', source: 'cbr', date: on },
+        { from: 'EUR', to: 'RUB', rate: '93.5000000000', source: 'manual', date: on },
+      ],
+      'EUR',
+      'RUB',
+      on,
+    );
+    expect(snap?.source).toBe('manual');
+    expect(snap?.rate).toBe('93.5000000000');
+  });
+
+  it('свежесть важнее источника: вчерашний ручной курс не побеждает сегодняшнюю котировку', () => {
+    const snap = resolveRate(
+      [
+        { from: 'EUR', to: 'RUB', rate: '93.5000000000', source: 'manual', date: '2026-07-24' },
+        { from: 'EUR', to: 'RUB', rate: '90.0000000000', source: 'cbr', date: on },
+      ],
+      'EUR',
+      'RUB',
+      on,
+    );
+    expect(snap?.source).toBe('cbr');
+  });
+});

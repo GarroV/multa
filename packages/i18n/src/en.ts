@@ -53,6 +53,17 @@ export const en = {
   'income.extra.irregular': 'Comes irregularly',
   'income.extra.irregularNote': 'Irregular income stays out of the plan — only recorded as fact.',
   'income.variable': 'floats',
+  'income.received': 'Money in',
+  'income.expectedAmount': 'expected',
+  'income.actualAmount': 'Received',
+  'income.rateOfDay': '{from}/{to} rate for that day',
+  'income.rateOptional': 'use the quote',
+  'income.rateHint': 'Your rate beats the quote for that date and is never recalculated later.',
+  'income.badRate': 'Rate must be a positive number',
+  'income.fix': 'Fix it',
+  'income.chip.expected': 'expected',
+  'income.chip.received': 'received',
+  'income.cancelReceipt': 'undo',
 
   // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
   'onboarding.debts.title': 'Any loans or installments?',

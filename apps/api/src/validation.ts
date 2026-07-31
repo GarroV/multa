@@ -86,6 +86,26 @@ export const incomeSourceRowSchema = incomeSourceSchema.extend({ id: z.string().
 
 export const incomeSourcePatchSchema = incomeSourceSchema.partial();
 
+/**
+ * Подтверждение поступления (issue #48). Сумма — в minor валюты прихода; валюта по умолчанию берётся
+ * у источника. Курс — десятичная строка: его вводят руками, глядя на табло обменника, и он важнее
+ * котировки на ту же дату. Float в курсе не допускаем по тем же причинам, что и в деньгах.
+ */
+export const incomeReceiptSchema = z.object({
+  amountMinor: positiveMinor.transform((v) => v.toString()),
+  currency: ccy.optional(),
+  occurredOn: isoDate,
+  rate: z
+    .union([z.string(), z.number()])
+    .transform((v) => String(v).trim())
+    .refine(
+      (v) => /^\d+(\.\d+)?$/.test(v) && Number(v) > 0,
+      'курс — положительное десятичное число',
+    )
+    .optional(),
+  note: z.string().min(1).max(200).optional(),
+});
+
 /** Онбординг: ритм + правило выходных + набор источников одним запросом (атомарно). */
 export const onboardingIncomeSchema = z.object({
   rhythm: rhythmSchema,

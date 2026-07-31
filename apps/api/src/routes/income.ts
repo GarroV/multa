@@ -8,12 +8,24 @@ import {
   serializeSource,
   skipOnboarding,
 } from '../income/store.ts';
+import {
+  deleteReceipt,
+  findSource,
+  insertReceipt,
+  ReceiptDuplicate,
+  ReceiptRateUnavailable,
+  serializeReceipt,
+} from '../income/receipts.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import {
+  incomeReceiptSchema,
   incomeSourcePatchSchema,
   incomeSourceSchema,
   onboardingIncomeSchema,
 } from '../validation.ts';
+
+/** Кривой id — это «нет такого», а не 500 от драйвера на некорректном uuid. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Источники дохода: CRUD + атомарный шаг онбординга. Скоуп — только из токена (правило 7). */
 export const incomeRoute = new Hono<{ Variables: AppVariables }>();
@@ -46,6 +58,45 @@ incomeRoute.delete('/income-sources/:id', async (c) => {
   if (!id) return c.json({ error: 'not_found' }, 404);
   if (!(await deleteSourceById(ws.id, id))) return c.json({ error: 'not_found' }, 404);
   return c.body(null, 204);
+});
+
+/**
+ * Подтверждение поступления (issue #48): фактическая сумма, дата и — при желании — курс дня
+ * выплаты. После этого план считается по факту, а не по ожидаемой сумме.
+ */
+incomeRoute.post('/income-sources/:id/received', async (c) => {
+  const ws = c.get('workspace')!;
+  const id = c.req.param('id');
+  const body = incomeReceiptSchema.parse(await c.req.json());
+  if (!id || !UUID_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+
+  const source = await findSource(ws.id, id);
+  if (!source) return c.json({ error: 'not_found' }, 404);
+
+  try {
+    const row = await insertReceipt(ws.id, ws.baseCurrency, id, {
+      amountMinor: BigInt(body.amountMinor),
+      // Валюта по умолчанию — валюта источника: обычно приходит именно в ней.
+      currency: body.currency ?? source.currency,
+      occurredOn: body.occurredOn,
+      ...(body.rate ? { rate: body.rate } : {}),
+      ...(body.note ? { note: body.note } : {}),
+    });
+    return c.json(serializeReceipt(row), 201);
+  } catch (err) {
+    if (err instanceof ReceiptDuplicate) return c.json({ error: 'receipt_exists' }, 409);
+    if (err instanceof ReceiptRateUnavailable) return c.json({ error: 'rate_unavailable' }, 422);
+    throw err;
+  }
+});
+
+/** Отмена подтверждения: план возвращается к плановой сумме источника. */
+incomeRoute.delete('/income-receipts/:id', async (c) => {
+  const ws = c.get('workspace')!;
+  const id = c.req.param('id');
+  if (!id || !UUID_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+  if (!(await deleteReceipt(ws.id, id))) return c.json({ error: 'not_found' }, 404);
+  return c.json({ ok: true });
 });
 
 /** Шаг онбординга «когда приходят деньги»: ритм и источники за один атомарный запрос. */

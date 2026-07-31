@@ -132,6 +132,10 @@ function findOnOrBefore(
   for (const q of quotes) {
     if (q.from === from && q.to === to && q.date <= on && q.date >= minDate) {
       if (!best || q.date > best.date) best = q;
+      // На одну дату может быть и котировка источника, и курс, введённый руками в день выплаты.
+      // Побеждает ручной: человек смотрел на табло обменника, а ЦБ публикует свой курс.
+      // Свежесть при этом важнее источника — сравнение по дате идёт первым.
+      else if (q.date === best.date && q.source === 'manual' && best.source !== 'manual') best = q;
     }
   }
   return best;
