@@ -16,6 +16,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import {
+  accounts,
   categories,
   currencyBuckets,
   debts,
@@ -152,6 +153,7 @@ async function wipe(workspaceId: string): Promise<void> {
   await db.delete(envelopes).where(eq(envelopes.workspaceId, workspaceId));
   await db.delete(goals).where(eq(goals.workspaceId, workspaceId));
   await db.delete(categories).where(eq(categories.workspaceId, workspaceId));
+  await db.delete(accounts).where(eq(accounts.workspaceId, workspaceId));
 }
 
 /** Английские категории демо: пресеты продукта плюс те, что нужны валютным тратам. */
@@ -213,6 +215,17 @@ export async function seedDemo(userId: string): Promise<string> {
     if (!hit) throw new Error(`demo seed: category ${name} missing`);
     return hit.id;
   };
+
+  /*
+   * Счета (issue #45): демо обязано показывать «сколько всего денег есть» — это первый блок плана.
+   * Три валюты сразу, потому что продукт как раз про жизнь между валютами.
+   */
+  await db.insert(accounts).values([
+    { workspaceId, name: 'Cash', currency: 'RUB', kind: 'cash', balanceMinor: 1_240_000n },
+    { workspaceId, name: 'Debit card', currency: 'RUB', kind: 'card', balanceMinor: 5_130_000n },
+    { workspaceId, name: 'Savings', currency: 'EUR', kind: 'savings', balanceMinor: 210_00n },
+    { workspaceId, name: 'Dinar wallet', currency: 'RSD', kind: 'cash', balanceMinor: 980_000n },
+  ]);
 
   await db.insert(incomeSources).values([
     {

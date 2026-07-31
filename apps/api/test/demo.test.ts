@@ -42,6 +42,24 @@ describe('вход в демо', () => {
     expect(BigInt(plan.canSpendPerDayMinor)).toBeGreaterThan(0n);
   });
 
+  test('остаток по счетам заполнен и считается в базовой валюте', async () => {
+    const guest = anonymous();
+    await expectOk(await guest.post('/v1/demo/enter'));
+    const balances = await expectOk<{
+      totalMinor: string | null;
+      byCurrency: { currency: string }[];
+      unresolved: string[];
+    }>(await guest.get('/v1/accounts/balances'));
+
+    // Три валюты сразу: продукт про жизнь между валютами, и первый экран это показывает.
+    expect(new Set(balances.byCurrency.map((b) => b.currency))).toEqual(
+      new Set(['RUB', 'EUR', 'RSD']),
+    );
+    // Итог обязан считаться: «—» вместо суммы означало бы, что курсов демо нет.
+    expect(balances.unresolved).toEqual([]);
+    expect(BigInt(balances.totalMinor ?? '0')).toBeGreaterThan(0n);
+  });
+
   test('данные демо на английском', async () => {
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));

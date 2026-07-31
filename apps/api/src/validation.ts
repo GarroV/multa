@@ -106,6 +106,22 @@ export const incomeReceiptSchema = z.object({
   note: z.string().min(1).max(200).optional(),
 });
 
+/**
+ * Счёт (issue #45). Остаток может быть нулевым и отрицательным — кредитка бывает в минусе, поэтому
+ * здесь `minor`, а не `positiveMinor`. Вид счёта ограничен теми же значениями, что в check-констрейнте
+ * базы: расхождение между схемой и Zod дало бы 500 вместо понятного 400.
+ */
+export const accountSchema = z.object({
+  name: z.string().min(1).max(60),
+  currency: ccy,
+  kind: z.enum(['cash', 'card', 'savings', 'other']).default('cash'),
+  balanceMinor: minor.transform((v) => v.toString()).optional(),
+});
+
+export const accountPatchSchema = accountSchema
+  .partial()
+  .extend({ archived: z.boolean().optional() });
+
 /** Онбординг: ритм + правило выходных + набор источников одним запросом (атомарно). */
 export const onboardingIncomeSchema = z.object({
   rhythm: rhythmSchema,

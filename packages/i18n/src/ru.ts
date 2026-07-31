@@ -201,6 +201,17 @@ export const ru: Record<TranslationKey, string> = {
   'nav.settings': 'Настройки',
 
   // Обязательства
+  'acc.title': 'СЧЕТА',
+  'acc.total': 'ВСЕГО ДЕНЕГ',
+  'acc.byCurrency': 'по валютам',
+  'acc.noRate': 'нет курса: {list}',
+  'acc.empty': 'Счета не заведены — итог считать не из чего',
+  'acc.kind.cash': 'наличные',
+  'acc.kind.card': 'карта',
+  'acc.kind.savings': 'накопительный',
+  'acc.kind.other': 'другое',
+  'acc.archive': 'в архив',
+  'acc.balance': 'Остаток',
   'obl.title': 'Обязательства',
   'obl.debts': 'Долги',
   'obl.envelopes': 'Конверты',

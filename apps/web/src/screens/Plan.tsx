@@ -11,6 +11,7 @@ import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   isOnboardingIncomplete,
+  useBalances,
   useCancelIncomeReceipt,
   useConfirmExecution,
   useForecast,
@@ -201,6 +202,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   // Подтверждение поступления (issue #48): открывается чипом «ждём» у конкретной выплаты.
   const [receiptFor, setReceiptFor] = useState<IncomeEventDto | null>(null);
   const cancelReceipt = useCancelIncomeReceipt();
+  const balances = useBalances();
 
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
   const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
@@ -223,6 +225,36 @@ function PlanBody({ plan }: { plan: PlanDto }) {
         <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
       )}
       <div className="kpi-strip">
+        {balances.data && balances.data.byCurrency.length > 0 && (
+          <Kpi label={t('acc.total')}>
+            <span className="kpi-value">
+              {balances.data.totalMinor === null
+                ? '—'
+                : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
+            </span>
+            <div className="kpi-rows">
+              {balances.data.byCurrency.map((b) => (
+                <div key={b.currency}>
+                  <span>
+                    {formatMinor(b.minor, b.currency, locale)} {b.currency}
+                  </span>
+                  {b.baseMinor === null ? (
+                    <span className="st-warn">—</span>
+                  ) : (
+                    b.currency !== base && (
+                      <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
+                    )
+                  )}
+                </div>
+              ))}
+            </div>
+            {balances.data.unresolved.length > 0 && (
+              <span className="kpi-sub st-warn">
+                {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
+              </span>
+            )}
+          </Kpi>
+        )}
         <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })}>
           <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
             {withCcy(plan.remainingLivingMinor)}

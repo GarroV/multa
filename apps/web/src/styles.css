@@ -719,7 +719,9 @@ a {
 /* --- Полоса KPI: четыре клетки, разделённые линией, без внешних отступов --- */
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* auto-fit, а не фиксированные 4 колонки: число блоков зависит от данных (остаток по счетам
+     появляется только когда они заведены), и пятый блок не должен висеть один во второй строке. */
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
   gap: 1px;
   background: var(--line);
   border-bottom: 1px solid var(--line);
@@ -785,6 +787,7 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
 @media (max-width: 640px) {
   .kpi-strip {
     grid-template-columns: minmax(0, 1fr);

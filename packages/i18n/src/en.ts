@@ -201,6 +201,17 @@ export const en = {
   'nav.settings': 'Settings',
 
   // Обязательства
+  'acc.title': 'ACCOUNTS',
+  'acc.total': 'MONEY ON HAND',
+  'acc.byCurrency': 'by currency',
+  'acc.noRate': 'no rate: {list}',
+  'acc.empty': 'No accounts yet — nothing to total up',
+  'acc.kind.cash': 'cash',
+  'acc.kind.card': 'card',
+  'acc.kind.savings': 'savings',
+  'acc.kind.other': 'other',
+  'acc.archive': 'archive',
+  'acc.balance': 'Balance',
   'obl.title': 'Obligations',
   'obl.debts': 'Debts',
   'obl.envelopes': 'Envelopes',

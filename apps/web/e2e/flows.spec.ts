@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { enterDemo, resetDemo } from './helpers.ts';
 
 /**
  * Рабочие флоу поверх демо: запись траты, тема и язык, защита форм от невалидного ввода
@@ -6,9 +7,8 @@ import { expect, test } from '@playwright/test';
  */
 
 test.beforeEach(async ({ page }) => {
-  await page.request.post('/v1/demo/reset').catch(() => undefined);
-  await page.goto('/demo');
-  await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
+  await resetDemo(page);
+  await enterDemo(page);
 });
 
 test('трата записывается и попадает в факт категории', async ({ page }) => {
