@@ -28,7 +28,7 @@ import { currencyMix, lockedSplit, planVsFact, spreadAverage } from '../lib/stat
  */
 
 function Centered({ children }: { children: ReactNode }) {
-  return <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>{children}</div>;
+  return <div className="center-screen">{children}</div>;
 }
 
 function Metric({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'accent' | 'over' }) {
@@ -181,7 +181,7 @@ function StatsBody({ plan }: { plan: PlanDto }) {
       </div>
 
       <div className="panels">
-        <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+        <div className="col">
           <Panel label={t('stats.signals')} accent={plan.burn.willLast ? 'cyan' : 'mag'}>
             {!plan.burn.willLast && plan.burn.runsOutOn && (
               <Signal
@@ -286,7 +286,7 @@ function StatsBody({ plan }: { plan: PlanDto }) {
           )}
         </div>
 
-        <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+        <div className="col">
           <Panel
             label={t('fx.title')}
             sum={t('fx.totalLost')}
@@ -348,7 +348,7 @@ export function Statistics() {
   if (error) {
     return (
       <Centered>
-        <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
+        <div className="center-stack">
           <span className="sub">{t('common.error')}</span>
           <button className="btn" onClick={() => void refetch()}>{t('common.retry')}</button>
         </div>
