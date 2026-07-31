@@ -381,6 +381,27 @@ export function useCancelIncomeReceipt() {
   });
 }
 
+// --- Категорийная аналитика (issue #51) ---
+
+export interface CategoryAnalyticsRow {
+  categoryId: string;
+  name: string;
+  plannedMinor: string;
+  medianMinor: string;
+  deltaPct: number | null;
+  verdict: 'unknown' | 'stable' | 'raise' | 'lower' | 'volatile' | 'unplanned';
+  series: { startsOn: string; spentMinor: string }[];
+  periods: number;
+}
+
+export function useCategoryAnalytics(periods = 6) {
+  return useQuery({
+    queryKey: ['analytics', 'categories', periods],
+    retry: false,
+    queryFn: () => api<CategoryAnalyticsRow[]>(`/v1/analytics/categories?periods=${periods}`),
+  });
+}
+
 // --- История ревизий (issue #52) ---
 
 export interface RevisionMoveDto {

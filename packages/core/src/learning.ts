@@ -53,3 +53,46 @@ export function budgetAdvice(input: BudgetAdviceInput): BudgetAdvice | null {
 
   return { kind: diff > 0n ? 'raise' : 'lower', suggestedMinor, periods: history.length };
 }
+
+/**
+ * Вердикт по категории для аналитики (issue #51). Совет (`budgetAdvice`) отвечает «менять ли план»,
+ * вердикт — «что вообще происходит со статьёй», и у него есть состояние, которого у совета нет:
+ * **нестабильно**. Статью с разбросом в обе стороны бессмысленно «поднимать» — её надо разбирать
+ * (в ней прячутся разные по смыслу траты), поэтому она обязана называться своим словом.
+ */
+export type CategoryVerdictKind =
+  'unknown' | 'stable' | 'raise' | 'lower' | 'volatile' | 'unplanned';
+
+export interface CategoryVerdict {
+  readonly kind: CategoryVerdictKind;
+  /** Медиана факта: один месяц с ремонтом не должен задирать бюджет на год. */
+  readonly medianMinor: bigint;
+  /** Отклонение медианы от плана в процентах; null — плана нет, сравнивать не с чем. */
+  readonly deltaPct: number | null;
+  readonly periods: number;
+}
+
+export function categoryVerdict(input: BudgetAdviceInput): CategoryVerdict {
+  const { plannedMinor, history } = input;
+  const periods = history.length;
+  if (periods === 0) return { kind: 'unknown', medianMinor: 0n, deltaPct: null, periods };
+
+  const medianMinor = median(history);
+  const deltaPct =
+    plannedMinor > 0n
+      ? Number(((medianMinor - plannedMinor) * 10_000n) / plannedMinor) / 100
+      : null;
+
+  if (plannedMinor <= 0n) return { kind: 'unplanned', medianMinor, deltaPct, periods };
+  if (periods < MIN_PERIODS) return { kind: 'unknown', medianMinor, deltaPct, periods };
+
+  const threshold = (plannedMinor * NOISE_PCT) / 100n;
+  const above = history.filter((v) => v - plannedMinor > threshold).length;
+  const below = history.filter((v) => plannedMinor - v > threshold).length;
+  // Разброс в обе стороны — не «поднять» и не «снизить»: привычки не видно.
+  if (above > 0 && below > 0) return { kind: 'volatile', medianMinor, deltaPct, periods };
+
+  const advice = budgetAdvice(input);
+  if (!advice) return { kind: 'stable', medianMinor, deltaPct, periods };
+  return { kind: advice.kind, medianMinor, deltaPct, periods };
+}
