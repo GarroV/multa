@@ -1,7 +1,7 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { App } from './App.tsx';
 import { Demo } from './screens/Demo.tsx';
-import { Exchange } from './screens/Exchange.tsx';
+import { Statistics } from './screens/Statistics.tsx';
 import { Obligations } from './screens/Obligations.tsx';
 import { Plan } from './screens/Plan.tsx';
 import { Settings } from './screens/Settings.tsx';
@@ -25,7 +25,20 @@ const todayRoute = createRoute({
   },
 });
 const planRoute = createRoute({ getParentRoute: () => rootRoute, path: '/plan', component: Plan });
-const exchangeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/exchange', component: Exchange });
+const statisticsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/statistics',
+  component: Statistics,
+});
+// Размен переехал в «Статистику» (issue #30): ввод, копилка потерь и история стоят рядом с
+// метриками, которые из них и считаются. Старый адрес не роняем.
+const exchangeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/exchange',
+  beforeLoad: () => {
+    throw redirect({ to: '/statistics' });
+  },
+});
 const obligationsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/obligations', component: Obligations });
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/settings', component: Settings });
 // Демо без регистрации (#56): единственный экран, который не требует сессии — он её и получает.
@@ -35,6 +48,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   todayRoute,
   planRoute,
+  statisticsRoute,
   exchangeRoute,
   obligationsRoute,
   settingsRoute,

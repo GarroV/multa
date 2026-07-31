@@ -17,7 +17,7 @@ import { useTheme } from './lib/theme.ts';
 
 const NAV: { to: string; key: TranslationKey }[] = [
   { to: '/plan', key: 'nav.plan' },
-  { to: '/exchange', key: 'nav.exchange' },
+  { to: '/statistics', key: 'nav.statistics' },
   { to: '/obligations', key: 'nav.obligations' },
   { to: '/settings', key: 'nav.settings' },
 ];

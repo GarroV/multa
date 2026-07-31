@@ -1163,3 +1163,9 @@ a {
   .tabs { order: 3; width: 100%; overflow-x: auto; }
   .tab { height: 34px; }
 }
+
+/* Ввод размена живёт в подвале панели статистики: два поля пары и дата в одну строку. */
+.fx-form {
+  display: grid;
+  gap: 8px;
+}

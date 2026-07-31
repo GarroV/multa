@@ -11,7 +11,7 @@
  *    что-то показывать, поэтому сеется история шести закрытых периодов, а не только текущий.
  */
 
-import { exchangeResult } from '@multa/core';
+import { convert, exchangeResult, money } from '@multa/core';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
@@ -401,22 +401,31 @@ export async function seedDemo(userId: string): Promise<string> {
   }
   await db.insert(transactions).values(historyRows);
 
-  // История разменов: разные спреды, чтобы «сколько я теряю на менялах» было не пустым.
-  const fxHistory: { from: 'RUB'; to: 'EUR' | 'RSD'; fromMinor: bigint; toMinor: bigint; back: number }[] = [
-    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, toMinor: 59_800n, back: 20 },
-    { from: 'RUB', to: 'RSD', fromMinor: 4_000_000n, toMinor: 6_710_000n, back: 35 },
-    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, toMinor: 60_100n, back: 50 },
-    { from: 'RUB', to: 'EUR', fromMinor: 5_500_000n, toMinor: 54_000n, back: 65 },
+  /*
+   * История разменов. Полученную сумму НЕ хардкодим: она считается от официального курса на дату
+   * минус заданный спред в базисных пунктах. Иначе демо показывает бессмыслицу — до 31.07.2026
+   * суммы стояли константами, и на экране статистики средний спред выходил −0,4% при отдельных
+   * операциях «+9,4%» и «−30,8%», то есть меняла как будто платил сверху рыночного курса.
+   */
+  const fxHistory: { from: 'RUB'; to: 'EUR' | 'RSD'; fromMinor: bigint; spreadBp: bigint; back: number; note: string }[] = [
+    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 180n, back: 20, note: 'Menjačnica' },
+    { from: 'RUB', to: 'RSD', fromMinor: 4_000_000n, spreadBp: 90n, back: 35, note: 'Menjačnica' },
+    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 260n, back: 50, note: 'Bank' },
+    { from: 'RUB', to: 'EUR', fromMinor: 5_500_000n, spreadBp: 120n, back: 65, note: 'Wise' },
   ];
   for (const op of fxHistory) {
     const day = shift(asOf, -op.back);
     const official = await getRate(op.from, op.to, day);
+    if (!official) continue;
+    // Честная сумма по официальному курсу, затем удержание спреда — так это и происходит у менялы.
+    const fairMinor = convert(money(op.fromMinor, op.from), official).minor;
+    const toMinor = fairMinor - (fairMinor * op.spreadBp) / 10_000n;
     // Спред считает то же ядро, что и роут размена: у демо-данных не должно быть своей арифметики,
     // иначе «сколько я теряю на менялах» в демо и в жизни расходились бы.
     const result = exchangeResult({
       fromMinor: op.fromMinor,
       fromCurrency: op.from,
-      toMinor: op.toMinor,
+      toMinor,
       toCurrency: op.to,
       official,
     });
@@ -426,12 +435,14 @@ export async function seedDemo(userId: string): Promise<string> {
       fromCurrency: op.from,
       toCurrency: op.to,
       fromMinor: op.fromMinor,
-      toMinor: op.toMinor,
+      toMinor,
       actualRate: result.effectiveRate,
-      ...(official ? { officialRate: official.rate, officialSource: official.source } : {}),
+      officialRate: official.rate,
+      officialSource: official.source,
       ...(result.spreadPct !== null ? { spreadPct: result.spreadPct } : {}),
       ...(result.lostMinor !== null ? { spreadMinor: result.lostMinor } : {}),
       occurredOn: day,
+      note: op.note,
     });
   }
 
