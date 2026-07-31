@@ -1,7 +1,9 @@
+import { useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { AppShell } from './AppShell.tsx';
 import { useI18n } from './lib/i18n.tsx';
 import { useMe } from './lib/queries.ts';
+import { Demo } from './screens/Demo.tsx';
 import { Login } from './screens/Login.tsx';
 import { Onboarding } from './screens/Onboarding.tsx';
 import { OnboardingCurrency } from './screens/OnboardingCurrency.tsx';
@@ -10,6 +12,7 @@ import { OnboardingCurrency } from './screens/OnboardingCurrency.tsx';
 export function App() {
   const { t, setLocale } = useI18n();
   const { data: me, isLoading } = useMe();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   // Язык интерфейса подхватывается из воркспейса один раз за сессию: демо обязано открываться
   // по-английски (issue #56), а ручной выбор в шапке после этого не перетирается.
   const localeApplied = useRef(false);
@@ -27,6 +30,12 @@ export function App() {
       </div>
     );
   }
+  /*
+   * Демо — единственный экран, который живёт до сессии: он её и получает. Без этой ветки гейт
+   * показывал смотрящему форму регистрации (найдено браузерным E2E), то есть весь смысл
+   * «посмотреть без регистрации» ломался при первом же чистом визите.
+   */
+  if (!me?.user && pathname === '/demo') return <Demo />;
   if (!me?.user) return <Login />;
   if (!me.workspace) return <OnboardingCurrency />;
   // Онбординг закрыт, когда есть и ритм, и хотя бы один активный источник дохода —
