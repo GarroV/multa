@@ -13,3 +13,4 @@ export * from './forecast.ts';
 export * from './receiptQr.ts';
 export * from './receiptSplit.ts';
 export * from './recurring.ts';
+export * from './importXlsx.ts';
