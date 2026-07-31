@@ -830,6 +830,10 @@ a {
   position: relative;
   padding: 18px 24px 26px;
   border-bottom: 1px solid var(--line);
+  /* clip, а не hidden: подпись у края оси не должна распирать страницу, но и скролл-контейнер
+     здесь не нужен. Ширина текста зависит от рендеринга шрифтов, поэтому на Linux-раннере
+     подпись вылезала на 7px там, где на macOS помещалась (пойман браузерным E2E). */
+  overflow-x: clip;
 }
 .pmap-line {
   position: relative;
@@ -1191,7 +1195,15 @@ a {
 .app-frame {
   min-height: 100%;
   display: grid;
+  /* Колонка обязана быть minmax(0, 1fr): при `auto` grid-элементы берут max-content, и топбар
+     раздувал страницу до ширины всех своих кнопок в одну строку (E2E: 30px переполнения на 375px)
+     ещё до того, как успевал сработать перенос. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
+}
+.topbar,
+.app-main {
+  min-width: 0;
 }
 .topbar {
   position: sticky;
@@ -1275,20 +1287,59 @@ a {
 .app-main {
   min-width: 0;
 }
-@media (max-width: 720px) {
+/* Порог 900, а не 720: на планшетной ширине бренд + четыре вкладки + ввод + тема + язык + выход
+   в строку 48px не влезают и распирают страницу по горизонтали — браузерный E2E показал 105px
+   переполнения на 768px. Инструменты переносятся, вкладки уходят во вторую строку. */
+@media (max-width: 900px) {
   .topbar {
     height: auto;
     flex-wrap: wrap;
     gap: 8px;
     padding: 8px 12px;
   }
+  /* Строка инструментов обязана занимать всю ширину: `margin-left: auto` растил её по содержимому,
+     поэтому `flex-wrap` не срабатывал и на 375px страница уезжала на 30px вправо. */
+  .topbar-right {
+    flex: 1 1 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .tabs {
     order: 3;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
   }
   .tab {
     height: 34px;
+  }
+}
+
+/* На телефоне переполнение давали суммы в одну строку: колонка «факт / план» и подписи корзин
+   не сжимались (E2E: 30px на 375px). Разрешаем переносы и отдаём суммам всю ширину строки. */
+@media (max-width: 560px) {
+  /* На телефоне подпись события не обязана быть одной строкой: важнее, чтобы ось влезала. */
+  .pmap-cap {
+    white-space: normal;
+    max-width: 38vw;
+    text-align: center;
+  }
+  .prow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+  .prow > .row {
+    grid-column: 2 / -1;
+    justify-content: flex-end;
+  }
+  .prow-num {
+    white-space: normal;
+    word-break: break-word;
+  }
+  .kpi-rows > div {
+    flex-wrap: wrap;
   }
 }
 

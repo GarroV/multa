@@ -28,3 +28,7 @@ reference-data/
 *.log
 npm-debug.log*
 coverage/
+
+# Playwright: отчёты и артефакты падений
+apps/web/test-results/
+apps/web/playwright-report/
