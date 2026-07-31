@@ -8,7 +8,7 @@
 
 ## Статус
 
-Ранняя разработка, **dogfooding-first**: первый пользователь — основатель. Работаем по спринтам из `docs/07-roadmap.md`. Сейчас: **Спринт 2 — план и обязательства**.
+Ранняя разработка, **dogfooding-first**: первый пользователь — основатель. Работаем по спринтам из `docs/07-roadmap.md`. Спринты 1–5 (фундамент, план и каскад, факт и размен, сигналы и пересборка, чеки и AI) сделаны; сейчас: **Спринт 6 — переработка интерфейса и полировка**.
 
 Прод крутится на домашнем сервере MUSPELHEIM: http://muspelheim.tail48dfee.ts.net (доступ по Tailscale). Как деплоить и что проверять после — `docs/15-deploy-prod.md`.
 
@@ -29,11 +29,21 @@ pnpm + Turborepo монорепо. Всё self-hosted, профиль **$0 + о�
 pnpm install
 docker compose up -d        # postgres + api + caddy
 pnpm dev                    # web + api
-pnpm test                   # vitest (ядро — обязательно)
 pnpm typecheck
+pnpm test                   # юниты ядра/api/web + интеграционные тесты api
 ```
 
 Требуется: Node ≥ 22, pnpm 11, Docker (OrbStack на macOS).
+
+Интеграционные тесты api ходят в настоящий Postgres — перед первым прогоном нужна пустая база
+`multa_test` (миграции накатятся сами):
+
+```bash
+createdb -O multa multa_test          # один раз; адрес можно задать через TEST_DATABASE_URL
+pnpm --filter @multa/api test
+```
+
+Подробнее об уровнях тестов — `docs/03-architecture.md` §Тестовый контур.
 
 ## Документация
 

@@ -777,19 +777,30 @@ export async function setExecution(
   const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
   const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
 
-  const rows = await db
-    .select({ id: plannedItems.id, plannedMinor: plannedItems.plannedMinor })
-    .from(plannedItems)
-    .where(
-      and(
-        eq(plannedItems.workspaceId, ws.id),
-        eq(plannedItems.periodId, periodId),
-        eq(plannedItems.targetKind, targetKind),
-        eq(plannedItems.targetId, targetId),
-      ),
-    )
-    .limit(1);
-  const item = rows[0];
+  const findItem = async () => {
+    const rows = await db
+      .select({ id: plannedItems.id, plannedMinor: plannedItems.plannedMinor })
+      .from(plannedItems)
+      .where(
+        and(
+          eq(plannedItems.workspaceId, ws.id),
+          eq(plannedItems.periodId, periodId),
+          eq(plannedItems.targetKind, targetKind),
+          eq(plannedItems.targetId, targetId),
+        ),
+      )
+      .limit(1);
+    return rows[0];
+  };
+
+  // Строки плана появляются в БД при сборке. Если её ещё не было (обязательство создали и
+  // сразу отметили «сделал», не открыв «План»), собираем и ищем снова — иначе результат
+  // зависел бы от того, успел ли клиент запросить план.
+  let item = await findItem();
+  if (!item) {
+    await assembleForPeriod(ws, sources, period, asOf);
+    item = await findItem();
+  }
   if (!item) throw new Error('planned_item_not_found');
 
   const executedMinor = mode === 'skip' ? 0n : (executedOverrideMinor ?? item.plannedMinor);
@@ -923,6 +934,10 @@ export async function applyRebalance(
   // Тип источника берём из БД, а не из запроса: клиент мог назвать долг «категорией»
   // и обойти защиту (железное правило 7 — данные от клиента не авторитетны).
   if (from.targetKind === 'debt' || from.targetKind === 'bucket') throw new Error('source_protected');
+  // Получателем может быть только категория: желаемые суммы обязательств на каждой сборке
+  // берутся из своих таблиц (payment_minor, planned_per_period_minor, правило конверта), и
+  // прибавка к planned_items им ничего не даёт — источник урезался бы, а платёж не рос.
+  if (to.targetKind !== 'category') throw new Error('target_not_adjustable');
   if (from.targetKind === 'category') {
     const owned = await db
       .select({ isProtected: categories.protected })

@@ -116,9 +116,8 @@ receiptsRoute.post('/receipts/:id/confirm', async (c) => {
     : today(ws.timezone);
   const { periodId } = await ensurePeriodForDate(ws, occurredOn);
 
-  // Повторное подтверждение переписывает свои транзакции, а не удваивает траты.
-  await db.delete(transactions).where(and(eq(transactions.workspaceId, ws.id), eq(transactions.receiptId, receipt.id)));
-
+  // Категории проверяем ДО удаления прежних трат: иначе отклонённая правка раскладки
+  // стирала бы уже записанный факт (проверял — стирала).
   const owned = await db
     .select({ id: categories.id })
     .from(categories)
@@ -126,26 +125,32 @@ receiptsRoute.post('/receipts/:id/confirm', async (c) => {
   const allowed = new Set(owned.map((o) => o.id));
   if (body.split.some((s) => !allowed.has(s.categoryId))) return c.json({ error: 'category_not_found' }, 404);
 
-  await db.insert(transactions).values(
-    body.split.map((s) => ({
-      workspaceId: ws.id,
-      periodId,
-      kind: 'expense',
-      targetKind: 'category',
-      targetId: s.categoryId,
-      amountMinor: s.amountMinor,
-      currency: receipt.currency!,
-      baseAmountMinor: s.amountMinor,
-      rate: '1',
-      rateSource: 'base',
-      rateDate: occurredOn,
-      occurredOn,
-      source: 'receipt',
-      receiptId: receipt.id,
-    })),
-  );
-
-  await db.update(receipts).set({ status: 'parsed' }).where(eq(receipts.id, receipt.id));
+  // Переписываем траты чека одной транзакцией БД: между удалением и вставкой нет момента,
+  // когда чек подтверждён, а трат нет.
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(transactions)
+      .where(and(eq(transactions.workspaceId, ws.id), eq(transactions.receiptId, receipt.id)));
+    await tx.insert(transactions).values(
+      body.split.map((s) => ({
+        workspaceId: ws.id,
+        periodId,
+        kind: 'expense',
+        targetKind: 'category',
+        targetId: s.categoryId,
+        amountMinor: s.amountMinor,
+        currency: receipt.currency!,
+        baseAmountMinor: s.amountMinor,
+        rate: '1',
+        rateSource: 'base',
+        rateDate: occurredOn,
+        occurredOn,
+        source: 'receipt',
+        receiptId: receipt.id,
+      })),
+    );
+    await tx.update(receipts).set({ status: 'parsed' }).where(eq(receipts.id, receipt.id));
+  });
   return c.json({ ok: true, transactions: body.split.length });
 });
 
