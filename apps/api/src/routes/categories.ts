@@ -1,4 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
+import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { categories } from '../db/schema/domain.ts';
@@ -65,6 +66,7 @@ categoriesRoute.post('/categories', async (c) => {
 
 categoriesRoute.patch('/categories/:id', async (c) => {
   const ws = c.get('workspace')!;
+  if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
   const body = categoryPatchSchema.parse(await c.req.json());
   const updated = await db
     .update(categories)
@@ -83,6 +85,7 @@ categoriesRoute.patch('/categories/:id', async (c) => {
 categoriesRoute.delete('/categories/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
   const rows = await db
     .select({ isSystem: categories.isSystem })
     .from(categories)

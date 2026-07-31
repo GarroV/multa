@@ -22,8 +22,9 @@ import {
   debts,
   envelopes,
   exchangeOps,
-  fxRates,
+  fxManualRates,
   goals,
+  incomeReceipts,
   incomeSources,
   payPeriods,
   plannedItems,
@@ -119,14 +120,27 @@ const DEMO_RATES: { base: string; rate: string }[] = [
  * продукт и нужен. Вставляем как `manual` и только там, где котировки нет: настоящие курсы
  * приоритетнее и не перетираются.
  */
-async function ensureDemoRates(asOf: string, days: readonly string[]): Promise<void> {
+/**
+ * Курсы демо — **личные** курсы демо-воркспейса, а не публичные котировки.
+ *
+ * Раньше они писались в глобальный `fx_rates` с `source: 'manual'`, и после появления приоритета
+ * ручного курса (issue #48) вход в демо начал переопределять курс всем остальным воркспейсам:
+ * транзакция реального пользователя в EUR считалась по демо-курсу вместо котировки ЦБ. Найдено
+ * адверсарным аудитом. Теперь курсы живут в `fx_manual_rates` демо-воркспейса и наружу не видны
+ * (правило 7).
+ */
+async function ensureDemoRates(
+  workspaceId: string,
+  asOf: string,
+  days: readonly string[],
+): Promise<void> {
   const dates = [...new Set([asOf, ...days])];
   await db
-    .insert(fxRates)
+    .insert(fxManualRates)
     .values(
       dates.flatMap((onDate) =>
         DEMO_RATES.map((r) => ({
-          source: 'manual',
+          workspaceId,
           base: r.base,
           quote: 'RUB',
           onDate,
@@ -144,6 +158,8 @@ async function wipe(workspaceId: string): Promise<void> {
   await db.delete(exchangeOps).where(eq(exchangeOps.workspaceId, workspaceId));
   await db.delete(receipts).where(eq(receipts.workspaceId, workspaceId));
   await db.delete(planRevisions).where(eq(planRevisions.workspaceId, workspaceId));
+  await db.delete(incomeReceipts).where(eq(incomeReceipts.workspaceId, workspaceId));
+  await db.delete(fxManualRates).where(eq(fxManualRates.workspaceId, workspaceId));
   await db.delete(plannedItems).where(eq(plannedItems.workspaceId, workspaceId));
   await db.delete(payPeriods).where(eq(payPeriods.workspaceId, workspaceId));
   await db.delete(recurringItems).where(eq(recurringItems.workspaceId, workspaceId));
@@ -202,6 +218,7 @@ export async function seedDemo(userId: string): Promise<string> {
   const asOf = today(DEMO_TZ);
   // Даты, на которые демо смотрит курсом: сегодня и дни разменов ниже.
   await ensureDemoRates(
+    workspaceId,
     asOf,
     [20, 35, 50, 65].map((back) => shift(asOf, -back)),
   );
@@ -382,6 +399,63 @@ export async function seedDemo(userId: string): Promise<string> {
     })),
   );
 
+  /*
+   * Подтверждённое поступление (issue #48) и правка плана (issue #52): демо обязано показывать
+   * работающие фичи, а не только их наличие в коде. Иначе смотрящий видит пустые панели там, где у
+   * реального пользователя главные события периода.
+   */
+  const salary = (
+    await db
+      .select({ id: incomeSources.id, amount: incomeSources.amount })
+      .from(incomeSources)
+      .where(and(eq(incomeSources.workspaceId, workspaceId), eq(incomeSources.currency, 'RUB')))
+      .limit(1)
+  )[0];
+  if (salary) {
+    // Пришло чуть меньше плановой суммы — как в жизни, и цифра дня считается по факту.
+    await db.insert(incomeReceipts).values({
+      workspaceId,
+      sourceId: salary.id,
+      occurredOn: current.period.startsOn,
+      amountMinor: 18_700_000n,
+      currency: 'RUB',
+      baseAmountMinor: 18_700_000n,
+      rate: '1',
+      rateSource: 'identity',
+      rateDate: current.period.startsOn,
+    });
+  }
+
+  // Одна правка в истории: «взяли из Fun, добавили в Groceries» — панель истории не пустая.
+  const from = catId('Fun');
+  const to = catId('Groceries');
+  // Суммы берём из того же словаря бюджетов: правка обязана быть согласована с планом периода.
+  const funBudget = BUDGETS.Fun ?? 0n;
+  const groceriesBudget = BUDGETS.Groceries ?? 0n;
+  const moveMinor = 50_000n;
+  await db
+    .update(plannedItems)
+    .set({ plannedMinor: funBudget - moveMinor })
+    .where(and(eq(plannedItems.periodId, current.periodId), eq(plannedItems.targetId, from)));
+  await db
+    .update(plannedItems)
+    .set({ plannedMinor: groceriesBudget + moveMinor })
+    .where(and(eq(plannedItems.periodId, current.periodId), eq(plannedItems.targetId, to)));
+  await db.insert(planRevisions).values({
+    workspaceId,
+    periodId: current.periodId,
+    reason: 'overspend',
+    moves: [
+      {
+        fromKind: 'category',
+        fromId: from,
+        toKind: 'category',
+        toId: to,
+        amountMinor: moveMinor.toString(),
+      },
+    ],
+  });
+
   // Факт закрытых периодов: по одной сводной трате на категорию и период («крупный мазок» —
   // легитимный сценарий продукта, а не деградация).
   const historyRows: (typeof transactions.$inferInsert)[] = [];
@@ -409,8 +483,8 @@ export async function seedDemo(userId: string): Promise<string> {
   }
 
   // Факт текущего периода: Groceries почти исчерпаны (даёт burn-сигнал), Transport ещё пуст.
-  const eurRate = await getRate('EUR', 'RUB', asOf);
-  const rsdRate = await getRate('RSD', 'RUB', asOf);
+  const eurRate = await getRate('EUR', 'RUB', asOf, workspaceId);
+  const rsdRate = await getRate('RSD', 'RUB', asOf, workspaceId);
   const currentFacts: {
     name: string;
     minor: bigint;
@@ -474,7 +548,7 @@ export async function seedDemo(userId: string): Promise<string> {
   ];
   for (const op of fxHistory) {
     const day = shift(asOf, -op.back);
-    const official = await getRate(op.from, op.to, day);
+    const official = await getRate(op.from, op.to, day, workspaceId);
     if (!official) continue;
     // Честная сумма по официальному курсу, затем удержание спреда — так это и происходит у менялы.
     const fairMinor = convert(money(op.fromMinor, op.from), official).minor;

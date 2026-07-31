@@ -1,4 +1,5 @@
 import { convert, money } from '@multa/core';
+import { isUuid } from '../http/ids.ts';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
@@ -133,7 +134,7 @@ accountsRoute.post('/accounts', async (c) => {
 accountsRoute.patch('/accounts/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
-  if (!id || !UUID_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
   const patch = accountPatchSchema.parse(await c.req.json());
 
   const rows = await db
@@ -159,7 +160,7 @@ accountsRoute.patch('/accounts/:id', async (c) => {
 accountsRoute.delete('/accounts/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
-  if (!id || !UUID_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
 
   const used = await db.execute(
     sql`select 1 from transactions where workspace_id = ${ws.id} and account_id = ${id} limit 1`,

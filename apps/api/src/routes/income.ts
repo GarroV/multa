@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { isUuid } from '../http/ids.ts';
 import {
   deleteSourceById,
   insertSource,
@@ -45,7 +46,7 @@ incomeRoute.post('/income-sources', async (c) => {
 incomeRoute.patch('/income-sources/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
-  if (!id) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
   const patch = incomeSourcePatchSchema.parse(await c.req.json());
   const row = await patchSourceById(ws.id, id, patch);
   if (!row) return c.json({ error: 'not_found' }, 404);
@@ -55,7 +56,7 @@ incomeRoute.patch('/income-sources/:id', async (c) => {
 incomeRoute.delete('/income-sources/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
-  if (!id) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
   if (!(await deleteSourceById(ws.id, id))) return c.json({ error: 'not_found' }, 404);
   return c.body(null, 204);
 });
@@ -68,7 +69,7 @@ incomeRoute.post('/income-sources/:id/received', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
   const body = incomeReceiptSchema.parse(await c.req.json());
-  if (!id || !UUID_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
 
   const source = await findSource(ws.id, id);
   if (!source) return c.json({ error: 'not_found' }, 404);
@@ -94,7 +95,7 @@ incomeRoute.post('/income-sources/:id/received', async (c) => {
 incomeRoute.delete('/income-receipts/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
-  if (!id || !UUID_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
   if (!(await deleteReceipt(ws.id, id))) return c.json({ error: 'not_found' }, 404);
   return c.json({ ok: true });
 });

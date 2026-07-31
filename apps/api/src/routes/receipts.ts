@@ -1,4 +1,5 @@
 import { parseReceiptQr, splitReceipt, type ReceiptItem } from '@multa/core';
+import { isUuid } from '../http/ids.ts';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
@@ -111,6 +112,7 @@ receiptsRoute.post('/receipts/qr', async (c) => {
 /** Подтверждение раскладки: превращает чек в транзакции периода той даты, когда он выдан. */
 receiptsRoute.post('/receipts/:id/confirm', async (c) => {
   const ws = c.get('workspace')!;
+  if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
   const body = receiptConfirmSchema.parse(await c.req.json());
   const rows = await db
     .select()
