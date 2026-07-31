@@ -5,7 +5,6 @@ import { Exchange } from './screens/Exchange.tsx';
 import { Obligations } from './screens/Obligations.tsx';
 import { Plan } from './screens/Plan.tsx';
 import { Settings } from './screens/Settings.tsx';
-import { Today } from './screens/Today.tsx';
 
 const rootRoute = createRootRoute({ component: App });
 
@@ -13,11 +12,18 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/today' });
+    throw redirect({ to: '/plan' });
   },
 });
 
-const todayRoute = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: Today });
+// «Сегодня» слился с планом (issue #30): один плотный экран вместо обзора и деталей по отдельности.
+const todayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/today',
+  beforeLoad: () => {
+    throw redirect({ to: '/plan' });
+  },
+});
 const planRoute = createRoute({ getParentRoute: () => rootRoute, path: '/plan', component: Plan });
 const exchangeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/exchange', component: Exchange });
 const obligationsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/obligations', component: Obligations });

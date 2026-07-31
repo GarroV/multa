@@ -662,3 +662,504 @@ a {
   font-size: 12px;
 }
 .danger { color: var(--over); }
+
+/* ============================================================================
+ * Плотная раскладка по прототипу (issue #30). Идея простая: экран — это ведомость,
+ * а не набор карточек. Отсюда четыре решения, из которых выведены все классы ниже.
+ *
+ * 1. Полоса KPI сверху — четыре ответа на вопросы «сколько осталось», «сколько в день»,
+ *    «сколько менять» и «куда ушла выплата». Они всегда на месте, без скролла.
+ * 2. Панель — единица содержания: цветная засечка + caps-лейбл + сумма периода + инструменты.
+ *    Засечка кодирует роль раздела, а не украшает: cyan — деньги на жизнь, mag — риск,
+ *    vio — другая валюта, lime — доход и накопление, amber — внимание.
+ * 3. Строка — 34px: дата, имя с чипами, сумма в колонке, действие. Разделители hairline.
+ * 4. Ширина не ограничена 960px: плотность требует места, колонки сумм держит grid.
+ * ========================================================================== */
+
+.dense {
+  padding: 0 0 40px;
+  display: grid;
+  gap: 0;
+}
+
+/* --- Полоса KPI: четыре клетки, разделённые линией, без внешних отступов --- */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.kpi {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 14px 18px 16px;
+  background: var(--surf);
+  background-image: var(--ambient);
+  min-width: 0;
+}
+.kpi-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.kpi-value.accent {
+  color: var(--cyan);
+  text-shadow: var(--ts-c);
+}
+/* Цифра дня набрана 22px весом 500 — это ещё «мелкий текст» по WCAG, порог 4.5. В светлой теме
+   чистый cyan даёт 4.06, поэтому там берём затемнённый вариант (5.6). */
+:root[data-theme='light'] .kpi-value.accent {
+  color: var(--cyan-hi);
+}
+.kpi-value.over {
+  color: var(--mag);
+}
+.kpi-sub {
+  font-size: 12px;
+  color: var(--mid);
+}
+.kpi-rows {
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.kpi-rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+@media (max-width: 1180px) {
+  .kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .kpi-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Баннер риска: разговор, а не выговор. Цвет несёт срочность, текст — вопрос --- */
+.risk-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, rgba(var(--mag-rgb), 0.12), transparent 60%);
+  color: var(--ink);
+}
+.risk-band::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--mag);
+  box-shadow: var(--g-dot);
+  color: var(--mag);
+}
+.risk-band.info {
+  background: linear-gradient(90deg, rgba(var(--cyan-rgb), 0.1), transparent 60%);
+}
+.risk-band.info::before {
+  background: var(--cyan);
+  color: var(--cyan);
+}
+.risk-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+/* --- Карта периода: события выплаты на одной оси, «сегодня» подсвечено --- */
+.pmap {
+  position: relative;
+  padding: 18px 24px 26px;
+  border-bottom: 1px solid var(--line);
+}
+.pmap-line {
+  position: relative;
+  height: 1px;
+  background: var(--line-strong);
+  margin: 22px 0 0;
+}
+.pmap-mark {
+  position: absolute;
+  top: 0;
+  left: var(--at, 0%);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+.pmap-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: -3px;
+  background: var(--cyan);
+  color: var(--cyan);
+  box-shadow: var(--g-dot);
+}
+.pmap-dot.risk { background: var(--mag); color: var(--mag); }
+.pmap-dot.income { background: var(--lime); color: var(--lime); }
+.pmap-dot.fx { background: var(--vio); color: var(--vio); }
+.pmap-dot.due { background: var(--amber); color: var(--amber); }
+.pmap-cap {
+  font-size: 11px;
+  color: var(--mid);
+  white-space: nowrap;
+}
+/* «Сейчас» подсвечивается по смыслу, а не по позиции в разметке: раньше цвет доставался
+   первой метке периода, даже если это была зарплата. cyan-hi, а не cyan, — в светлой теме
+   чистый cyan даёт на 11px контраст 2.5. */
+.pmap-cap.now { color: var(--cyan-hi); }
+/* Крайние подписи не должны вылезать за экран: у них своя точка отсчёта. */
+.pmap-mark[style*='--at: 0%'] { transform: none; justify-items: start; }
+.pmap-mark[style*='--at: 100%'] { transform: translateX(-100%); justify-items: end; }
+
+/* --- Панели: две колонки на широком экране, одна на узком --- */
+.panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 18px 24px 0;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+  min-width: 0;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel2);
+}
+.panel-mark {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  flex: none;
+  background: var(--cyan);
+}
+.panel-mark.mag { background: var(--mag); }
+.panel-mark.vio { background: var(--vio); }
+.panel-mark.lime { background: var(--lime); }
+.panel-mark.amber { background: var(--amber); }
+.panel-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.panel-sum {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  /* mid, а не dim: на фоне panel2 (он светлее surf) dim давал контраст 4.37 при 11px — ниже AA.
+     Иерархия «имя ярче суммы» держится и так: ink 15:1 против mid 7.9:1. */
+  color: var(--mid);
+  white-space: nowrap;
+}
+.panel-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-body {
+  display: grid;
+}
+.panel-foot {
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* Чип-метка: статус строки или раздела. Не кнопка — читается, но не нажимается. */
+.tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mid);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.tag.cyan { color: var(--cyan); border-color: rgba(var(--cyan-rgb), 0.45); }
+.tag.mag { color: var(--mag); border-color: rgba(var(--mag-rgb), 0.45); }
+.tag.vio { color: var(--vio); border-color: rgba(var(--vio-rgb), 0.45); }
+.tag.lime { color: var(--lime); border-color: rgba(var(--lime-rgb), 0.45); }
+.tag.amber { color: var(--amber); border-color: rgba(var(--amber-rgb), 0.45); }
+
+/* Кнопка-действие в строке: маленькая, появляется акцентом при наведении на строку. */
+.act {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mid);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.act:hover:not(:disabled) {
+  color: var(--cyan);
+  border-color: rgba(var(--cyan-rgb), 0.5);
+  background: rgba(var(--cyan-rgb), 0.08);
+}
+.act:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* --- Строка ведомости --- */
+.prow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.prow:last-child { border-bottom: none; }
+.prow:hover { background: var(--hover1); }
+.prow-day {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  min-width: 18px;
+}
+.prow-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.prow-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prow-note {
+  grid-column: 2 / -1;
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: -2px;
+}
+.prow-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  display: grid;
+  gap: 1px;
+  justify-items: end;
+}
+.prow-num > b { font-weight: 500; }
+.prow-num > i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--dim);
+}
+/* Строка с прогрессом: полоса занимает всю ширину под именем и суммой. */
+.prow-bar {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- Полоса плана/факта: 3px, цвет = состояние --- */
+.bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.bar > i {
+  display: block;
+  height: 100%;
+  width: var(--w, 0%);
+  border-radius: 2px;
+  background: var(--cyan);
+  box-shadow: var(--bar-sheen);
+}
+.bar.lime > i { background: var(--lime); }
+.bar.vio > i { background: var(--vio); }
+.bar.amber > i { background: var(--amber); }
+.bar.mag > i { background: var(--mag); }
+
+/* --- Донат каскада: дуги dasharray по кругу длиной 100 --- */
+.donut {
+  width: 84px;
+  height: 84px;
+  flex: none;
+  transform: rotate(-90deg);
+}
+.donut circle {
+  fill: none;
+  stroke-width: 7;
+}
+.donut .track { stroke: var(--line); }
+.legend {
+  display: grid;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  min-width: 0;
+}
+.legend > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.legend .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+.legend .name { color: var(--mid); }
+.legend .val { margin-left: auto; color: var(--ink); }
+
+/* Точки и дуги делят одну палитру ролей — легенда читается без подписи цвета. */
+.k-debt { background: var(--mag); }
+.k-bucket { background: var(--vio); }
+.k-envelope { background: var(--cyan); }
+.k-category { background: var(--cyan-hi); }
+.k-goal { background: var(--lime); }
+
+@media (prefers-reduced-motion: reduce) {
+  .act,
+  .prow {
+    transition: none;
+  }
+}
+
+/* --- Оболочка: навигация сверху (прототип). Сайдбар забирал ширину у ведомости --- */
+.app-frame {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 48px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--chrome-bg);
+  backdrop-filter: blur(8px);
+}
+.topbar-brand {
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.tabs {
+  display: flex;
+  align-self: stretch;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mid);
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+}
+.tab:hover { color: var(--ink); }
+.tab-active {
+  color: var(--ink);
+  border-bottom-color: var(--cyan);
+  box-shadow: inset 0 -12px 20px -14px rgba(var(--cyan-rgb), 0.6);
+}
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Сегмент-переключатель: два-три взаимоисключающих значения (тема, язык) без выпадающих списков. */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.seg-btn {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mid);
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--line-strong); }
+.seg-btn:hover { color: var(--ink); }
+.seg-btn[aria-pressed='true'] {
+  color: var(--ink);
+  background: rgba(var(--cyan-rgb), 0.14);
+}
+.app-main { min-width: 0; }
+@media (max-width: 720px) {
+  .topbar {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .tabs { order: 3; width: 100%; overflow-x: auto; }
+  .tab { height: 34px; }
+}
