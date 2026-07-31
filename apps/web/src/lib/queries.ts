@@ -67,6 +67,8 @@ export interface PlanAllocation {
   overspentMinor: string;
   advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number };
   protectedCategory?: boolean;
+  /** Цель с осознанно пропущенным взносом в этом периоде (issue #54). */
+  frozen?: boolean;
   executionStatus: 'pending' | 'confirmed' | 'partial' | 'skipped' | 'n_a';
   executedMinor: string;
   remainderMinor: string;
@@ -396,6 +398,8 @@ export interface RevisionDto {
   reason: string;
   createdAt: string;
   undone: boolean;
+  /** `move` — перенос, `freeze`/`unfreeze` — пропуск взноса в цель (issue #54). */
+  kind: 'move' | 'freeze' | 'unfreeze';
   moves: RevisionMoveDto[];
 }
 
@@ -404,6 +408,25 @@ export function useRevisions() {
     queryKey: ['revisions'],
     retry: false,
     queryFn: () => api<RevisionDto[]>('/v1/plan/current/revisions'),
+  });
+}
+
+/**
+ * Заморозка взноса в цель на период (issue #54): деньги уходят на другое, накопленное остаётся,
+ * срок сдвигается. Обратный жест — снятие заморозки, а не «откатить правку».
+ */
+export function useGoalFreeze() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goalId, frozen }: { goalId: string; frozen: boolean }) =>
+      api(`/v1/plan/current/items/goal/${goalId}/${frozen ? 'freeze' : 'unfreeze'}`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['revisions'] });
+      void qc.invalidateQueries({ queryKey: ['forecast'] });
+    },
   });
 }
 

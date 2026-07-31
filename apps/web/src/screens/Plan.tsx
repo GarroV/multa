@@ -15,6 +15,7 @@ import {
   useCancelIncomeReceipt,
   useConfirmExecution,
   useForecast,
+  useGoalFreeze,
   useRevisions,
   usePlan,
   useSkipExecution,
@@ -59,6 +60,7 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
   const { t } = useI18n();
   const confirm = useConfirmExecution();
   const skip = useSkipExecution();
+  const freeze = useGoalFreeze();
   const busy = confirm.isPending || skip.isPending;
   const done = a.executionStatus === 'confirmed';
   const skipped = a.executionStatus === 'skipped';
@@ -82,6 +84,7 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
           </Tag>
         )}
         {a.protectedCategory && <Tag tone="cyan">{t('plan.tag.protected')}</Tag>}
+        {a.frozen && <Tag tone="amber">{t('goal.frozen')}</Tag>}
       </span>
       <span className="prow-num">
         <b className={done || skipped ? 'dim' : undefined}>
@@ -90,6 +93,17 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
         {secondary && <i>{secondary}</i>}
       </span>
       <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        {a.targetKind === 'goal' && (
+          <button
+            type="button"
+            className="act"
+            disabled={freeze.isPending}
+            aria-pressed={a.frozen === true}
+            onClick={() => freeze.mutate({ goalId: a.targetId, frozen: a.frozen !== true })}
+          >
+            {t(a.frozen ? 'goal.unfreeze' : 'goal.freeze')}
+          </button>
+        )}
         {/* Исполнение вручную по умолчанию: кредит банку тоже переводят руками. */}
         <button
           type="button"
@@ -206,17 +220,24 @@ function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
             <span className="prow-name">
               <span>
                 {first
-                  ? t('rev.move', {
-                      amount: `${formatMinor(first.amountMinor, base, locale)} ${base}`,
-                      to: first.toName ?? '—',
-                      from: first.fromName ?? '—',
-                    })
+                  ? t(
+                      rev.kind === 'freeze'
+                        ? 'rev.freeze'
+                        : rev.kind === 'unfreeze'
+                          ? 'rev.unfreeze'
+                          : 'rev.move',
+                      {
+                        amount: `${formatMinor(first.amountMinor, base, locale)} ${base}`,
+                        to: first.toName ?? '—',
+                        from: first.fromName ?? '—',
+                      },
+                    )
                   : rev.reason}
               </span>
               {rev.undone && <Tag>{t('rev.undone')}</Tag>}
             </span>
             <span className="prow-num" />
-            {rev.undone ? (
+            {rev.undone || rev.kind !== 'move' ? (
               <span />
             ) : (
               <button

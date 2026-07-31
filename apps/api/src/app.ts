@@ -30,10 +30,13 @@ import {
 import {
   applyRebalance,
   getCurrentPlan,
+  FreezeAlreadySet,
+  FreezeNotApplicable,
   listRevisions,
   rebalanceSuggestions,
   RevisionAlreadyUndone,
   RevisionNotFound,
+  setGoalFreeze,
   undoRevision,
   UndoWouldGoNegative,
   setCategoryBudget,
@@ -222,6 +225,42 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
       return c.json({ error: 'onboarding_incomplete' }, 409);
     throw err;
   }
+}
+
+/** Перевод доменных ошибок заморозки в коды ответа: общая часть у freeze и unfreeze. */
+function freezeError(err: unknown): { error: string; status: 400 | 404 | 409 } | null {
+  if (err instanceof FreezeNotApplicable) return { error: 'freeze_not_applicable', status: 400 };
+  if (err instanceof FreezeAlreadySet) return { error: 'freeze_already_set', status: 409 };
+  if (err instanceof Error && err.message === 'goal_not_found')
+    return { error: 'not_found', status: 404 };
+  if (err instanceof Error && err.message === 'onboarding_incomplete')
+    return { error: 'onboarding_incomplete', status: 409 };
+  return null;
+}
+
+const UUID_PATH_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Заморозка взноса в цель на период (issue #54): пропуск — осознанное решение, поэтому у него своя
+ * ручка и своя запись в истории, а не молчаливое обнуление строки.
+ */
+for (const [suffix, frozen] of [
+  ['freeze', true],
+  ['unfreeze', false],
+] as const) {
+  app.post(`/v1/plan/current/items/:kind/:id/${suffix}`, requireWorkspace, async (c) => {
+    const ws = c.get('workspace')!;
+    const kind = c.req.param('kind') as TargetKind;
+    const id = c.req.param('id');
+    if (!id || !UUID_PATH_RE.test(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      return c.json(await setGoalFreeze(ws, today(ws.timezone), kind, id, frozen));
+    } catch (err) {
+      const mapped = freezeError(err);
+      if (mapped) return c.json({ error: mapped.error }, mapped.status);
+      throw err;
+    }
+  });
 }
 
 /**

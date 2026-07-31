@@ -213,6 +213,11 @@ export const plannedItems = pgTable(
       .notNull()
       .default(sql`0`),
     auto: boolean('auto').notNull().default(false),
+    /**
+     * Осознанный пропуск взноса в этом периоде (issue #54). Признак на строке периода, а не на
+     * цели: флаг на цели забывается и превращается в вечный пропуск.
+     */
+    frozen: boolean('frozen').notNull().default(false),
   },
   (t) => [
     unique('planned_items_uq').on(t.periodId, t.targetKind, t.targetId),
