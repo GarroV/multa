@@ -33,6 +33,23 @@ create table income_sources (      -- только деньги: сколько 
 );
 create index income_sources_ws_idx on income_sources (workspace_id, sort);
 
+create table income_receipts (     -- подтверждённые поступления: факт важнее плана
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  source_id uuid not null references income_sources on delete cascade,
+  occurred_on date not null,       -- фактическая дата: зарплату могли выдать раньше плановой
+  amount_minor bigint not null,    -- сколько пришло в валюте прихода
+  currency char(3) not null,
+  base_amount_minor bigint not null,
+  rate numeric(20,10) not null,    -- иммутабельный снапшот (правило 2): позже не пересчитывается
+  rate_source text not null,       -- 'manual' — курс дня выплаты, введённый руками
+  rate_date date not null,
+  note text,
+  created_at timestamptz not null default now(),
+  unique (workspace_id, source_id, occurred_on)  -- одно подтверждение на выплату
+);
+create index income_receipts_ws_day_idx on income_receipts (workspace_id, occurred_on);
+
 create table workspace_members (   -- закладка под семейный режим (v2); в MVP только owner
   workspace_id uuid not null references workspaces on delete cascade,
   user_id uuid not null references users(id),
@@ -226,13 +243,23 @@ create table import_batches (
 -- transactions: add column import_batch_id uuid references import_batches
 
 create table fx_rates (
-  source text not null,      -- 'cbr' | 'ecb' | 'frankfurter'
+  source text not null,      -- 'cbr' | 'ecb' | 'frankfurter' (только публичные источники)
   base char(3) not null,
   quote char(3) not null,
   on_date date not null,
   rate numeric(20,10) not null,
   primary key (source, base, quote, on_date)
 ); -- глобальная, без RLS (публичные данные), запись только сервисной ролью
+
+create table fx_manual_rates (   -- личные курсы: курс дня выплаты, введённый руками
+  workspace_id uuid not null references workspaces on delete cascade,
+  base char(3) not null,
+  quote char(3) not null,
+  on_date date not null,
+  rate numeric(20,10) not null,
+  created_at timestamptz not null default now(),
+  primary key (workspace_id, base, quote, on_date)
+); -- отдельно от fx_rates: там публичные котировки, и личный курс протекал бы в чужие планы
 ```
 
 ## Billing (см. 08-billing.md)

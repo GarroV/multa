@@ -44,6 +44,10 @@ export interface IncomeEventDto {
   date: string;
   amountMinor: string;
   currency: string;
+  /** `received` — поступление подтверждено фактом (issue #48), `expected` — ещё ждём. */
+  status: 'expected' | 'received';
+  receiptId?: string;
+  baseAmountMinor?: string;
 }
 
 export type PlanTargetKind = 'debt' | 'bucket' | 'envelope' | 'category' | 'goal';
@@ -331,6 +335,46 @@ export function useCreateIncomeSource() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['income-sources'] });
       void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
+/**
+ * Подтверждение поступления (issue #48). Курс — необязательный: если человек знает курс дня
+ * выплаты, он фиксируется и по нему считается весь период, включая «к размену».
+ */
+export function useConfirmIncome() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      sourceId: string;
+      amountMinor: string;
+      currency?: string;
+      occurredOn: string;
+      rate?: string;
+    }) => {
+      const { sourceId, ...body } = input;
+      return api(`/v1/income-sources/${sourceId}/received`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['forecast'] });
+    },
+  });
+}
+
+/** Отмена подтверждения: план возвращается к плановой сумме источника. */
+export function useCancelIncomeReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (receiptId: string) =>
+      api(`/v1/income-receipts/${receiptId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['forecast'] });
     },
   });
 }

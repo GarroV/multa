@@ -52,6 +52,7 @@ import {
 import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { getRate } from '../fx/service.ts';
+import { receiptsForPeriod } from '../income/receipts.ts';
 
 /**
  * targetKind, которыми управляет автосборка (пишет allocated, чистит исчезнувшие).
@@ -255,9 +256,11 @@ async function toBase(
   sourceCurrency: string,
   base: string,
   on: string,
+  /** Личные курсы воркспейса (курс дня выплаты) важнее публичных котировок — issue #48. */
+  workspaceId?: string,
 ): Promise<bigint | null> {
   if (sourceCurrency === base) return sourceMinor;
-  const snap = await getRate(sourceCurrency, base, on);
+  const snap = await getRate(sourceCurrency, base, on, workspaceId);
   if (!snap) return null;
   return convert(money(sourceMinor, sourceCurrency), snap).minor;
 }
@@ -300,7 +303,8 @@ async function resolveObligations(
     extra?: { toCurrency?: string; baseOverride?: bigint },
   ): Promise<void> => {
     if (sourceMinor <= 0n) return; // нулевые/пустые обязательства в план не тянем
-    const baseMinor = extra?.baseOverride ?? (await toBase(sourceMinor, sourceCurrency, base, on));
+    const baseMinor =
+      extra?.baseOverride ?? (await toBase(sourceMinor, sourceCurrency, base, on, ws.id));
     if (baseMinor === null) {
       unresolved.push({
         targetKind,
@@ -415,6 +419,12 @@ export interface IncomeEventDto {
   date: string;
   amountMinor: string;
   currency: string;
+  /** `received` — поступление подтверждено фактом (issue #48), `expected` — ещё ждём. */
+  status: 'expected' | 'received';
+  /** Только у подтверждённых: id записи, чтобы UI мог отменить подтверждение. */
+  receiptId?: string;
+  /** Только у подтверждённых: сумма в базовой валюте по зафиксированному курсу. */
+  baseAmountMinor?: string;
 }
 
 export interface IncomeUnresolvedDto extends IncomeEventDto {
@@ -436,7 +446,7 @@ async function incomeForPeriod(
     ...new Set(events.map((e) => e.currency).filter((ccy) => ccy !== ws.baseCurrency)),
   ];
   const snapshots = await Promise.all(
-    foreign.map(async (ccy) => [ccy, await getRate(ccy, ws.baseCurrency, asOf)] as const),
+    foreign.map(async (ccy) => [ccy, await getRate(ccy, ws.baseCurrency, asOf, ws.id)] as const),
   );
   const rates = new Map(snapshots);
   const total = expectedIncomeForPeriod(events, ws.baseCurrency, (m) => {
@@ -449,12 +459,78 @@ async function incomeForPeriod(
     date: e.date,
     amountMinor: e.amountMinor.toString(),
     currency: e.currency,
+    status: 'expected',
   });
-  return {
-    incomeMinor: total.incomeMinor,
-    events: events.map(toDto),
-    unresolved: total.unresolved.map((e) => ({ ...toDto(e), reason: 'rate_unavailable' as const })),
-  };
+
+  /*
+   * Факт важнее плана (issue #48). Подтверждённое поступление замещает ожидаемое событие того же
+   * источника: зарплату могли выдать раньше и не той суммой, и цифра дня обязана считаться по
+   * тому, что реально пришло. Сопоставление — по источнику, а не по дате: дата факта почти всегда
+   * отличается от плановой.
+   */
+  const receipts = await receiptsForPeriod(ws.id, period.startsOn, period.endsOn);
+  const bySource = new Map<string, typeof receipts>();
+  for (const r of receipts) {
+    const list = bySource.get(r.sourceId) ?? [];
+    list.push(r);
+    bySource.set(r.sourceId, list);
+  }
+
+  const dtos: IncomeEventDto[] = [];
+  const unresolved: IncomeUnresolvedDto[] = [];
+  const unresolvedKeys = new Set(total.unresolved.map((e) => `${e.sourceId}:${e.date}`));
+  let incomeMinor = 0n;
+
+  for (const event of events) {
+    const receipt = bySource.get(event.sourceId)?.shift();
+    if (receipt) {
+      incomeMinor += receipt.baseAmountMinor;
+      dtos.push({
+        sourceId: event.sourceId,
+        label: event.label,
+        date: receipt.occurredOn,
+        amountMinor: receipt.amountMinor.toString(),
+        currency: receipt.currency,
+        status: 'received',
+        receiptId: receipt.id,
+        baseAmountMinor: receipt.baseAmountMinor.toString(),
+      });
+      continue;
+    }
+    const dto = toDto(event);
+    dtos.push(dto);
+    if (unresolvedKeys.has(`${event.sourceId}:${event.date}`)) {
+      unresolved.push({ ...dto, reason: 'rate_unavailable' as const });
+    } else {
+      const snap = event.currency === ws.baseCurrency ? null : rates.get(event.currency);
+      incomeMinor +=
+        event.currency === ws.baseCurrency
+          ? event.amountMinor
+          : snap
+            ? convert(money(event.amountMinor, event.currency), snap).minor
+            : 0n;
+    }
+  }
+
+  // Приход по источнику, у которого в этом периоде не было плановой выплаты (аванс, разовый гонорар):
+  // деньги пришли — значит их видно в плане, иначе доход занижен.
+  for (const [sourceId, rest] of bySource) {
+    for (const receipt of rest) {
+      incomeMinor += receipt.baseAmountMinor;
+      dtos.push({
+        sourceId,
+        label: sources.find((src) => src.id === sourceId)?.label ?? '',
+        date: receipt.occurredOn,
+        amountMinor: receipt.amountMinor.toString(),
+        currency: receipt.currency,
+        status: 'received',
+        receiptId: receipt.id,
+        baseAmountMinor: receipt.baseAmountMinor.toString(),
+      });
+    }
+  }
+
+  return { incomeMinor, events: dtos, unresolved };
 }
 
 /**

@@ -364,6 +364,60 @@ export const recurringItems = pgTable(
 );
 
 // Глобальный кэш официальных курсов (публичные данные, без workspace). Исторические не меняются.
+/**
+ * Подтверждённые поступления дохода (issue #48). Пока выплаты нет, план считает по ожидаемой
+ * сумме источника; подтверждение фиксирует, сколько пришло на самом деле и по какому курсу.
+ *
+ * Курс лежит снапшотом (правило 2): человек вводит курс дня выплаты, глядя на табло обменника, и
+ * последующая публикация котировок не имеет права переписать историю.
+ */
+export const incomeReceipts = pgTable(
+  'income_receipts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => incomeSources.id, { onDelete: 'cascade' }),
+    occurredOn: date('occurred_on').notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: ccy('currency').notNull(),
+    baseAmountMinor: bigint('base_amount_minor', { mode: 'bigint' }).notNull(),
+    rate: numeric('rate', { precision: 20, scale: 10 }).notNull(),
+    rateSource: text('rate_source').notNull(),
+    rateDate: date('rate_date').notNull(),
+    note: text('note'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // Одно подтверждение на выплату источника: иначе доход периода удваивался бы молча.
+    unique('income_receipts_source_day_uq').on(t.workspaceId, t.sourceId, t.occurredOn),
+    index('income_receipts_ws_day_idx').on(t.workspaceId, t.occurredOn),
+  ],
+);
+
+/**
+ * Личные курсы воркспейса (issue #48): курс дня выплаты, который человек ввёл руками, глядя на
+ * табло обменника. Отдельно от `fx_rates` намеренно — там публичные котировки, общие для всех
+ * воркспейсов, и запись личного факта туда протекала бы в чужие планы (правило 7).
+ */
+export const fxManualRates = pgTable(
+  'fx_manual_rates',
+  {
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    base: char('base', { length: 3 }).notNull(),
+    quote: char('quote', { length: 3 }).notNull(),
+    onDate: date('on_date').notNull(),
+    rate: numeric('rate', { precision: 20, scale: 10 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.base, t.quote, t.onDate] })],
+);
+
 export const fxRates = pgTable(
   'fx_rates',
   {

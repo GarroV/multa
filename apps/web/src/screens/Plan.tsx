@@ -2,6 +2,7 @@ import type { TranslationKey } from '@multa/i18n';
 import { Link } from '@tanstack/react-router';
 import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
+import { IncomeReceipt } from '../components/IncomeReceipt.tsx';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag, type Accent } from '../components/ui/Panel.tsx';
 import { CascadeDonut } from '../components/ui/CascadeDonut.tsx';
@@ -10,11 +11,13 @@ import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   isOnboardingIncomplete,
+  useCancelIncomeReceipt,
   useConfirmExecution,
   useForecast,
   usePlan,
   useSkipExecution,
   type ForecastEvent,
+  type IncomeEventDto,
   type PlanAllocation,
   type PlanDto,
   type PlanTargetKind,
@@ -195,6 +198,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   // Пересборка живёт в строке категории (там известно, сколько не хватает), поэтому баннер
   // риска не открывает свой модал, а раскрывает редактор категорий — оттуда один шаг до варианта.
   const [editingCats, setEditingCats] = useState(false);
+  // Подтверждение поступления (issue #48): открывается чипом «ждём» у конкретной выплаты.
+  const [receiptFor, setReceiptFor] = useState<IncomeEventDto | null>(null);
+  const cancelReceipt = useCancelIncomeReceipt();
 
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
   const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
@@ -213,6 +219,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
 
   return (
     <div className="dense">
+      {receiptFor && (
+        <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
+      )}
       <div className="kpi-strip">
         <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })}>
           <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
@@ -317,13 +326,33 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 <span className="prow-name">
                   <span>{e.label}</span>
                   {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
+                  {e.status === 'received' && <Tag tone="lime">{t('income.chip.received')}</Tag>}
                 </span>
                 <span className="prow-num">
                   <b>
                     {formatMinor(e.amountMinor, e.currency, locale)} {e.currency}
                   </b>
+                  {e.baseAmountMinor && e.currency !== base && (
+                    <i>
+                      ≈ {formatMinor(e.baseAmountMinor, base, locale)} {base}
+                    </i>
+                  )}
                 </span>
-                <span />
+                {/* Пока «ждём» — чип открывает подтверждение факта; после — даёт его отменить. */}
+                {e.status === 'expected' ? (
+                  <button type="button" className="act" onClick={() => setReceiptFor(e)}>
+                    {t('income.chip.expected')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="act"
+                    disabled={cancelReceipt.isPending}
+                    onClick={() => e.receiptId && cancelReceipt.mutate(e.receiptId)}
+                  >
+                    {t('income.cancelReceipt')}
+                  </button>
+                )}
               </div>
             ))}
             {BigInt(plan.extraIncomeMinor) > 0n && (

@@ -52,6 +52,17 @@ export const ru: Record<TranslationKey, string> = {
   'income.extra.irregular': 'Приходит когда как',
   'income.extra.irregularNote': 'Нерегулярный доход в план не идёт — только в факт.',
   'income.variable': 'плавает',
+  'income.received': 'Поступление',
+  'income.expectedAmount': 'ждём',
+  'income.actualAmount': 'Пришло',
+  'income.rateOfDay': 'Курс {from}/{to} на этот день',
+  'income.rateOptional': 'по котировке',
+  'income.rateHint': 'Свой курс важнее котировки на эту дату и потом не пересчитывается.',
+  'income.badRate': 'Курс — положительное число',
+  'income.fix': 'Зафиксировать',
+  'income.chip.expected': 'ждём',
+  'income.chip.received': 'пришло',
+  'income.cancelReceipt': 'отменить',
 
   // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
   'onboarding.debts.title': 'Платишь кредиты или рассрочки?',

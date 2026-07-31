@@ -36,6 +36,20 @@
       "when": 1785415396102,
       "tag": "0004_exchange_ops_currencies",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785502721146,
+      "tag": "0005_add_income_receipts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785503234519,
+      "tag": "0006_add_fx_manual_rates",
+      "breakpoints": true
     }
   ]
 }
