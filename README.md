@@ -43,6 +43,13 @@ createdb -O multa multa_test          # один раз; адрес можно �
 pnpm --filter @multa/api test
 ```
 
+Смоук прод-сборки web (ловит падения на уровне модуля, которых не видно на исходниках):
+
+```bash
+pnpm --filter @multa/web build
+pnpm --filter @multa/web test:bundle
+```
+
 Подробнее об уровнях тестов — `docs/03-architecture.md` §Тестовый контур.
 
 ## Документация
