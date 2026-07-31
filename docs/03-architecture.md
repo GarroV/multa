@@ -171,6 +171,8 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 | `PUT/DELETE /v1/plan/current/categories/:id`                         | бюджет категории на период                                       | 2      |
 | `POST /v1/plan/current/items/:kind/:id/confirm`, `/skip`             | исполнение плановой строки                                       | 3      |
 | `GET/POST /v1/plan/current/rebalance`                                | варианты пересборки и применение                                 | 4      |
+| `GET /v1/plan/current/revisions`                                     | история правок периода: что, откуда, когда                       | 6      |
+| `POST /v1/plan/current/revisions/:id/undo`                           | откат правки; сам откат тоже ревизия                             | 6      |
 | `GET /v1/forecast`                                                   | таймлайн: закрытие долгов, цели, риски                           | 4      |
 | `GET/POST/PATCH/DELETE /v1/accounts`                                 | счета: наличные, карты, накопительные; архивация вместо удаления | 6      |
 | `GET /v1/accounts/balances`                                          | «сколько всего денег»: суммы по валютам + итог в базовой         | 6      |

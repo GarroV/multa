@@ -1078,6 +1078,217 @@ export async function rebalanceSuggestions(
     .sort((a, b) => (history.get(b.targetId) ?? 0) - (history.get(a.targetId) ?? 0));
 }
 
+/**
+ * История ревизий периода (issue #52). Отдаём то, что нужно строке в интерфейсе: сколько, откуда,
+ * куда и когда. Имена строк резолвим здесь же — иначе UI пришлось бы делать второй запрос ради
+ * подписи, а по id человек ничего не узнаёт.
+ *
+ * `accepted = false` означает «откатано». Ревизии не удаляются никогда: по истории считается
+ * «как обычно», и вычищенное прошлое сделало бы подсказки неверными.
+ */
+export interface RevisionMoveDto {
+  fromKind: string;
+  fromId: string;
+  fromName: string | null;
+  toKind: string;
+  toId: string;
+  toName: string | null;
+  amountMinor: string;
+}
+
+export interface RevisionDto {
+  id: string;
+  reason: string;
+  createdAt: string;
+  undone: boolean;
+  moves: RevisionMoveDto[];
+}
+
+interface RawMove {
+  fromKind?: string;
+  fromId?: string;
+  toKind?: string;
+  toId?: string;
+  amountMinor?: string;
+}
+
+/** Имена строк плана по id — одним пакетом на все виды обязательств. */
+async function namesByIds(
+  workspaceId: string,
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  if (ids.length === 0) return names;
+  const unique = [...new Set(ids)];
+  const [cats, debtRows, envRows, goalRows, bucketRows] = await Promise.all([
+    db
+      .select({ id: categories.id, name: categories.name })
+      .from(categories)
+      .where(and(eq(categories.workspaceId, workspaceId), inArray(categories.id, unique))),
+    db
+      .select({ id: debts.id, name: debts.name })
+      .from(debts)
+      .where(and(eq(debts.workspaceId, workspaceId), inArray(debts.id, unique))),
+    db
+      .select({ id: envelopes.id, name: envelopes.name })
+      .from(envelopes)
+      .where(and(eq(envelopes.workspaceId, workspaceId), inArray(envelopes.id, unique))),
+    db
+      .select({ id: goals.id, name: goals.name })
+      .from(goals)
+      .where(and(eq(goals.workspaceId, workspaceId), inArray(goals.id, unique))),
+    db
+      .select({ id: currencyBuckets.id, name: currencyBuckets.name })
+      .from(currencyBuckets)
+      .where(
+        and(eq(currencyBuckets.workspaceId, workspaceId), inArray(currencyBuckets.id, unique)),
+      ),
+  ]);
+  for (const row of [...cats, ...debtRows, ...envRows, ...goalRows, ...bucketRows]) {
+    names.set(row.id, row.name);
+  }
+  return names;
+}
+
+export async function listRevisions(ws: Workspace, asOf: string): Promise<RevisionDto[]> {
+  const period = currentPeriod(ws, asOf);
+  const rows = await db
+    .select({
+      id: planRevisions.id,
+      reason: planRevisions.reason,
+      accepted: planRevisions.accepted,
+      moves: planRevisions.moves,
+      createdAt: planRevisions.createdAt,
+      periodStart: payPeriods.startsOn,
+    })
+    .from(planRevisions)
+    .innerJoin(payPeriods, eq(planRevisions.periodId, payPeriods.id))
+    .where(and(eq(planRevisions.workspaceId, ws.id), eq(payPeriods.startsOn, period.startsOn)))
+    .orderBy(desc(planRevisions.createdAt))
+    .limit(50);
+
+  const ids = rows.flatMap((r) =>
+    ((r.moves as RawMove[] | null) ?? []).flatMap((m) => [m.fromId, m.toId]),
+  );
+  const names = await namesByIds(
+    ws.id,
+    ids.filter((id): id is string => typeof id === 'string'),
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    reason: r.reason,
+    createdAt: r.createdAt.toISOString(),
+    undone: !r.accepted,
+    moves: ((r.moves as RawMove[] | null) ?? []).map((m) => ({
+      fromKind: m.fromKind ?? '',
+      fromId: m.fromId ?? '',
+      fromName: m.fromId ? (names.get(m.fromId) ?? null) : null,
+      toKind: m.toKind ?? '',
+      toId: m.toId ?? '',
+      toName: m.toId ? (names.get(m.toId) ?? null) : null,
+      amountMinor: m.amountMinor ?? '0',
+    })),
+  }));
+}
+
+export class RevisionNotFound extends Error {}
+export class RevisionAlreadyUndone extends Error {}
+export class UndoWouldGoNegative extends Error {}
+
+/**
+ * Откат ревизии: возвращаем суммы обратно и пишем сам откат ещё одной ревизией. Если деньги уже
+ * ушли дальше и строка-получатель уйдёт в минус, откат не делается вовсе — тихо обнулить строку
+ * было бы хуже, чем сказать «так уже не получится».
+ */
+export async function undoRevision(
+  ws: Workspace,
+  asOf: string,
+  revisionId: string,
+): Promise<PlanDto> {
+  const period = currentPeriod(ws, asOf);
+  const rows = await db
+    .select({
+      id: planRevisions.id,
+      periodId: planRevisions.periodId,
+      accepted: planRevisions.accepted,
+      moves: planRevisions.moves,
+    })
+    .from(planRevisions)
+    .innerJoin(payPeriods, eq(planRevisions.periodId, payPeriods.id))
+    .where(
+      and(
+        eq(planRevisions.workspaceId, ws.id),
+        eq(planRevisions.id, revisionId),
+        eq(payPeriods.startsOn, period.startsOn),
+      ),
+    )
+    .limit(1);
+  const revision = rows[0];
+  if (!revision) throw new RevisionNotFound();
+  if (!revision.accepted) throw new RevisionAlreadyUndone();
+
+  const moves = ((revision.moves as RawMove[] | null) ?? []).filter(
+    (m) => m.fromId && m.toId && m.amountMinor,
+  );
+  if (moves.length === 0) throw new RevisionNotFound();
+
+  const ids = moves.flatMap((m) => [m.fromId!, m.toId!]);
+  const items = await db
+    .select({
+      id: plannedItems.id,
+      targetId: plannedItems.targetId,
+      plannedMinor: plannedItems.plannedMinor,
+    })
+    .from(plannedItems)
+    .where(and(eq(plannedItems.periodId, revision.periodId), inArray(plannedItems.targetId, ids)));
+  const byTarget = new Map(items.map((i) => [i.targetId, i]));
+
+  // Сначала проверяем весь откат целиком: половинчатая правка плана хуже отказа.
+  for (const m of moves) {
+    const to = byTarget.get(m.toId!);
+    if (!to) throw new RevisionNotFound();
+    if (to.plannedMinor < BigInt(m.amountMinor!)) throw new UndoWouldGoNegative();
+  }
+
+  await db.transaction(async (tx) => {
+    for (const m of moves) {
+      const amount = BigInt(m.amountMinor!);
+      const from = byTarget.get(m.fromId!);
+      const to = byTarget.get(m.toId!)!;
+      await tx
+        .update(plannedItems)
+        .set({ plannedMinor: to.plannedMinor - amount })
+        .where(eq(plannedItems.id, to.id));
+      if (from) {
+        await tx
+          .update(plannedItems)
+          .set({ plannedMinor: from.plannedMinor + amount })
+          .where(eq(plannedItems.id, from.id));
+      }
+    }
+    await tx
+      .update(planRevisions)
+      .set({ accepted: false })
+      .where(eq(planRevisions.id, revision.id));
+    // Сам откат — тоже ревизия: история дописывается, а не переписывается.
+    await tx.insert(planRevisions).values({
+      workspaceId: ws.id,
+      periodId: revision.periodId,
+      reason: 'manual',
+      moves: moves.map((m) => ({
+        fromKind: m.toKind,
+        fromId: m.toId,
+        toKind: m.fromKind,
+        toId: m.fromId,
+        amountMinor: m.amountMinor,
+      })),
+    });
+  });
+
+  return getCurrentPlan(ws, asOf);
+}
+
 /** Сколько раз из каждого источника уже брали (по принятым PlanRevision). */
 async function loadRebalanceHistory(workspaceId: string): Promise<Map<string, number>> {
   const rows = await db
