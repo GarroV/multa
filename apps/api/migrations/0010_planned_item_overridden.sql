@@ -1,0 +1,1 @@
+ALTER TABLE "planned_items" ADD COLUMN "overridden" boolean DEFAULT false NOT NULL;

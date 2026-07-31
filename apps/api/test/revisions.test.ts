@@ -156,3 +156,129 @@ describe('история ревизий', () => {
     expect((await bob.post(`/v1/plan/current/revisions/${revision!.id}/undo`)).status).toBe(404);
   });
 });
+
+describe('пересборка из обязательства (находка аудита)', () => {
+  /** Доход 30 000, категория 20 000, две цели по 5 000 — свободных денег нет. */
+  async function tightPlan(client: TestClient) {
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '20000000' }),
+    );
+    const goalA = await expectOk<{ id: string }>(
+      await client.post('/v1/goals', {
+        name: 'Мотоцикл',
+        currency: 'RUB',
+        targetMinor: '40000000',
+        plannedPerPeriodMinor: '5000000',
+      }),
+      201,
+    );
+    const goalB = await expectOk<{ id: string }>(
+      await client.post('/v1/goals', {
+        name: 'Отпуск',
+        currency: 'RUB',
+        targetMinor: '40000000',
+        plannedPerPeriodMinor: '5000000',
+      }),
+      201,
+    );
+    await getPlan(client);
+    return { food, goalA: goalA.id, goalB: goalB.id };
+  }
+
+  test('перенос из цели уменьшает именно её, а не все цели пропорционально', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const { food, goalA, goalB } = await tightPlan(client);
+
+    await expectOk(
+      await client.post('/v1/plan/current/rebalance', {
+        fromKind: 'goal',
+        fromId: goalA,
+        toId: food,
+        amountMinor: '2000000',
+      }),
+    );
+
+    const plan = await getPlan(client);
+    const a = plan.allocations.find((x) => x.targetId === goalA)!;
+    const b = plan.allocations.find((x) => x.targetId === goalB)!;
+    const cat = plan.allocations.find((x) => x.targetId === food)!;
+    // Уступила выбранная цель. Раньше списание затиралось пересборкой из таблицы целей, дефицит
+    // закрывал каскад — и «Отпуск», который никто не выбирал, терял половину.
+    expect(BigInt(a.allocatedMinor)).toBe(3_000_000n);
+    expect(BigInt(b.allocatedMinor)).toBe(5_000_000n);
+    expect(BigInt(cat.allocatedMinor)).toBe(22_000_000n);
+    expect(BigInt(plan.compressedMinor)).toBe(0n);
+  });
+
+  test('прибавка выживает и при порядке сжатия «категории первыми»', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const { food, goalA } = await tightPlan(client);
+    await expectOk(
+      await client.patch('/v1/workspace/settings', {
+        cascade: { compressOrder: ['category', 'envelope', 'goal'] },
+      }),
+    );
+
+    await expectOk(
+      await client.post('/v1/plan/current/rebalance', {
+        fromKind: 'goal',
+        fromId: goalA,
+        toId: food,
+        amountMinor: '2000000',
+      }),
+    );
+
+    const plan = await getPlan(client);
+    // Жест обязан что-то менять: раньше при этой настройке каскад срезал категории первыми и
+    // съедал ровно ту прибавку, ради которой пересборку и делали.
+    expect(BigInt(plan.allocations.find((x) => x.targetId === food)!.allocatedMinor)).toBe(
+      22_000_000n,
+    );
+    expect(BigInt(plan.compressedMinor)).toBe(0n);
+  });
+
+  test('откат возвращает взнос цели к её собственной сумме', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const { food, goalA, goalB } = await tightPlan(client);
+    await expectOk(
+      await client.post('/v1/plan/current/rebalance', {
+        fromKind: 'goal',
+        fromId: goalA,
+        toId: food,
+        amountMinor: '2000000',
+      }),
+    );
+    const [revision] = await expectOk<RevisionDto[]>(
+      await client.get('/v1/plan/current/revisions'),
+    );
+    await expectOk(await client.post(`/v1/plan/current/revisions/${revision!.id}/undo`));
+
+    const plan = await getPlan(client);
+    expect(BigInt(plan.allocations.find((x) => x.targetId === goalA)!.allocatedMinor)).toBe(
+      5_000_000n,
+    );
+    /*
+     * Переопределение периода снято, а не «заморожено» на прежней сумме. Проверяем это так: после
+     * добавления третьей цели денег не хватает, и обе прежние цели обязаны уступить ОДИНАКОВО —
+     * если бы у goalA осталась метка правки, каскад её не тронул бы, и весь дефицит лёг на goalB.
+     */
+    await expectOk(
+      await client.post('/v1/goals', {
+        name: 'Ещё цель',
+        currency: 'RUB',
+        targetMinor: '1000000',
+        plannedPerPeriodMinor: '1000000',
+      }),
+      201,
+    );
+    const after = await getPlan(client);
+    const a2 = BigInt(after.allocations.find((x) => x.targetId === goalA)!.allocatedMinor);
+    const b2 = BigInt(after.allocations.find((x) => x.targetId === goalB)!.allocatedMinor);
+    expect(a2).toBeLessThan(5_000_000n);
+    // Разница в одну копейку законна: метод наибольшего остатка отдаёт неделимый остаток одной из
+    // строк, чтобы сумма долей точно совпала с дефицитом.
+    const diff = a2 > b2 ? a2 - b2 : b2 - a2;
+    expect(diff).toBeLessThanOrEqual(1n);
+  });
+});

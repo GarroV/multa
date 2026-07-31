@@ -224,6 +224,13 @@ export const plannedItems = pgTable(
      * цели: флаг на цели забывается и превращается в вечный пропуск.
      */
     frozen: boolean('frozen').notNull().default(false),
+    /**
+     * Сумму этой строки правил человек (пересборка плана), и сборка не имеет права её пересчитать
+     * из таблицы обязательства. Без признака списание с цели затиралось на следующей же сборке:
+     * прибавка получателю оставалась, дефицит закрывал каскад, и деньги теряла другая цель —
+     * та, которую никто не выбирал (найдено адверсарным аудитом).
+     */
+    overridden: boolean('overridden').notNull().default(false),
   },
   (t) => [
     unique('planned_items_uq').on(t.periodId, t.targetKind, t.targetId),
@@ -311,7 +318,16 @@ export const transactions = pgTable(
     rawInput: text('raw_input'),
     receiptId: uuid('receipt_id').references(() => receipts.id),
     transferPairId: uuid('transfer_pair_id'),
-    plannedItemId: uuid('planned_item_id').references(() => plannedItems.id),
+    /**
+     * Ссылка на плановую строку — связь исполнения с планом. `ON DELETE set null`: плановая строка
+     * живёт один период и исчезает вместе с обязательством (удалили цель, закрыли долг, пропал
+     * курс), а **факт исполнения обязан переживать это** — в транзакции лежит иммутабельный
+     * снапшот курса (правило 2), и терять его нельзя. Без set null сборка плана падала на FK и
+     * экран плана 500-ил навсегда (найдено адверсарным аудитом).
+     */
+    plannedItemId: uuid('planned_item_id').references(() => plannedItems.id, {
+      onDelete: 'set null',
+    }),
   },
   (t) => [
     check(

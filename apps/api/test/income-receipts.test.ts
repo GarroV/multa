@@ -207,6 +207,42 @@ describe('подтверждение поступления', () => {
     );
   });
 
+  test('отмена подтверждения снимает ручной курс: опечатку можно исправить', async () => {
+    // Курс, введённый с опечаткой, продолжал пересчитывать остатки и новые траты даже после
+    // удаления подтверждения — исправить его из интерфейса было нечем (найдено аудитом).
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const source = await firstSource(client);
+    const on = await dayInPeriod(client);
+    await seedRate('EUR', 'RUB', '90.0000000000', on, 'cbr');
+
+    const receipt = await expectOk<ReceiptRow>(
+      await client.post(`/v1/income-sources/${source.id}/received`, {
+        amountMinor: '100000',
+        currency: 'EUR',
+        occurredOn: on,
+        // Опечатка: 9.12 вместо 91.2.
+        rate: '9.12',
+      }),
+      201,
+    );
+    // numeric(20,10) в базе — курс возвращается с нулями до десятого знака.
+    expect(Number(receipt.rate)).toBeCloseTo(9.12, 6);
+
+    await expectOk(await client.del(`/v1/income-receipts/${receipt.id}`));
+
+    // После отмены курс снова публичный: 1 000 EUR по 90 = 90 000 RUB.
+    const tx = await expectOk<{ rate: string; rateSource: string; baseAmountMinor: string }>(
+      await client.post('/v1/transactions', {
+        amountMinor: '100000',
+        currency: 'EUR',
+        occurredOn: on,
+      }),
+      201,
+    );
+    expect(tx.rateSource).toBe('cbr');
+    expect(tx.baseAmountMinor).toBe('9000000');
+  });
+
   test('чужой источник и чужое подтверждение недоступны', async () => {
     const alice = await onboarded();
     const source = await firstSource(alice);

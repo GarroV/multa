@@ -99,3 +99,29 @@ describe('изоляция workspace', () => {
     expect(mine.find((r) => r.id === item.id)?.name).toBe('Интернет');
   });
 });
+
+describe('удаление обязательств честно отвечает (находка аудита)', () => {
+  test('чужой и несуществующий id дают 404, а не «успешно удалено»', async () => {
+    const alice = await onboarded();
+    const bob = await onboarded();
+    const debt = await expectOk<{ id: string }>(
+      await bob.post('/v1/debts', {
+        name: 'Кредит Боба',
+        currency: 'RUB',
+        principalMinor: '1000000',
+        remainingMinor: '1000000',
+        paymentMinor: '100000',
+      }),
+      201,
+    );
+
+    // Раньше ручка отвечала 204 и на чужой id: клиент считал, что долг удалён, а он оставался.
+    expect((await alice.del(`/v1/debts/${debt.id}`)).status).toBe(404);
+    expect((await alice.del('/v1/debts/11111111-1111-1111-1111-111111111111')).status).toBe(404);
+
+    const bobDebts = await expectOk<{ id: string }[]>(await bob.get('/v1/debts'));
+    expect(bobDebts.map((d) => d.id)).toContain(debt.id);
+    // Свой — удаляется и отвечает 204.
+    expect((await bob.del(`/v1/debts/${debt.id}`)).status).toBe(204);
+  });
+});

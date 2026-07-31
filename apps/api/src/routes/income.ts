@@ -96,7 +96,8 @@ incomeRoute.delete('/income-receipts/:id', async (c) => {
   const ws = c.get('workspace')!;
   const id = c.req.param('id');
   if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
-  if (!(await deleteReceipt(ws.id, id))) return c.json({ error: 'not_found' }, 404);
+  if (!(await deleteReceipt(ws.id, ws.baseCurrency, id)))
+    return c.json({ error: 'not_found' }, 404);
   return c.json({ ok: true });
 });
 

@@ -505,9 +505,12 @@ export async function seedDemo(userId: string): Promise<string> {
   ];
   for (const f of currentFacts) {
     const snap = f.currency === 'RUB' ? null : f.currency === 'EUR' ? eurRate : rsdRate;
-    const baseAmountMinor = snap
-      ? BigInt(Math.round(Number(f.minor) * Number(snap.rate)))
-      : f.minor;
+    /*
+     * Через ядровой `convert`, а не `Number(...) * Number(...)`: float в деньгах запрещён (правило
+     * 1), и он же игнорирует экспоненты валют — RSD с exponent 0 пересчитывался как двузначный.
+     * Рядом, у разменов, уже использовался convert; здесь остался старый расчёт (найдено аудитом).
+     */
+    const baseAmountMinor = snap ? convert(money(f.minor, f.currency), snap).minor : f.minor;
     historyRows.push({
       workspaceId,
       periodId: current.periodId,
