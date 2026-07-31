@@ -1,51 +1,152 @@
 @import 'tailwindcss';
 
-/* Шрифты self-hosted (профиль $0, без CDN): Inter — интерфейс и деньги, у него табличные
-   цифры по умолчанию; JetBrains Mono — только курсы, id и технические строки. */
-@import '@fontsource-variable/inter';
+/* Шрифты self-hosted (профиль $0, без CDN): Geist — интерфейс и деньги, JetBrains Mono — суммы,
+   курсы и микролейблы, Space Grotesk — логотип и заголовки лендинга. */
+@import '@fontsource-variable/geist';
 @import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/space-grotesk';
 
 /*
- * «Ведомость» — визуальный язык Multa (docs/06-design-system).
+ * Визуальный язык Multa. Источник правды — design/prototype.html (31.07.2026),
+ * словарь и правила — docs/06-design-system.md.
  *
- * Три правила, из которых выведено всё остальное:
- * 1. Плотность отвечает за доверие. Финансовый инструмент читают, а не рассматривают: строки
- *    32px, hairline-разделители, минимум хрома. Пустое место — не «воздух», а необоснованный
- *    пиксель.
- * 2. Один акцент. Насыщенный цвет означает действие или сигнал; всё остальное живёт в градациях
- *    серого. Свечения и стекла нет вовсе: в интерфейсе про деньги они читаются как несерьёзность.
- * 3. Цифры — табличные всегда. Колонки сумм обязаны совпадать по разрядам, иначе сравнение
- *    глазами не работает.
+ * Правила, из которых выведено остальное:
+ * 1. Плотность отвечает за доверие: строки 32px, hairline-разделители, минимум хрома.
+ * 2. Цвет — смысл, а не украшение. Пять акцентов, у каждого одна роль: cyan — действие и
+ *    «сейчас», mag — риск, vio — другая валюта, lime — доход и исполнено, amber — внимание.
+ * 3. Цифры табличные всегда: колонки сумм обязаны совпадать по разрядам.
+ * 4. Свечение живёт только в переменных --g-* и только в тёмной теме — в светлой они `none`,
+ *    поэтому тема переключается токенами, а не отдельными стилями.
  */
 :root {
   color-scheme: dark;
 
-  /* Чернильные серые, не «космос»: цвет фона не должен спорить с цифрами. */
-  --bg-void: #0e1013;
-  --bg-panel: #15181d;
-  --bg-raised: #1b1f26;
-  --line: #262b33;
-  --line-strong: #333a45;
+  --bg: #040509;
+  --surf: #07090f;
+  --tab: #04060b;
+  --cmd: #05070c;
+  --panel: #0d1220;
+  --panel2: #131a2e;
+  --line: #1e2a45;
+  --line-strong: #2a3a5c;
 
-  --text-hi: #e8eaed;
-  --text-mid: #9aa1ad;
-  --text-dim: #6b7280;
+  --ink: #eaf2ff;
+  --mid: #93a4c3;
+  /* Осознанное отклонение от прототипа (там #55648a): микролейблы набраны 9–11px, а на фоне
+     #07090f это контраст 3.4 — ниже WCAG AA. Осветлено до 4.6, иерархия ink → mid → dim цела. */
+  --dim: #6d80a8;
 
-  /* Единственный насыщенный цвет — действие и «сейчас». */
-  --accent: #6a8cff;
-  --accent-quiet: #2b3a63;
-  /* Семантика статусов: три цвета, каждый со своим смыслом, декоративных нет. */
-  --ok: #4ea87a;
-  --warn: #d8a03d;
-  --over: #d1685c;
+  --cyan: #00e5ff;
+  --cyan-hi: #7ff3ff;
+  --cyan-rgb: 0, 229, 255;
+  --mag: #ff2e97;
+  --mag-rgb: 255, 46, 151;
+  --vio: #8b5cf6;
+  --vio-rgb: 139, 92, 246;
+  --lime: #b6ff2e;
+  --lime-rgb: 182, 255, 46;
+  --amber: #ffb020;
+  --amber-rgb: 255, 176, 32;
+
+  --hover1: rgba(19, 26, 46, 0.4);
+  --hover2: rgba(19, 26, 46, 0.5);
+  --scrim: rgba(4, 5, 9, 0.75);
+  --chrome-bg: rgba(4, 5, 9, 0.9);
+  --shell-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --ambient: radial-gradient(
+    120% 180% at 12% 0%,
+    rgba(0, 229, 255, 0.07) 0%,
+    rgba(139, 92, 246, 0.05) 38%,
+    transparent 72%
+  );
+  --bar-sheen: inset 0 0 8px rgba(0, 229, 255, 0.25);
+
+  --g-c-8: 0 0 10px rgba(0, 229, 255, 0.75), 0 0 22px rgba(0, 229, 255, 0.3);
+  --g-c-12: 0 0 14px rgba(0, 229, 255, 0.5), 0 0 34px rgba(0, 229, 255, 0.16);
+  --g-c-16: 0 0 18px rgba(0, 229, 255, 0.45), 0 0 44px rgba(0, 229, 255, 0.18);
+  --g-m-8: 0 0 10px rgba(255, 46, 151, 0.85), 0 0 24px rgba(255, 46, 151, 0.35);
+  --g-m-12: 0 0 14px rgba(255, 46, 151, 0.5), 0 0 34px rgba(255, 46, 151, 0.18);
+  --g-v-12: 0 0 14px rgba(139, 92, 246, 0.45), 0 0 34px rgba(139, 92, 246, 0.16);
+  --g-l-12: 0 0 14px rgba(182, 255, 46, 0.4), 0 0 32px rgba(182, 255, 46, 0.14);
+  --g-dot: 0 0 10px currentColor, 0 0 22px currentColor;
+  --ts-c: 0 0 16px rgba(0, 229, 255, 0.55), 0 0 46px rgba(0, 229, 255, 0.25);
+  --ts-c-sm: 0 0 10px rgba(0, 229, 255, 0.6);
 
   --radius: 8px;
   --radius-lg: 12px;
   --row: 32px;
 
-  --font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-ui: 'Geist Variable', 'Geist', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', monospace;
-  --font-brand: var(--font-ui);
+  --font-brand: 'Space Grotesk Variable', var(--font-ui);
+
+  /* Имена прежней «Ведомости» остаются алиасами: уже свёрстанные экраны получают новую палитру
+     без правки компонентов и переезжают на прямые токены по мере вёрстки по прототипу. */
+  --bg-void: var(--surf);
+  --bg-panel: var(--panel);
+  --bg-raised: var(--panel2);
+  --text-hi: var(--ink);
+  --text-mid: var(--mid);
+  --text-dim: var(--dim);
+  --accent: var(--cyan);
+  --accent-quiet: rgba(0, 229, 255, 0.14);
+  --ok: var(--lime);
+  --warn: var(--amber);
+  --over: var(--mag);
+}
+
+/* Светлая тема: те же имена, свечения выключены. Переключатель придёт с новыми Настройками
+   (issue #30); до этого тёмная — по умолчанию, как в прототипе. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #eceff5;
+  --surf: #ffffff;
+  --tab: #e4e8f0;
+  --cmd: #f5f7fb;
+  --panel: #f6f8fc;
+  --panel2: #ffffff;
+  --line: #d3dae7;
+  --line-strong: #c2cbdc;
+
+  --ink: #0a1020;
+  --mid: #475874;
+  /* Отклонение от прототипа осознанно: его #7e8da8 даёт на белом контраст 3.35, а микролейблы
+     набраны 9–11px — это ниже WCAG AA (4.5). Затемнено до 4.9. */
+  --dim: #5b6a88;
+
+  --cyan: #0089ab;
+  --cyan-hi: #00647f;
+  --cyan-rgb: 0, 137, 171;
+  --mag: #d4136c;
+  --mag-rgb: 212, 19, 108;
+  --vio: #6236d8;
+  --vio-rgb: 98, 54, 216;
+  --lime: #4c8500;
+  --lime-rgb: 76, 133, 0;
+  --amber: #a06a08;
+  --amber-rgb: 160, 106, 8;
+
+  --hover1: rgba(10, 16, 32, 0.035);
+  --hover2: rgba(10, 16, 32, 0.055);
+  --scrim: rgba(10, 16, 32, 0.35);
+  --chrome-bg: rgba(236, 239, 245, 0.9);
+  --shell-shadow: 0 18px 48px rgba(10, 16, 32, 0.14);
+  --ambient: none;
+  --bar-sheen: none;
+
+  --g-c-8: none;
+  --g-c-12: none;
+  --g-c-16: none;
+  --g-m-8: none;
+  --g-m-12: none;
+  --g-v-12: none;
+  --g-l-12: none;
+  --g-dot: none;
+  --ts-c: none;
+  --ts-c-sm: none;
+
+  --accent-quiet: rgba(0, 137, 171, 0.12);
 }
 
 * {
