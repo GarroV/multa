@@ -1,0 +1,1 @@
+ALTER TABLE "planned_items" ADD COLUMN "frozen" boolean DEFAULT false NOT NULL;

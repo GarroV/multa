@@ -170,6 +170,7 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 | `GET /v1/plan/current`                                               | план периода: каскад, факт, сигнал burn-rate                     | 2–4    |
 | `PUT/DELETE /v1/plan/current/categories/:id`                         | бюджет категории на период                                       | 2      |
 | `POST /v1/plan/current/items/:kind/:id/confirm`, `/skip`             | исполнение плановой строки                                       | 3      |
+| `POST /v1/plan/current/items/goal/:id/freeze`, `/unfreeze`           | пропуск взноса в цель на период: осознанный, с записью в историю | 6      |
 | `GET/POST /v1/plan/current/rebalance`                                | варианты пересборки и применение                                 | 4      |
 | `GET /v1/plan/current/revisions`                                     | история правок периода: что, откуда, когда                       | 6      |
 | `POST /v1/plan/current/revisions/:id/undo`                           | откат правки; сам откат тоже ревизия                             | 6      |

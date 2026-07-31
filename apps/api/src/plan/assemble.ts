@@ -144,22 +144,38 @@ async function loadCategoryHistory(
 /** Статусы исполнения плановых строк периода: ключ `kind:id`. */
 async function loadExecutions(
   periodId: string,
-): Promise<Map<string, { status: ExecutionStatus; executedMinor: bigint }>> {
+): Promise<Map<string, { status: ExecutionStatus; executedMinor: bigint; frozen: boolean }>> {
   const rows = await db
     .select({
       targetKind: plannedItems.targetKind,
       targetId: plannedItems.targetId,
       status: plannedItems.executionStatus,
       executedMinor: plannedItems.executedMinor,
+      frozen: plannedItems.frozen,
     })
     .from(plannedItems)
     .where(eq(plannedItems.periodId, periodId));
   return new Map(
     rows.map((r) => [
       `${r.targetKind}:${r.targetId}`,
-      { status: r.status as ExecutionStatus, executedMinor: r.executedMinor },
+      { status: r.status as ExecutionStatus, executedMinor: r.executedMinor, frozen: r.frozen },
     ]),
   );
+}
+
+/** Цели, чей взнос пропущен в этом периоде осознанно (issue #54). */
+async function frozenGoalIds(periodId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ targetId: plannedItems.targetId })
+    .from(plannedItems)
+    .where(
+      and(
+        eq(plannedItems.periodId, periodId),
+        eq(plannedItems.targetKind, 'goal'),
+        eq(plannedItems.frozen, true),
+      ),
+    );
+  return new Set(rows.map((r) => r.targetId));
 }
 
 /**
@@ -273,6 +289,8 @@ async function resolveObligations(
   ws: Workspace,
   incomeMinor: bigint,
   on: string,
+  /** Цели с осознанным пропуском взноса в этом периоде (issue #54) — в каскад не попадают. */
+  frozenGoals: ReadonlySet<string> = new Set(),
 ): Promise<{ resolved: ResolvedItem[]; unresolved: UnresolvedItem[] }> {
   const base = ws.baseCurrency;
   const [debtRows, bucketRows, envelopeRows, goalRows] = await Promise.all([
@@ -339,7 +357,10 @@ async function resolveObligations(
       await push('envelope', e.id, e.name, e.currency, numericToMinor(e.ruleValue));
     }
   }
-  for (const g of goalRows) await push('goal', g.id, g.name, g.currency, g.plannedPerPeriodMinor);
+  for (const g of goalRows) {
+    if (frozenGoals.has(g.id)) continue;
+    await push('goal', g.id, g.name, g.currency, g.plannedPerPeriodMinor);
+  }
 
   return { resolved, unresolved };
 }
@@ -379,17 +400,24 @@ async function persistPlannedItems(
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const liveIds = rows.map((r) => r.targetId);
-    // Удаляем управляемые строки, чьи обязательства удалены/закрыты (категории не трогаем).
+    /*
+     * Удаляем управляемые строки, чьи обязательства удалены/закрыты (категории не трогаем).
+     * Замороженные строки не удаляем: их отсутствие в плане — это и есть заморозка (issue #54), а
+     * не признак исчезнувшего обязательства. Без этого условия заморозка жила до первой же сборки
+     * плана и молча снималась.
+     */
     const staleFilter =
       liveIds.length > 0
         ? and(
             eq(plannedItems.periodId, periodId),
             inArray(plannedItems.targetKind, [...MANAGED_KINDS]),
             notInArray(plannedItems.targetId, liveIds),
+            eq(plannedItems.frozen, false),
           )
         : and(
             eq(plannedItems.periodId, periodId),
             inArray(plannedItems.targetKind, [...MANAGED_KINDS]),
+            eq(plannedItems.frozen, false),
           );
     await tx.delete(plannedItems).where(staleFilter);
 
@@ -606,6 +634,8 @@ export interface PlanAllocationDto {
   protectedCategory?: boolean;
   /** Совет по бюджету на основе факта прошлых периодов (Спринт 4): поднять или опустить. */
   advice?: { kind: 'raise' | 'lower'; suggestedMinor: string; periods: number };
+  /** Цель с осознанно пропущенным взносом в этом периоде (issue #54). */
+  frozen?: boolean;
 }
 
 export interface PlanDto {
@@ -693,7 +723,8 @@ async function assembleForPeriod(
   if (created) await carryOverCategories(ws, periodId, period.startsOn);
   // План — проекция «на момент сборки»: конвертируем по курсу на asOf (сегодня), а не на
   // дату старта периода. Иммутабельный снапшот курса важен для транзакций-фактов, не для плана.
-  const { resolved, unresolved } = await resolveObligations(ws, incomeMinor, asOf);
+  const frozenGoals = await frozenGoalIds(periodId);
+  const { resolved, unresolved } = await resolveObligations(ws, incomeMinor, asOf, frozenGoals);
   const cats = await loadCategoryBudgets(periodId);
 
   // Обязательства (base уже посчитан) + категории (бюджет уже в base). Порядок каскада — в assemblePlan.
@@ -771,8 +802,44 @@ async function assembleForPeriod(
         ? { protectedCategory: cats.find((c) => c.targetId === a.targetId)?.isProtected === true }
         : {}),
       ...adviceFields(a.targetKind, a.allocatedMinor, history.get(a.targetId)),
+      ...(a.targetKind === 'goal' ? { frozen: false } : {}),
     };
   });
+
+  /*
+   * Замороженные цели (issue #54): в каскаде их нет, но в плане они обязаны быть видны — иначе
+   * пропуск читается как «цель исчезла», а мы просили не молчать о пропусках.
+   */
+  if (frozenGoals.size > 0) {
+    const rows = await db
+      .select({
+        id: goals.id,
+        name: goals.name,
+        currency: goals.currency,
+        plannedPerPeriodMinor: goals.plannedPerPeriodMinor,
+      })
+      .from(goals)
+      .where(and(eq(goals.workspaceId, ws.id), inArray(goals.id, [...frozenGoals])));
+    for (const row of rows) {
+      allocations.push({
+        targetKind: 'goal',
+        targetId: row.id,
+        name: row.name,
+        sourceCurrency: row.currency,
+        sourceMinor: row.plannedPerPeriodMinor.toString(),
+        plannedMinor: '0',
+        allocatedMinor: '0',
+        shortfallMinor: '0',
+        spentMinor: '0',
+        remainingMinor: '0',
+        overspentMinor: '0',
+        executionStatus: 'skipped',
+        executedMinor: '0',
+        remainderMinor: '0',
+        frozen: true,
+      });
+    }
+  }
 
   // Категории, где трата есть, а бюджета нет: без этих строк факт молча исчезал бы из UI
   // (в каскад они не попадают, потому что planned = 0). Отдаём их как чистый перерасход.
@@ -1101,6 +1168,8 @@ export interface RevisionDto {
   reason: string;
   createdAt: string;
   undone: boolean;
+  /** `move` — перенос между строками, `freeze`/`unfreeze` — пропуск взноса в цель (issue #54). */
+  kind: 'move' | 'freeze' | 'unfreeze';
   moves: RevisionMoveDto[];
 }
 
@@ -1110,6 +1179,10 @@ interface RawMove {
   toKind?: string;
   toId?: string;
   amountMinor?: string;
+  /** Заморозка и её снятие пишутся тем же журналом, но переносом не являются. */
+  action?: 'freeze' | 'unfreeze';
+  freezeKind?: string;
+  freezeId?: string;
 }
 
 /** Имена строк плана по id — одним пакетом на все виды обязательств. */
@@ -1168,28 +1241,121 @@ export async function listRevisions(ws: Workspace, asOf: string): Promise<Revisi
     .limit(50);
 
   const ids = rows.flatMap((r) =>
-    ((r.moves as RawMove[] | null) ?? []).flatMap((m) => [m.fromId, m.toId]),
+    ((r.moves as RawMove[] | null) ?? []).flatMap((m) => [m.fromId, m.toId, m.freezeId]),
   );
   const names = await namesByIds(
     ws.id,
     ids.filter((id): id is string => typeof id === 'string'),
   );
 
-  return rows.map((r) => ({
-    id: r.id,
-    reason: r.reason,
-    createdAt: r.createdAt.toISOString(),
-    undone: !r.accepted,
-    moves: ((r.moves as RawMove[] | null) ?? []).map((m) => ({
-      fromKind: m.fromKind ?? '',
-      fromId: m.fromId ?? '',
-      fromName: m.fromId ? (names.get(m.fromId) ?? null) : null,
-      toKind: m.toKind ?? '',
-      toId: m.toId ?? '',
-      toName: m.toId ? (names.get(m.toId) ?? null) : null,
-      amountMinor: m.amountMinor ?? '0',
-    })),
-  }));
+  return rows.map((r) => {
+    const raw = (r.moves as RawMove[] | null) ?? [];
+    const action = raw.find((m) => m.action)?.action;
+    return {
+      id: r.id,
+      reason: r.reason,
+      createdAt: r.createdAt.toISOString(),
+      undone: !r.accepted,
+      kind: action ?? ('move' as const),
+      moves: raw.map((m) => {
+        // У заморозки «источник» — сама цель: строка истории читается как «Мотоцикл, 5 000».
+        const fromId = m.freezeId ?? m.fromId ?? '';
+        return {
+          fromKind: m.freezeKind ?? m.fromKind ?? '',
+          fromId,
+          fromName: fromId ? (names.get(fromId) ?? null) : null,
+          toKind: m.toKind ?? '',
+          toId: m.toId ?? '',
+          toName: m.toId ? (names.get(m.toId) ?? null) : null,
+          amountMinor: m.amountMinor ?? '0',
+        };
+      }),
+    };
+  });
+}
+
+export class FreezeNotApplicable extends Error {}
+export class FreezeAlreadySet extends Error {}
+
+/**
+ * Заморозка взноса в цель на текущий период (issue #54). Пропуск — решение человека, а не сжатие
+ * каскада: накопленное остаётся, цель не удаляется, освободившиеся деньги видны как свободные.
+ *
+ * Только цели: долги и валютные корзины автоматика не трогает никогда, и руками их «пропускать»
+ * тем же жестом было бы опасно — платёж по кредиту не пропускают одной кнопкой.
+ */
+export async function setGoalFreeze(
+  ws: Workspace,
+  asOf: string,
+  targetKind: TargetKind,
+  goalId: string,
+  frozen: boolean,
+): Promise<PlanDto> {
+  if (targetKind !== 'goal') throw new FreezeNotApplicable();
+
+  const goalRows = await db
+    .select({ id: goals.id, name: goals.name, planned: goals.plannedPerPeriodMinor })
+    .from(goals)
+    .where(and(eq(goals.workspaceId, ws.id), eq(goals.id, goalId)))
+    .limit(1);
+  const goal = goalRows[0];
+  if (!goal) throw new Error('goal_not_found');
+
+  const period = currentPeriod(ws, asOf);
+  const sources = await activeSources(ws);
+  const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+  const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
+
+  const existing = await db
+    .select({ id: plannedItems.id, frozen: plannedItems.frozen })
+    .from(plannedItems)
+    .where(
+      and(
+        eq(plannedItems.periodId, periodId),
+        eq(plannedItems.targetKind, 'goal'),
+        eq(plannedItems.targetId, goalId),
+      ),
+    )
+    .limit(1);
+  // Повторное нажатие — не «ещё одна заморозка», а ошибка: иначе история копит пустые записи.
+  if (existing[0]?.frozen === frozen) throw new FreezeAlreadySet();
+
+  await db.transaction(async (tx) => {
+    if (existing[0]) {
+      await tx
+        .update(plannedItems)
+        // planned_minor обнуляем вместе с заморозкой: строка больше не участвует в раздаче, а при
+        // снятии сумма вернётся из самой цели на следующей сборке.
+        .set({ frozen, ...(frozen ? { plannedMinor: 0n } : {}) })
+        .where(eq(plannedItems.id, existing[0].id));
+    } else {
+      await tx.insert(plannedItems).values({
+        workspaceId: ws.id,
+        periodId,
+        targetKind: 'goal',
+        targetId: goalId,
+        plannedMinor: 0n,
+        executionStatus: 'skipped',
+        frozen,
+      });
+    }
+    // Пропуск попадает в историю правок: «о пропусках не молчим» (01-domain-model §Исполнение).
+    await tx.insert(planRevisions).values({
+      workspaceId: ws.id,
+      periodId,
+      reason: 'manual',
+      moves: [
+        {
+          action: frozen ? 'freeze' : 'unfreeze',
+          freezeKind: 'goal',
+          freezeId: goalId,
+          amountMinor: goal.planned.toString(),
+        },
+      ],
+    });
+  });
+
+  return getCurrentPlan(ws, asOf);
 }
 
 export class RevisionNotFound extends Error {}

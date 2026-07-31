@@ -147,6 +147,7 @@ create table planned_items (
     check (execution_status in ('pending','confirmed','partial','skipped','n_a')), -- n_a для категорий
   executed_minor bigint not null default 0,  -- подтвержденная сумма (для partial)
   auto boolean not null default false,       -- автоплатеж: подтверждается сам в дату
+  frozen boolean not null default false,  -- осознанный пропуск взноса в цель на этот период (#54)
   unique (period_id, target_kind, target_id)
 );
 -- транзакция подтверждения ссылается на строку плана:
