@@ -25,7 +25,7 @@ const daysBetween = (from: string, to: string): number =>
  * которого открывают приложение: «дотяну ли до выплаты».
  */
 function PeriodBar({ plan }: { plan: PlanDto }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const total = daysBetween(plan.period.startsOn, plan.period.endsOn);
   if (total <= 0) return null;
 
@@ -56,8 +56,8 @@ function PeriodBar({ plan }: { plan: PlanDto }) {
         </span>
         <span className="num num-dim">
           {t('spend.spentOfPlan', {
-            spent: formatMinor(plan.spentLivingMinor, plan.baseCurrency, 'ru'),
-            plan: formatMinor(plan.livingMinor, plan.baseCurrency, 'ru'),
+            spent: formatMinor(plan.spentLivingMinor, plan.baseCurrency, locale),
+            plan: formatMinor(plan.livingMinor, plan.baseCurrency, locale),
           })}
         </span>
       </div>

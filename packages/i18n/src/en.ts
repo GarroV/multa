@@ -110,6 +110,8 @@ export const en = {
   'auth.signIn': 'Sign in',
   'auth.signUp': 'Create account',
   'auth.toSignUp': 'No account? Create one',
+  'demo.entering': 'Opening the demo…',
+  'demo.failed': 'The demo is unavailable right now.',
   'auth.toSignIn': 'Have an account? Sign in',
 
   // Общее (доп.)

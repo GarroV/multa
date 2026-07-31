@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { AppShell } from './AppShell.tsx';
 import { useI18n } from './lib/i18n.tsx';
 import { useMe } from './lib/queries.ts';
@@ -7,8 +8,17 @@ import { OnboardingCurrency } from './screens/OnboardingCurrency.tsx';
 
 /** Root-компонент: гейт по состоянию сессии → auth / онбординг / оболочка приложения. */
 export function App() {
-  const { t } = useI18n();
+  const { t, setLocale } = useI18n();
   const { data: me, isLoading } = useMe();
+  // Язык интерфейса подхватывается из воркспейса один раз за сессию: демо обязано открываться
+  // по-английски (issue #56), а ручной выбор в шапке после этого не перетирается.
+  const localeApplied = useRef(false);
+  const wsLocale = me?.workspace?.locale;
+  useEffect(() => {
+    if (localeApplied.current || !wsLocale) return;
+    localeApplied.current = true;
+    setLocale(wsLocale);
+  }, [wsLocale, setLocale]);
 
   if (isLoading) {
     return (

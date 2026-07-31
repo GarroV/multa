@@ -108,6 +108,8 @@ export const ru: Record<TranslationKey, string> = {
   'auth.signIn': 'Войти',
   'auth.signUp': 'Создать аккаунт',
   'auth.toSignUp': 'Нет аккаунта? Создать',
+  'demo.entering': 'Открываем демо…',
+  'demo.failed': 'Демо сейчас недоступно.',
   'auth.toSignIn': 'Уже есть аккаунт? Войти',
 
   // Общее (доп.)
