@@ -1,8 +1,9 @@
-import { money, toMajorString } from '@multa/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
+import { Panel, Tag } from '../components/ui/Panel.tsx';
 import { api } from '../lib/api.ts';
+import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { payoutsToSources, rhythmToPayload, type RhythmForm } from '../lib/income.ts';
 import {
@@ -39,12 +40,15 @@ function toRhythmForm(rhythm: unknown, weekendRule: RhythmForm['weekendRule']): 
   };
 }
 
-/** Сумма источника в major-строке — для отображения в списке. */
-function amountLabel(amount: unknown, currency: string): string {
+/**
+ * Сумма источника для списка. Формат — как везде в колонке сумм (разряды, локаль): raw-major
+ * давал «190000.00» рядом с «190,000» в плане, и глазом это читалось как разные числа.
+ */
+function amountLabel(amount: unknown, currency: string, locale: string): string {
   const a = amount as { kind?: string; amountMinor?: string; percent?: string };
   if (a?.kind === 'percent') return `${a.percent}%`;
   if (a?.kind === 'absolute' && a.amountMinor) {
-    return toMajorString(money(BigInt(a.amountMinor), currency));
+    return formatMinor(a.amountMinor, currency, locale);
   }
   return '—';
 }
@@ -58,8 +62,15 @@ function scheduleLabel(schedule: unknown): string {
   return '—';
 }
 
+/**
+ * Настройки (прототип, issue #30): панели вместо столбика карточек. Тема и язык живут в топбаре —
+ * их меняют на ходу, а не «настраивают», поэтому дублировать их здесь незачем.
+ *
+ * Сохранение говорит и об успехе, и о провале: раньше ошибка PATCH оставалась в мутации и экран
+ * выглядел так, будто всё записалось.
+ */
 export function Settings() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const qc = useQueryClient();
   const { data: me } = useMe();
   const ws = me?.workspace;
@@ -98,114 +109,152 @@ export function Settings() {
     },
   });
 
-  if (!ws)
-    return (
-      <div className="page sub">
-        {t('common.loading')}
-      </div>
-    );
+  if (!ws) return <div className="dense"><div className="panels"><span className="sub">{t('common.loading')}</span></div></div>;
 
   return (
-    <div className="page" style={{ maxWidth: 560 }}>
-      <div className="page-head">
-        <h1 className="page-title">{t('settings.title')}</h1>
-      </div>
-      <section className="tile tile-wide">
-        <span className="micro">{t('settings.currency')}</span>
-        <input
-          className="field num field-sm"
-          value={currency}
-          maxLength={3}
-          onChange={(e) => {
-            setCurrency(e.target.value.toUpperCase());
-            setSaved(false);
-          }}
-        />
-      </section>
-      <section className="tile tile-wide">
-        <span className="micro">{t('settings.rhythm')}</span>
-        <RhythmPicker
-          value={rhythm}
-          onChange={(next) => {
-            setRhythm(next);
-            setSaved(false);
-          }}
-          today={todayISO()}
-        />
-      </section>
-      <section className="tile tile-wide">
-        <span className="micro">{t('settings.sources')}</span>
-          {sources.map((s) => (
-            <div key={s.id} className="list-item">
-              <span>
-                {s.label} <span className="sub">· {scheduleLabel(s.schedule)}</span>
-                {s.stability === 'variable' && (
-                  <span className="sub"> · {t('income.variable')}</span>
-                )}
-              </span>
-              <span className="row">
-                <span className="num sub">
-                  {amountLabel(s.amount, s.currency)} {s.currency}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  aria-label={t('common.cancel')}
-                  disabled={removeSource.isPending}
-                  onClick={() => removeSource.mutate(s.id)}
-                >
-                  ✕
+    <div className="dense">
+      <div className="panels">
+        <div className="col">
+          <Panel
+            label={t('settings.workspace')}
+            sum={ws.timezone}
+            tools={
+              <>
+                {saved && <span className="tag lime">{t('common.saved')}</span>}
+                {save.isError && <span className="tag mag">{t('common.error')}</span>}
+                <button type="button" className="act" disabled={save.isPending} onClick={() => save.mutate()}>
+                  {t('common.save')}
                 </button>
+              </>
+            }
+          >
+            <div className="prow">
+              <span className="prow-day" aria-hidden />
+              <span className="prow-name"><span>{t('settings.currency')}</span></span>
+              <span className="prow-num">
+                <input
+                  className="field num field-ccy"
+                  aria-label={t('settings.currency')}
+                  value={currency}
+                  maxLength={3}
+                  onChange={(e) => {
+                    setCurrency(e.target.value.toUpperCase());
+                    setSaved(false);
+                  }}
+                />
+              </span>
+              <span />
+            </div>
+            <div className="prow">
+              <span className="prow-day" aria-hidden />
+              <span className="prow-name"><span>{t('settings.rhythm')}</span></span>
+              <span className="prow-num" />
+              <span />
+              <span className="prow-bar" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+                <RhythmPicker
+                  value={rhythm}
+                  onChange={(next) => {
+                    setRhythm(next);
+                    setSaved(false);
+                  }}
+                  today={todayISO()}
+                />
               </span>
             </div>
+          </Panel>
+
+          <Panel label={t('settings.account')} accent="vio">
+            <div className="prow">
+              <span className="prow-day" aria-hidden />
+              <span className="prow-name"><span>{me?.user?.email ?? '—'}</span></span>
+              <span className="prow-num"><i>{me?.user?.name ?? ''}</i></span>
+              <span />
+            </div>
+            {/* TOTP-переключатель ещё не сделан (issue #19) — обещать его строкой в настройках нельзя. */}
+          </Panel>
+        </div>
+
+        <Panel
+          label={t('settings.sources')}
+          accent="lime"
+          foot={
+            <div className="fx-form">
+              <div className="form-row">
+                <input
+                  className="field grow"
+                  aria-label={t('income.amounts.label')}
+                  placeholder={t('income.amounts.label')}
+                  value={draft.label}
+                  onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                />
+                <input
+                  className="field num field-ccy"
+                  inputMode="numeric"
+                  aria-label={t('income.amounts.day')}
+                  value={draft.day}
+                  onChange={(e) => {
+                    const n = Number(e.target.value.replace(/\D/g, ''));
+                    setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
+                  }}
+                />
+                <input
+                  className="field num field-sm"
+                  inputMode="decimal"
+                  aria-label={`${t('income.amounts.amount')} · ${ws.baseCurrency}`}
+                  placeholder={t('income.amounts.amount')}
+                  value={draft.amount}
+                  onChange={(e) => setDraft({ ...draft, amount: e.target.value.replace(',', '.') })}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={addSource.isPending || !draftPayload}
+                  onClick={() =>
+                    draftPayload &&
+                    addSource.mutate(
+                      { ...draftPayload, sort: sources.length },
+                      { onSuccess: () => setDraft({ label: '', day: 25, amount: '' }) },
+                    )
+                  }
+                >
+                  {t('common.add')}
+                </button>
+              </div>
+              {/* Ввод, из которого не собирается источник, не должен выглядеть как «кнопка сломалась». */}
+              {!draftPayload && (draft.label.trim() !== '' || draft.amount.trim() !== '') && (
+                <span className="sub danger">{t('settings.sourceIncomplete')}</span>
+              )}
+              {addSource.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
+              {removeSource.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
+            </div>
+          }
+        >
+          {sources.length === 0 && (
+            <div className="prow"><span /><span className="dim">{t('common.empty')}</span><span /><span /></div>
+          )}
+          {sources.map((s) => (
+            <div className="prow" key={s.id}>
+              <span className="prow-day">{scheduleLabel(s.schedule)}</span>
+              <span className="prow-name">
+                <span>{s.label}</span>
+                {s.stability === 'variable' && <Tag tone="amber">{t('income.variable')}</Tag>}
+                {s.currency !== ws.baseCurrency && <Tag tone="vio">{s.currency}</Tag>}
+              </span>
+              <span className="prow-num">
+                <b>{amountLabel(s.amount, s.currency, locale)} {s.currency}</b>
+              </span>
+              <button
+                type="button"
+                className="act"
+                aria-label={t('common.delete')}
+                disabled={removeSource.isPending}
+                onClick={() => removeSource.mutate(s.id)}
+              >
+                ✕
+              </button>
+            </div>
           ))}
-          <div className="form-row" style={{ marginTop: 6 }}>
-            <input
-              className="field grow"
-              aria-label={t('income.amounts.label')}
-              placeholder={t('income.amounts.label')}
-              value={draft.label}
-              onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-            />
-            <input
-              className="field num field-ccy"
-              inputMode="numeric"
-              aria-label={t('income.amounts.day')}
-              value={draft.day}
-              onChange={(e) => {
-                const n = Number(e.target.value.replace(/\D/g, ''));
-                setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
-              }}
-            />
-            <input
-              className="field num grow"
-              inputMode="decimal"
-              aria-label={t('income.amounts.amount')}
-              placeholder={`${t('income.amounts.amount')} · ${ws.baseCurrency}`}
-              value={draft.amount}
-              onChange={(e) => setDraft({ ...draft, amount: e.target.value.replace(',', '.') })}
-            />
-            <button
-              type="button"
-              className="btn"
-              disabled={addSource.isPending || !draftPayload}
-              onClick={() =>
-                draftPayload &&
-                addSource.mutate(
-                  { ...draftPayload, sort: sources.length },
-                  { onSuccess: () => setDraft({ label: '', day: 25, amount: '' }) },
-                )
-              }
-            >
-              {t('common.add')}
-            </button>
-          </div>
-      </section>
-      <div className="row" style={{ justifyContent: 'flex-end' }}>
-        {saved && <span className="sub st-ok">{t('common.saved')}</span>}
-        <button className="btn" disabled={save.isPending} onClick={() => save.mutate()}>
-          {t('common.save')}
-        </button>
+        </Panel>
       </div>
     </div>
   );

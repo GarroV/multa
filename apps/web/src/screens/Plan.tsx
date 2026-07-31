@@ -45,7 +45,7 @@ const GROUP_ACCENT: Record<PlanTargetKind, Accent> = {
 };
 
 function Centered({ children }: { children: ReactNode }) {
-  return <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>{children}</div>;
+  return <div className="center-screen">{children}</div>;
 }
 
 /** Строка обязательства: имя и валюта слева, сумма в колонке, исполнение — вручную. */
@@ -292,7 +292,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       <PeriodMap plan={plan} dueSoon={forecast.data?.dueSoon} events={forecast.data?.events} />
 
       <div className="panels">
-        <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+        <div className="col">
           <Panel
             label={t('plan.panel.income')}
             sum={withCcy(plan.incomeMinor)}
@@ -348,7 +348,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           </Panel>
         </div>
 
-        <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
+        <div className="col">
           {obligationGroups.map((g) => (
             <Panel
               key={g.kind}
@@ -407,7 +407,7 @@ export function Plan() {
   if (error) {
     return (
       <Centered>
-        <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
+        <div className="center-stack">
           <span className="sub">{t('common.error')}</span>
           <button className="btn" onClick={() => void refetch()}>{t('common.retry')}</button>
         </div>
