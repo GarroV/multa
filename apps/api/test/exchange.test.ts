@@ -149,3 +149,34 @@ describe('курсы', () => {
     expect(await res.json()).toMatchObject({ error: 'rate_unavailable' });
   });
 });
+
+describe('корзина в размене (находка аудита)', () => {
+  test('чужую корзину привязать нельзя, и её удаление не блокируется', async () => {
+    const alice = await onboarded();
+    const bob = await onboarded();
+    const bucket = await expectOk<{ id: string }>(
+      await bob.post('/v1/buckets', {
+        name: 'Евро на лето',
+        fromCurrency: 'RUB',
+        toCurrency: 'EUR',
+        amountMinor: '10000000',
+      }),
+      201,
+    );
+
+    // Клиент присылает id корзины сам — принадлежность обязан проверять сервер (правило 7).
+    const res = await alice.post('/v1/exchange-ops', {
+      fromCurrency: 'RUB',
+      toCurrency: 'EUR',
+      fromMinor: '1000000',
+      toMinor: '10000',
+      bucketId: bucket.id,
+    });
+    expect(res.status).toBe(404);
+
+    // Владельцу корзина по-прежнему доступна: чужая ссылка не появилась и FK её не держит.
+    expect((await bob.del(`/v1/buckets/${bucket.id}`)).status).toBe(204);
+    const left = await expectOk<{ id: string }[]>(await bob.get('/v1/buckets'));
+    expect(left.map((b) => b.id)).not.toContain(bucket.id);
+  });
+});

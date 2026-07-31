@@ -4,7 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
-import { exchangeOps } from '../db/schema/domain.ts';
+import { currencyBuckets, exchangeOps } from '../db/schema/domain.ts';
 import { getRate } from '../fx/service.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import { exchangeCreateSchema } from '../validation.ts';
@@ -67,6 +67,27 @@ exchangeRoute.post('/exchange-ops', async (c) => {
   if (body.fromCurrency === body.toCurrency) return c.json({ error: 'same_currency' }, 400);
   const occurredOn = body.occurredOn ?? today(ws.timezone);
 
+  /*
+   * Корзину клиент присылает по id, поэтому её принадлежность проверяем сами (правило 7): чужой id
+   * иначе оказывался бы в ссылке нашей операции и — из-за FK — навсегда блокировал владельцу
+   * удаление его же корзины (найдено адверсарным аудитом).
+   */
+  let bucketId: string | undefined;
+  if (body.bucketId) {
+    if (!isUuid(body.bucketId)) return c.json({ error: 'bucket_not_found' }, 404);
+    const owned = await db
+      .select({ id: currencyBuckets.id })
+      .from(currencyBuckets)
+      .where(and(eq(currencyBuckets.workspaceId, ws.id), eq(currencyBuckets.id, body.bucketId)))
+      .limit(1);
+    if (!owned[0]) return c.json({ error: 'bucket_not_found' }, 404);
+    bucketId = owned[0].id;
+  }
+
+  /*
+   * Здесь курс намеренно публичный, без личных курсов воркспейса: спред считается как отклонение
+   * от рыночной котировки. Сравнивать свой курс со своим же — значит всегда получать нулевой спред.
+   */
   const official = await getRate(body.fromCurrency, body.toCurrency, occurredOn);
   const result = exchangeResult({
     fromMinor: body.fromMinor,
@@ -91,7 +112,7 @@ exchangeRoute.post('/exchange-ops', async (c) => {
       ...(result.lostMinor !== null ? { spreadMinor: result.lostMinor } : {}),
       occurredOn,
       ...(body.note ? { note: body.note } : {}),
-      ...(body.bucketId ? { bucketId: body.bucketId } : {}),
+      ...(bucketId ? { bucketId } : {}),
     })
     .returning();
   return c.json(serialize(inserted[0]!), 201);

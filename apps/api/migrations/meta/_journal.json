@@ -64,6 +64,20 @@
       "when": 1785518860574,
       "tag": "0008_add_workspace_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785535227332,
+      "tag": "0009_planned_item_fk_set_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785535349833,
+      "tag": "0010_planned_item_overridden",
+      "breakpoints": true
     }
   ]
 }

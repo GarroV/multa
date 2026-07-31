@@ -125,6 +125,25 @@ describe('заморозка цели', () => {
     expect((await client.post(`/v1/plan/current/items/debt/${debt.id}/freeze`)).status).toBe(400);
   });
 
+  test('нельзя заморозить взнос, который уже отложен', async () => {
+    // Деньги отложены и транзакция расхода существует: «освобождение» этой суммы показало бы её
+    // свободной второй раз (найдено адверсарным аудитом).
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const goal = await addGoal(client, '5000000');
+    await getPlan(client);
+    await expectOk(await client.post(`/v1/plan/current/items/goal/${goal.id}/confirm`, {}));
+
+    const res = await client.post(`/v1/plan/current/items/goal/${goal.id}/freeze`, {});
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: 'freeze_after_execution' });
+
+    // Сначала отмена исполнения, потом заморозка — оба жеста осознанные.
+    await expectOk(await client.post(`/v1/plan/current/items/goal/${goal.id}/skip`, {}));
+    expect((await client.post(`/v1/plan/current/items/goal/${goal.id}/freeze`, {})).status).toBe(
+      200,
+    );
+  });
+
   test('чужую цель заморозить нельзя', async () => {
     const alice = await onboarded({ payoutMinor: '30000000' });
     const goal = await addGoal(alice, '5000000');

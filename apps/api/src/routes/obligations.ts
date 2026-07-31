@@ -47,10 +47,18 @@ for (const { path, table, schema } of ENTITIES) {
 
   obligations.delete(`/${path}/:id`, async (c) => {
     const ws = c.get('workspace')!;
-    if (!isUuid(c.req.param('id'))) return c.json({ error: 'not_found' }, 404);
-    await db
+    const id = c.req.param('id');
+    if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
+    /*
+     * 204 только если строка действительно удалена. Раньше ручка отвечала «успешно» и на чужой, и
+     * на несуществующий id: клиент считал, что обязательство исчезло, а оно оставалось на месте
+     * (найдено адверсарным аудитом; собственный тест изоляции требует ровно 404).
+     */
+    const deleted = await db
       .delete(table)
-      .where(and(eq(table.id, c.req.param('id')), eq(table.workspaceId, ws.id)));
+      .where(and(eq(table.id, id), eq(table.workspaceId, ws.id)))
+      .returning({ id: table.id });
+    if (deleted.length === 0) return c.json({ error: 'not_found' }, 404);
     return c.body(null, 204);
   });
 }

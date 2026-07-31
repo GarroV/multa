@@ -32,6 +32,7 @@ import {
 import {
   applyRebalance,
   getCurrentPlan,
+  FreezeAfterExecution,
   FreezeAlreadySet,
   FreezeNotApplicable,
   listRevisions,
@@ -207,8 +208,21 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
   const targetKind = c.req.param('kind') as TargetKind;
   const targetId = c.req.param('id');
   if (!isUuid(targetId)) return c.json({ error: 'not_found' }, 404);
-  const body =
-    mode === 'confirm' ? executionSchema.parse(await c.req.json().catch(() => ({}))) : {};
+  /*
+   * Пустое тело — законный «подтвердить как запланировано». Битое тело — нет: раньше любой сбой
+   * разбора превращался в `{}` и трактовался как «исполнено целиком», то есть кривой запрос
+   * становился денежным решением (найдено адверсарным аудитом). Теперь пусто → {}, мусор → 400.
+   */
+  const raw = mode === 'confirm' ? (await c.req.text()).trim() : '';
+  let parsed: unknown = {};
+  if (raw !== '') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return c.json({ error: 'validation', message: 'body is not json' }, 400);
+    }
+  }
+  const body = mode === 'confirm' ? executionSchema.parse(parsed) : {};
   try {
     const plan = await setExecution(
       ws,
@@ -235,6 +249,7 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
 function freezeError(err: unknown): { error: string; status: 400 | 404 | 409 } | null {
   if (err instanceof FreezeNotApplicable) return { error: 'freeze_not_applicable', status: 400 };
   if (err instanceof FreezeAlreadySet) return { error: 'freeze_already_set', status: 409 };
+  if (err instanceof FreezeAfterExecution) return { error: 'freeze_after_execution', status: 409 };
   if (err instanceof Error && err.message === 'goal_not_found')
     return { error: 'not_found', status: 404 };
   if (err instanceof Error && err.message === 'onboarding_incomplete')
@@ -359,7 +374,10 @@ app.post('/v1/plan/current/items/:kind/:id/skip', requireWorkspace, (c) =>
 
 app.get('/v1/fx/rate', requireAuth, async (c) => {
   const q = rateQuerySchema.parse(c.req.query());
-  const snap = await getRate(q.from, q.to, q.on ?? today());
+  // Если воркспейс уже известен, отдаём курс, по которому считается ЕГО план: он может быть личным
+  // (курс дня выплаты, issue #48). Публичную котировку показывает спред в истории разменов.
+  const ws = c.get('workspace');
+  const snap = await getRate(q.from, q.to, q.on ?? today(), ws?.id);
   if (!snap) return c.json({ error: 'rate_unavailable' }, 404);
   return c.json(snap);
 });

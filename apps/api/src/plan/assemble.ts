@@ -166,6 +166,19 @@ async function loadExecutions(
   );
 }
 
+/** Суммы строк периода, которые правил человек: сборка обязана их уважать (находка аудита). */
+async function loadOverrides(periodId: string): Promise<Map<string, bigint>> {
+  const rows = await db
+    .select({
+      targetKind: plannedItems.targetKind,
+      targetId: plannedItems.targetId,
+      plannedMinor: plannedItems.plannedMinor,
+    })
+    .from(plannedItems)
+    .where(and(eq(plannedItems.periodId, periodId), eq(plannedItems.overridden, true)));
+  return new Map(rows.map((r) => [`${r.targetKind}:${r.targetId}`, r.plannedMinor]));
+}
+
 /** Цели, чей взнос пропущен в этом периоде осознанно (issue #54). */
 async function frozenGoalIds(periodId: string): Promise<Set<string>> {
   const rows = await db
@@ -438,8 +451,12 @@ async function persistPlannedItems(
       )
       .onConflictDoUpdate({
         target: [plannedItems.periodId, plannedItems.targetKind, plannedItems.targetId],
-        // planned_minor пересобирается; execution_status/executed_minor сохраняются (исполнение Спринта 3+).
-        set: { plannedMinor: sql`excluded.planned_minor` },
+        // planned_minor пересобирается; execution_status/executed_minor сохраняются (исполнение
+        // Спринта 3+). Строку, которую правил человек (пересборка), не трогаем: его решение
+        // сильнее пересчёта из таблицы обязательства.
+        set: {
+          plannedMinor: sql`case when ${plannedItems.overridden} then ${plannedItems.plannedMinor} else excluded.planned_minor end`,
+        },
       });
   });
 }
@@ -731,13 +748,17 @@ async function assembleForPeriod(
   const frozenGoals = await frozenGoalIds(periodId);
   const { resolved, unresolved } = await resolveObligations(ws, incomeMinor, asOf, frozenGoals);
   const cats = await loadCategoryBudgets(periodId);
+  // Правки человека по обязательствам этого периода: пересборка списала часть взноса с цели.
+  const overrides = await loadOverrides(periodId);
 
   // Обязательства (base уже посчитан) + категории (бюджет уже в base). Порядок каскада — в assemblePlan.
   const plan: PlanItem[] = [
     ...resolved.map((r) => ({
       targetKind: r.targetKind,
       targetId: r.targetId,
-      plannedMinor: r.baseMinor,
+      // Переопределение периода важнее суммы из таблицы: иначе списание с цели исчезало бы, а
+      // дефицит закрывал каскад за счёт той цели, которую человек не выбирал.
+      plannedMinor: overrides.get(`${r.targetKind}:${r.targetId}`) ?? r.baseMinor,
     })),
     ...cats.map((c) => ({
       targetKind: 'category' as const,
@@ -1295,6 +1316,7 @@ export async function listRevisions(ws: Workspace, asOf: string): Promise<Revisi
 
 export class FreezeNotApplicable extends Error {}
 export class FreezeAlreadySet extends Error {}
+export class FreezeAfterExecution extends Error {}
 
 /**
  * Заморозка взноса в цель на текущий период (issue #54). Пропуск — решение человека, а не сжатие
@@ -1326,7 +1348,12 @@ export async function setGoalFreeze(
   const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
 
   const existing = await db
-    .select({ id: plannedItems.id, frozen: plannedItems.frozen })
+    .select({
+      id: plannedItems.id,
+      frozen: plannedItems.frozen,
+      status: plannedItems.executionStatus,
+      executedMinor: plannedItems.executedMinor,
+    })
     .from(plannedItems)
     .where(
       and(
@@ -1338,6 +1365,12 @@ export async function setGoalFreeze(
     .limit(1);
   // Повторное нажатие — не «ещё одна заморозка», а ошибка: иначе история копит пустые записи.
   if (existing[0]?.frozen === frozen) throw new FreezeAlreadySet();
+  /*
+   * Заморозить уже исполненный взнос нельзя: деньги отложены, транзакция расхода существует, и
+   * «освобождение» этой суммы дважды показало бы её свободной (найдено адверсарным аудитом).
+   * Сначала нужно отменить исполнение — это отдельный осознанный жест.
+   */
+  if (frozen && existing[0] && existing[0].executedMinor > 0n) throw new FreezeAfterExecution();
 
   await db.transaction(async (tx) => {
     if (existing[0]) {
@@ -1448,7 +1481,9 @@ export async function undoRevision(
       if (from) {
         await tx
           .update(plannedItems)
-          .set({ plannedMinor: from.plannedMinor + amount })
+          // Снимаем признак правки: сумма вернулась к «своей», и дальше её снова считает сборка,
+          // иначе правка самой цели больше не влияла бы на этот период.
+          .set({ plannedMinor: from.plannedMinor + amount, overridden: false })
           .where(eq(plannedItems.id, from.id));
       }
     }
@@ -1547,28 +1582,39 @@ export async function applyRebalance(
   }
   if (from.plannedMinor < input.amountMinor) throw new Error('insufficient_source');
 
-  await db
-    .update(plannedItems)
-    .set({ plannedMinor: from.plannedMinor - input.amountMinor })
-    .where(eq(plannedItems.id, from.id));
-  await db
-    .update(plannedItems)
-    .set({ plannedMinor: to.plannedMinor + input.amountMinor })
-    .where(eq(plannedItems.id, to.id));
-
-  await db.insert(planRevisions).values({
-    workspaceId: ws.id,
-    periodId,
-    reason: 'overspend',
-    moves: [
-      {
-        fromKind: from.targetKind,
-        fromId: from.targetId,
-        toKind: to.targetKind,
-        toId: to.targetId,
-        amountMinor: input.amountMinor.toString(),
-      },
-    ],
+  /*
+   * Одной транзакцией: списание, зачисление и запись в историю — три части одного решения.
+   * Половинчатая правка плана хуже отказа (тот же принцип, что в `undoRevision`).
+   *
+   * `overridden` ставим у источника-обязательства: его «желаемая» сумма живёт в своей таблице, и
+   * без признака следующая сборка вернула бы её назад, оставив прибавку получателю.
+   */
+  await db.transaction(async (tx) => {
+    await tx
+      .update(plannedItems)
+      .set({
+        plannedMinor: from.plannedMinor - input.amountMinor,
+        ...(from.targetKind === 'category' ? {} : { overridden: true }),
+      })
+      .where(eq(plannedItems.id, from.id));
+    await tx
+      .update(plannedItems)
+      .set({ plannedMinor: to.plannedMinor + input.amountMinor })
+      .where(eq(plannedItems.id, to.id));
+    await tx.insert(planRevisions).values({
+      workspaceId: ws.id,
+      periodId,
+      reason: 'overspend',
+      moves: [
+        {
+          fromKind: from.targetKind,
+          fromId: from.targetId,
+          toKind: to.targetKind,
+          toId: to.targetId,
+          amountMinor: input.amountMinor.toString(),
+        },
+      ],
+    });
   });
 
   return getCurrentPlan(ws, asOf);

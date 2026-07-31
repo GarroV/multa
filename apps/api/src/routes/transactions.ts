@@ -107,7 +107,9 @@ transactionsRoute.post('/transactions', async (c) => {
 
   // Снапшот курса на дату траты. Своя валюта → 1:1 (источник 'base', курс не нужен).
   const needsRate = body.currency !== ws.baseCurrency;
-  const snap = needsRate ? await getRate(body.currency, ws.baseCurrency, occurredOn) : null;
+  // Курс — по личным курсам воркспейса тоже (issue #48): курс дня выплаты, введённый руками,
+  // обязан применяться и к тратам, иначе план и факт считаются по разным курсам.
+  const snap = needsRate ? await getRate(body.currency, ws.baseCurrency, occurredOn, ws.id) : null;
   if (needsRate && !snap) return c.json({ error: 'rate_unavailable' }, 404);
   const baseAmountMinor = snap
     ? convert(money(body.amountMinor, body.currency), snap).minor

@@ -1,3 +1,4 @@
+import { and, eq } from 'drizzle-orm';
 import { app } from '../src/app.ts';
 import { db } from '../src/db/client.ts';
 import { fxRates } from '../src/db/schema/domain.ts';
@@ -148,6 +149,16 @@ export async function categoryId(client: TestClient, name: string): Promise<stri
  * сценарии должны сами положить котировку — иначе тест зависел бы от того, что кто-то до него
  * сходил в ЦБ.
  */
+/**
+ * Убирает котировку из кэша — воспроизводит «источник переехал / кэш почистили». Тестовой ручки в
+ * приложении для этого нет и быть не должно, поэтому работаем прямо с таблицей, как и `seedRate`.
+ */
+export async function forgetRate(base: string, quote: string): Promise<void> {
+  await db
+    .delete(fxRates)
+    .where(and(eq(fxRates.base, base.toUpperCase()), eq(fxRates.quote, quote.toUpperCase())));
+}
+
 export async function seedRate(
   base: string,
   quote: string,

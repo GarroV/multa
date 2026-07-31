@@ -193,13 +193,58 @@ async function resolveSnapshot(
   return await getRate(currency, baseCurrency, on, workspaceId);
 }
 
-/** Удаляет подтверждение: план возвращается к плановой сумме источника. */
-export async function deleteReceipt(workspaceId: string, id: string): Promise<boolean> {
-  const rows = await db
-    .delete(incomeReceipts)
-    .where(and(eq(incomeReceipts.workspaceId, workspaceId), eq(incomeReceipts.id, id)))
-    .returning({ id: incomeReceipts.id });
-  return rows.length > 0;
+/**
+ * Удаляет подтверждение: план возвращается к плановой сумме источника.
+ *
+ * Вместе с ним снимается личный курс, который это подтверждение и записало — если больше никто на
+ * эту дату и пару его не подтверждал. Иначе опечатку в курсе («9.12» вместо «91.2») невозможно
+ * исправить из интерфейса: подтверждение удалено, а кривой курс продолжает пересчитывать остатки
+ * по счетам и новые траты (найдено адверсарным аудитом).
+ */
+export async function deleteReceipt(
+  workspaceId: string,
+  baseCurrency: string,
+  id: string,
+): Promise<boolean> {
+  return await db.transaction(async (tx) => {
+    const rows = await tx
+      .delete(incomeReceipts)
+      .where(and(eq(incomeReceipts.workspaceId, workspaceId), eq(incomeReceipts.id, id)))
+      .returning({
+        currency: incomeReceipts.currency,
+        occurredOn: incomeReceipts.occurredOn,
+        rateSource: incomeReceipts.rateSource,
+      });
+    const removed = rows[0];
+    if (!removed) return false;
+    if (removed.rateSource !== 'manual') return true;
+
+    const others = await tx
+      .select({ id: incomeReceipts.id })
+      .from(incomeReceipts)
+      .where(
+        and(
+          eq(incomeReceipts.workspaceId, workspaceId),
+          eq(incomeReceipts.currency, removed.currency),
+          eq(incomeReceipts.occurredOn, removed.occurredOn),
+          eq(incomeReceipts.rateSource, 'manual'),
+        ),
+      )
+      .limit(1);
+    if (others.length > 0) return true;
+
+    await tx
+      .delete(fxManualRates)
+      .where(
+        and(
+          eq(fxManualRates.workspaceId, workspaceId),
+          eq(fxManualRates.base, removed.currency),
+          eq(fxManualRates.quote, baseCurrency),
+          eq(fxManualRates.onDate, removed.occurredOn),
+        ),
+      );
+    return true;
+  });
 }
 
 /**
