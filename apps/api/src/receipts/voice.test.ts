@@ -33,7 +33,7 @@ describe('decodeAudioDataUrl — приём голосовой заметки', 
   });
 
   it('слишком большая запись отвергается до отправки — защита от случайного гигабайта', () => {
-    const huge = 'A'.repeat(Math.ceil((MAX_AUDIO_BYTES + 1024) * 4 / 3));
+    const huge = 'A'.repeat(Math.ceil(((MAX_AUDIO_BYTES + 1024) * 4) / 3));
     expect(decodeAudioDataUrl(`data:audio/webm;base64,${huge}`)).toBeNull();
   });
 

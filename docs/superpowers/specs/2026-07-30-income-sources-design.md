@@ -30,13 +30,13 @@
 
 Текст issue описывал якорный источник; здесь это заменено. Расхождения, чтобы issue и спека не противоречили друг другу:
 
-| В #26 | Здесь | Почему |
-|---|---|---|
-| `isAnchor: boolean` на источнике, ровно один | нет такого поля; ритм — настройка воркспейса | Пометка «задаёт границы периодов» — деталь планировщика в предметной сущности «зарплата». При плоском списке источников она к тому же ломает полумесячный ритм (см. выше). |
-| `weekendRule` на источнике | `workspaces.payday_weekend_rule`, одно на воркспейс | Границы периода зависят от ритма; правило платёжного календаря — конвенция страны, не свойство работы. |
-| Инвариант «сумма процентов = 100%» | подсказка в форме, не блокировка | В плоском списке нет группы, по которой суммировать. |
-| `weekly`, `monthly-nth-weekday` в модели | выкинуты | `weekly` = `every-weeks{weeks:1}`; nth-weekday — YAGNI. |
-| `workspaces.period_anchors` удалить | остаётся (это ритм) | Ритм больше не выводится из источников, значит колонка нужна; удаляется только скалярный `expected_income_minor`. |
+| В #26                                        | Здесь                                               | Почему                                                                                                                                                                     |
+| -------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAnchor: boolean` на источнике, ровно один | нет такого поля; ритм — настройка воркспейса        | Пометка «задаёт границы периодов» — деталь планировщика в предметной сущности «зарплата». При плоском списке источников она к тому же ломает полумесячный ритм (см. выше). |
+| `weekendRule` на источнике                   | `workspaces.payday_weekend_rule`, одно на воркспейс | Границы периода зависят от ритма; правило платёжного календаря — конвенция страны, не свойство работы.                                                                     |
+| Инвариант «сумма процентов = 100%»           | подсказка в форме, не блокировка                    | В плоском списке нет группы, по которой суммировать.                                                                                                                       |
+| `weekly`, `monthly-nth-weekday` в модели     | выкинуты                                            | `weekly` = `every-weeks{weeks:1}`; nth-weekday — YAGNI.                                                                                                                    |
+| `workspaces.period_anchors` удалить          | остаётся (это ритм)                                 | Ритм больше не выводится из источников, значит колонка нужна; удаляется только скалярный `expected_income_minor`.                                                          |
 
 ## Модель ядра (`packages/core/src/income.ts`)
 
@@ -44,32 +44,31 @@
 export type WeekendRule = 'as-is' | 'before' | 'after';
 
 export type IncomeSchedule =
-  | { kind: 'monthly-days'; days: number[] }              // 10 и 25 (одинаковыми суммами)
+  | { kind: 'monthly-days'; days: number[] } // 10 и 25 (одинаковыми суммами)
   | { kind: 'every-weeks'; weeks: number; startsOn: string } // каждые N недель от реальной даты выплаты
-  | { kind: 'one-off'; date: string }                     // разовый гонорар
-  | { kind: 'irregular' };                                // «когда как» — в план не идёт, только факт
+  | { kind: 'one-off'; date: string } // разовый гонорар
+  | { kind: 'irregular' }; // «когда как» — в план не идёт, только факт
 
 export type IncomeAmount =
-  | { kind: 'absolute'; amountMinor: bigint }
-  | { kind: 'percent'; percent: string; ofMinor: bigint }; // аванс 40% от оклада
+  { kind: 'absolute'; amountMinor: bigint } | { kind: 'percent'; percent: string; ofMinor: bigint }; // аванс 40% от оклада
 
 export interface IncomeSource {
   readonly id: string;
-  readonly label: string;                      // «Аванс», «Зарплата», «Подработка»
-  readonly currency: string;                   // фриланс в USD — не обязательно базовая
+  readonly label: string; // «Аванс», «Зарплата», «Подработка»
+  readonly currency: string; // фриланс в USD — не обязательно базовая
   readonly schedule: IncomeSchedule;
   readonly amount: IncomeAmount;
-  readonly stability: 'fixed' | 'variable';    // оклад vs плавающее
+  readonly stability: 'fixed' | 'variable'; // оклад vs плавающее
   readonly active: boolean;
-  readonly startsOn?: string;                  // источник появился (новая работа)
-  readonly endsOn?: string;                    // источник кончился (уволился) — прогноз это знает
+  readonly startsOn?: string; // источник появился (новая работа)
+  readonly endsOn?: string; // источник кончился (уволился) — прогноз это знает
 }
 
 export interface IncomeEvent {
   readonly sourceId: string;
   readonly label: string;
-  readonly date: string;          // фактическая дата прихода (после правила выходных)
-  readonly amountMinor: bigint;   // в валюте источника
+  readonly date: string; // фактическая дата прихода (после правила выходных)
+  readonly amountMinor: bigint; // в валюте источника
   readonly currency: string;
 }
 ```
@@ -78,12 +77,12 @@ export interface IncomeEvent {
 
 ### Функции
 
-| Функция | Ответственность |
-|---|---|
-| `amountOfSource(source)` | `IncomeAmount` → bigint в валюте источника. `percent` → `floor(ofMinor × percent / 100)` в BigInt (планирование, не платёж). |
-| `incomeEventsIn(sources, period, weekendRule)` | События внутри `[startsOn, endsOn)`. Учитывает `active`, `startsOn`/`endsOn` источника, правило выходных, кламп коротких месяцев. `irregular` → ничего. |
-| `expectedIncomeForPeriod(events, toBase)` | `{ incomeMinor, unresolved }` в базовой валюте. `toBase: (Money) => Money \| null` — чистая инъекция, ядро не знает про БД и FX-кеш; `null` → приход попадает в `unresolved`, а не молча в ноль. |
-| `rhythmMismatches(rhythm, sources, weekendRule)` | Список предупреждений вида «период начинается 10-го, ни один источник в этот день не платит». Информационно, не блокирует. |
+| Функция                                          | Ответственность                                                                                                                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `amountOfSource(source)`                         | `IncomeAmount` → bigint в валюте источника. `percent` → `floor(ofMinor × percent / 100)` в BigInt (планирование, не платёж).                                                                     |
+| `incomeEventsIn(sources, period, weekendRule)`   | События внутри `[startsOn, endsOn)`. Учитывает `active`, `startsOn`/`endsOn` источника, правило выходных, кламп коротких месяцев. `irregular` → ничего.                                          |
+| `expectedIncomeForPeriod(events, toBase)`        | `{ incomeMinor, unresolved }` в базовой валюте. `toBase: (Money) => Money \| null` — чистая инъекция, ядро не знает про БД и FX-кеш; `null` → приход попадает в `unresolved`, а не молча в ноль. |
+| `rhythmMismatches(rhythm, sources, weekendRule)` | Список предупреждений вида «период начинается 10-го, ни один источник в этот день не платит». Информационно, не блокирует.                                                                       |
 
 ### Правка `periods.ts`
 
@@ -125,6 +124,7 @@ create index income_sources_ws_idx on income_sources (workspace_id, sort);
 ```
 
 Изменения `workspaces`:
+
 - `period_anchors jsonb` — **остаётся**, это ритм планирования (комментарий в схеме и доке переписать: «ритм планирования», не «якоря выплат»).
 - `payday_weekend_rule text not null default 'before'` — **добавить**, `check in ('as-is','before','after')`. Дефолт `'before'`: и в РФ, и в Сербии выплату переносят на предшествующий рабочий день.
 - `expected_income_minor bigint` — **удалить**. Доход периода живёт в `pay_periods.expected_income_minor` и считается по событиям.
@@ -137,14 +137,14 @@ create index income_sources_ws_idx on income_sources (workspace_id, sort);
 
 ## API
 
-| Метод | Назначение |
-|---|---|
-| `GET /v1/income-sources` | Список источников воркспейса (скоуп из токена, правило 7). |
-| `POST /v1/income-sources` | Создать. |
-| `PATCH /v1/income-sources/:id` | Правка (проверка принадлежности воркспейсу). |
-| `DELETE /v1/income-sources/:id` | Удалить. |
-| `POST /v1/onboarding/income` | Атомарно: ритм + правило выходных + набор источников одной транзакцией. Заменяет `POST /v1/onboarding/payday`, чтобы шаг не оставлял полусостояние. |
-| `PATCH /v1/workspace` | Правка ритма и правила выходных из настроек. |
+| Метод                           | Назначение                                                                                                                                          |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/income-sources`        | Список источников воркспейса (скоуп из токена, правило 7).                                                                                          |
+| `POST /v1/income-sources`       | Создать.                                                                                                                                            |
+| `PATCH /v1/income-sources/:id`  | Правка (проверка принадлежности воркспейсу).                                                                                                        |
+| `DELETE /v1/income-sources/:id` | Удалить.                                                                                                                                            |
+| `POST /v1/onboarding/income`    | Атомарно: ритм + правило выходных + набор источников одной транзакцией. Заменяет `POST /v1/onboarding/payday`, чтобы шаг не оставлял полусостояние. |
+| `PATCH /v1/workspace`           | Правка ритма и правила выходных из настроек.                                                                                                        |
 
 `GET /v1/plan/current` дополняется блоком `income`:
 
@@ -187,6 +187,7 @@ Zod на границе: `discriminatedUnion` по `schedule.kind` и `amount.ki
 ## Тесты
 
 **core** (`income.test.ts`, `periods.test.ts`):
+
 - события при смешанных расписаниях (10/25 + недельная подработка в том же периоде);
 - полуоткрытость границ: приход в день `endsOn` относится к следующему периоду;
 - кламп февраля: дни 30 и 31 → один период, два прихода;
@@ -198,6 +199,7 @@ Zod на границе: `discriminatedUnion` по `schedule.kind` и `amount.ki
 - инвариант: `expectedIncomeForPeriod` = сумма `incomeEventsIn` (приведённая к базовой).
 
 **api**:
+
 - схемы: невалидный `day`, `percent` вне диапазона, сумма не-целая, неизвестный `kind` → 400;
 - CRUD: источник чужого воркспейса не читается и не правится (404);
 - `/v1/plan/current` для периода 10–25 и 25–10 даёт разные `expectedMinor`;
@@ -205,6 +207,7 @@ Zod на границе: `discriminatedUnion` по `schedule.kind` и `amount.ki
 - воркспейс без источников → `onboarding_incomplete` (409).
 
 **web (e2e Playwright)**:
+
 - проход шага: ритм → суммы → второй источник → план собран;
 - превью дат в UI совпадает с датами из `generatePeriods`;
 - редактируемый день для «раз в месяц» и обязательная дата для цикла недель (регресс #27).

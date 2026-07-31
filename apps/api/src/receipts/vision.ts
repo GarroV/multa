@@ -29,7 +29,10 @@ export const RECEIPT_SCHEMA = {
     merchant: { type: ['string', 'null'] },
     currency: { type: 'string', description: 'ISO 4217, три буквы' },
     purchasedOn: { type: ['string', 'null'], description: 'YYYY-MM-DD' },
-    totalMajor: { type: 'string', description: 'итог чека в основных единицах, точка как разделитель' },
+    totalMajor: {
+      type: 'string',
+      description: 'итог чека в основных единицах, точка как разделитель',
+    },
     items: {
       type: 'array',
       items: {
@@ -55,7 +58,8 @@ export interface VisionReceipt {
   readonly items: readonly { name: string; amountMinor: bigint }[];
 }
 
-const isAmount = (v: unknown): v is string => typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v.trim());
+const isAmount = (v: unknown): v is string =>
+  typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v.trim());
 
 /** Разбирает ответ модели. null — ответу нельзя доверять, чек уйдёт в «Общее». */
 export function parseVisionPayload(raw: string): VisionReceipt | null {
@@ -81,11 +85,17 @@ export function parseVisionPayload(raw: string): VisionReceipt | null {
       const item = i as { name?: unknown; amountMajor?: unknown };
       return typeof item.name === 'string' && item.name.trim() !== '' && isAmount(item.amountMajor);
     })
-    .map((i) => ({ name: i.name.trim(), amountMinor: fromMajor(i.amountMajor.trim(), currency).minor }))
+    .map((i) => ({
+      name: i.name.trim(),
+      amountMinor: fromMajor(i.amountMajor.trim(), currency).minor,
+    }))
     .filter((i) => i.amountMinor > 0n);
 
   return {
-    merchant: typeof data.merchant === 'string' && data.merchant.trim() !== '' ? data.merchant.trim() : null,
+    merchant:
+      typeof data.merchant === 'string' && data.merchant.trim() !== ''
+        ? data.merchant.trim()
+        : null,
     currency,
     purchasedOn,
     totalMinor: fromMajor(total.trim(), currency).minor,

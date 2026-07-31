@@ -45,14 +45,21 @@ describe('parseTextPayload — разбор ответа LLM для тексто
   });
 
   it('без суммы — отказ: выдуманная сумма хуже просьбы уточнить', () => {
-    expect(parseTextPayload(JSON.stringify({ kind: 'expense' }), { baseCurrency: 'RUB', today: '2026-07-30' })).toBeNull();
+    expect(
+      parseTextPayload(JSON.stringify({ kind: 'expense' }), {
+        baseCurrency: 'RUB',
+        today: '2026-07-30',
+      }),
+    ).toBeNull();
     expect(parseTextPayload('не понял', { baseCurrency: 'RUB', today: '2026-07-30' })).toBeNull();
   });
 
   it('ноль и минус отвергаются: знак несёт вид операции', () => {
     const ctx = { baseCurrency: 'RUB', today: '2026-07-30' };
     expect(parseTextPayload(JSON.stringify({ kind: 'expense', amountMajor: '0' }), ctx)).toBeNull();
-    expect(parseTextPayload(JSON.stringify({ kind: 'expense', amountMajor: '-5' }), ctx)).toBeNull();
+    expect(
+      parseTextPayload(JSON.stringify({ kind: 'expense', amountMajor: '-5' }), ctx),
+    ).toBeNull();
   });
 
   it('приход не получает категорию даже если модель её придумала', () => {

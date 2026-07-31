@@ -40,7 +40,10 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
         <span className="num">
           {formatMinor(tx.amountMinor, tx.currency, locale)} {tx.currency}
           {converted && (
-            <span className="sub"> = {formatMinor(tx.baseAmountMinor, base, locale)} {base}</span>
+            <span className="sub">
+              {' '}
+              = {formatMinor(tx.baseAmountMinor, base, locale)} {base}
+            </span>
           )}
         </span>
         <button
@@ -62,7 +65,15 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
  * Ввод факта (04-web-ux §Ввод): сумма → категория сеткой → готово.
  * Умное текстовое поле и чеки — следующие шаги Спринта 3/5; здесь путь «в 3 клика».
  */
-export function SpendEntry({ base, locale, onClose }: { base: string; locale: string; onClose: () => void }) {
+export function SpendEntry({
+  base,
+  locale,
+  onClose,
+}: {
+  base: string;
+  locale: string;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   const { data: categories = [] } = useCategories();
   const { data: txs } = useTransactions();
@@ -109,7 +120,9 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
     setAmount(toMajorString(money(parsed.amountMinor, parsed.currency)));
     setOccurredOn(parsed.occurredOn);
     setNote(parsed.note ?? '');
-    const hit = parsed.categoryName ? categories.find((c) => c.name === parsed.categoryName) : undefined;
+    const hit = parsed.categoryName
+      ? categories.find((c) => c.name === parsed.categoryName)
+      : undefined;
     setCategoryId(parsed.kind === 'income' ? undefined : hit?.id);
   };
 
@@ -153,7 +166,12 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
               {t(isIncome ? 'spend.subtitleIncome' : 'spend.subtitle')}
             </div>
           </div>
-          <button type="button" className="btn btn-ghost" onClick={onClose} title={t('common.cancel')}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            title={t('common.cancel')}
+          >
             ✕
           </button>
         </div>
@@ -209,30 +227,30 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
         </div>
 
         {!isIncome && (
-        <div style={{ display: 'grid', gap: 8 }}>
-          <span className="micro">{t('spend.category')}</span>
-          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <button
-              type="button"
-              className="chip"
-              aria-pressed={categoryId === undefined}
-              onClick={() => setCategoryId(undefined)}
-            >
-              {t('spend.noCategory')}
-            </button>
-            {categories.map((cat) => (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <span className="micro">{t('spend.category')}</span>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
               <button
-                key={cat.id}
                 type="button"
                 className="chip"
-                aria-pressed={categoryId === cat.id}
-                onClick={() => setCategoryId(cat.id)}
+                aria-pressed={categoryId === undefined}
+                onClick={() => setCategoryId(undefined)}
               >
-                {cat.name}
+                {t('spend.noCategory')}
               </button>
-            ))}
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={categoryId === cat.id}
+                  onClick={() => setCategoryId(cat.id)}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
         )}
 
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -259,7 +277,9 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
         </div>
 
         <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
-          {create.isPending ? t('common.loading') : t(isIncome ? 'spend.submitIncome' : 'spend.submit')}
+          {create.isPending
+            ? t('common.loading')
+            : t(isIncome ? 'spend.submitIncome' : 'spend.submit')}
         </button>
 
         {create.isError && (
@@ -274,7 +294,9 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
             {txs && txs.transactions.length > 0 && (
               <span className="num num-dim">
                 {formatMinor(
-                  txs.transactions.reduce((acc, tx) => acc + BigInt(tx.baseAmountMinor), 0n).toString(),
+                  txs.transactions
+                    .reduce((acc, tx) => acc + BigInt(tx.baseAmountMinor), 0n)
+                    .toString(),
                   base,
                   locale,
                 )}{' '}
@@ -282,9 +304,13 @@ export function SpendEntry({ base, locale, onClose }: { base: string; locale: st
               </span>
             )}
           </div>
-          {txs?.transactions.length
-            ? txs.transactions.map((tx) => <SpendRow key={tx.id} tx={tx} base={base} locale={locale} />)
-            : <div className="sub">{t('spend.empty')}</div>}
+          {txs?.transactions.length ? (
+            txs.transactions.map((tx) => (
+              <SpendRow key={tx.id} tx={tx} base={base} locale={locale} />
+            ))
+          ) : (
+            <div className="sub">{t('spend.empty')}</div>
+          )}
         </section>
       </div>
     </div>

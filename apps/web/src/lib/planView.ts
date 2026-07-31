@@ -7,7 +7,13 @@ import type { PlanDto, PlanTargetKind } from './queries.ts';
  */
 
 /** Порядок каскада — тот же, что в ядре: долги → корзины → конверты → категории → цели. */
-export const CASCADE_ORDER: readonly PlanTargetKind[] = ['debt', 'bucket', 'envelope', 'category', 'goal'];
+export const CASCADE_ORDER: readonly PlanTargetKind[] = [
+  'debt',
+  'bucket',
+  'envelope',
+  'category',
+  'goal',
+];
 
 export interface CascadeGroup {
   kind: PlanTargetKind;

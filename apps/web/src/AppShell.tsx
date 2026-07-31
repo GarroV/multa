@@ -37,7 +37,12 @@ export function AppShell() {
         <span className="topbar-brand">multa</span>
         <nav className="tabs" aria-label={t('nav.plan')}>
           {NAV.map((n) => (
-            <Link key={n.to} to={n.to} className="tab" activeProps={{ className: 'tab tab-active' }}>
+            <Link
+              key={n.to}
+              to={n.to}
+              className="tab"
+              activeProps={{ className: 'tab tab-active' }}
+            >
               {t(n.key)}
             </Link>
           ))}
@@ -96,7 +101,9 @@ export function AppShell() {
       <main className="app-main">
         <Outlet />
       </main>
-      {spendOpen && base && <SpendEntry base={base} locale={locale} onClose={() => setSpendOpen(false)} />}
+      {spendOpen && base && (
+        <SpendEntry base={base} locale={locale} onClose={() => setSpendOpen(false)} />
+      )}
       {receiptOpen && base && (
         <ReceiptEntry base={base} locale={locale} onClose={() => setReceiptOpen(false)} />
       )}

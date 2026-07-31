@@ -58,7 +58,8 @@ export const en = {
   'onboarding.debts.title': 'Any loans or installments?',
   'onboarding.debts.subtitle': 'Add them and the plan reserves each payment first. Skippable.',
   'onboarding.buckets.title': 'Spending in another currency?',
-  'onboarding.buckets.subtitle': 'A swap basket: how much of your income to set aside in another currency (rent, life). Skippable.',
+  'onboarding.buckets.subtitle':
+    'A swap basket: how much of your income to set aside in another currency (rent, life). Skippable.',
   'onboarding.finish': 'See my plan',
   'onboarding.skipAll': 'skip setup',
 
@@ -84,7 +85,8 @@ export const en = {
   'plan.summary.free': 'Free at period end',
   'plan.summary.perDay': 'To live on, per day',
   'plan.summary.toExchange': 'To exchange',
-  'plan.compressed.note': "Not enough for everything — trimmed {amount} {ccy}. Goals give first, then envelopes, then categories; debts and baskets stay whole.",
+  'plan.compressed.note':
+    'Not enough for everything — trimmed {amount} {ccy}. Goals give first, then envelopes, then categories; debts and baskets stay whole.',
   'plan.row.trimmed': 'trimmed {amount}',
   'plan.category.budgetHint': 'budget / period',
   'cat.protected.on': 'Protected — not auto-trimmed under a shortfall',
@@ -92,7 +94,8 @@ export const en = {
   'cat.new.placeholder': 'New category',
   'plan.unresolved.title': 'Rate unavailable',
   'plan.unresolved.hint': 'These lines stay out of the split until rates refresh.',
-  'plan.unresolved.affectsHero': 'Some obligations have no rate yet — the daily figure leaves them out and may read too high.',
+  'plan.unresolved.affectsHero':
+    'Some obligations have no rate yet — the daily figure leaves them out and may read too high.',
   'plan.empty.noPlan': 'Nothing to route yet — set income and add obligations.',
   'plan.empty.needIncome': 'Setup was skipped. Add an income source and the plan builds itself.',
   'plan.today.viewFull': 'Full plan →',
@@ -114,7 +117,8 @@ export const en = {
   'plan.act.edit': 'edit',
   'plan.tag.protected': 'protected',
   'signal.burn.title': 'At this pace the living money runs out on {date}',
-  'signal.burn.body': 'You are spending {perDay} a day, {perDayPlan} was the plan. Move budget or ease off — both are fine.',
+  'signal.burn.body':
+    'You are spending {perDay} a day, {perDayPlan} was the plan. Move budget or ease off — both are fine.',
   'signal.burn.action': 'Rebalance',
   'signal.ok': 'Pace fits the plan',
 
@@ -230,7 +234,8 @@ export const en = {
   'spend.rateUnavailable': 'No rate for that date — pick another date or currency.',
   'spend.badAmount': 'Amount as a number, e.g. 1250 or 12.50',
   'spend.smart.placeholder': 'e.g. “250 groceries” or “coffee 4.5 eur yesterday”',
-  'spend.smart.hint': 'Type it as you would say it — amount, where, when. Anything unclear stays editable below.',
+  'spend.smart.hint':
+    'Type it as you would say it — amount, where, when. Anything unclear stays editable below.',
   'spend.smart.parsed': 'Recognised: {summary}',
   'spend.spentOfPlan': 'spent {spent} of {plan}',
   'spend.kind.expense': 'Spent',
@@ -276,7 +281,8 @@ export const en = {
   'receipt.done': 'Recorded',
   'plan.summary.spent': 'Spent',
   'plan.summary.remaining': 'Left to live on',
-  'plan.overspent.note': 'You are {amount} over plan — the daily pace is at zero. You can move budget from another category.',
+  'plan.overspent.note':
+    'You are {amount} over plan — the daily pace is at zero. You can move budget from another category.',
   'cat.spent': 'spent {amount}',
   'cat.remaining': '{amount} left',
   'cat.overspent': 'over by {amount}',

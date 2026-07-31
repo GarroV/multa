@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseEntry } from './parseEntry.ts';
 
-const ctx = { baseCurrency: 'RUB', today: '2026-07-30', categories: ['Продукты', 'Кафе', 'Транспорт', 'Общее'] };
+const ctx = {
+  baseCurrency: 'RUB',
+  today: '2026-07-30',
+  categories: ['Продукты', 'Кафе', 'Транспорт', 'Общее'],
+};
 
 describe('parseEntry — умное поле ввода (04-web-ux §Ввод)', () => {
   it('«250 еда» — сумма в базовой валюте, категория угадана по слову', () => {

@@ -9,7 +9,14 @@ import { expectOk, getPlan, onboarded, signedUp } from './client.ts';
 interface ForecastDto {
   horizonPeriods: number;
   dueSoon: { id: string; name: string; amountMinor: string; currency: string; on: string }[];
-  events: { kind: string; targetId: string; name: string; on: string; periodsAway: number; amountMinor: string | null }[];
+  events: {
+    kind: string;
+    targetId: string;
+    name: string;
+    on: string;
+    periodsAway: number;
+    amountMinor: string | null;
+  }[];
 }
 
 describe('прогноз', () => {

@@ -46,7 +46,10 @@ const stem = (word: string): string => (word.length > 5 ? word.slice(0, 5) : wor
 
 /** Первая категория, чьё слово-примета встречается в названии позиции. */
 function matchCategory(name: string, categories: readonly SplitCategory[]): string | null {
-  const words = name.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const words = name
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
   for (const category of categories) {
     for (const keyword of category.keywords) {
       const key = keyword.toLowerCase();
@@ -63,7 +66,10 @@ export function splitReceipt(input: SplitReceiptInput): ReceiptSplit {
   const { items, categories, fallbackCategoryId, totalMinor } = input;
   if (totalMinor <= 0n) return { byCategory: [], confidence: 'low' };
   if (items.length === 0) {
-    return { byCategory: [{ categoryId: fallbackCategoryId, amountMinor: totalMinor }], confidence: 'low' };
+    return {
+      byCategory: [{ categoryId: fallbackCategoryId, amountMinor: totalMinor }],
+      confidence: 'low',
+    };
   }
 
   const sums = new Map<string, bigint>();
@@ -79,7 +85,10 @@ export function splitReceipt(input: SplitReceiptInput): ReceiptSplit {
   }
 
   if (itemsTotal === 0n) {
-    return { byCategory: [{ categoryId: fallbackCategoryId, amountMinor: totalMinor }], confidence: 'low' };
+    return {
+      byCategory: [{ categoryId: fallbackCategoryId, amountMinor: totalMinor }],
+      confidence: 'low',
+    };
   }
 
   const byCategory = [...sums].map(([categoryId, amountMinor]) => ({ categoryId, amountMinor }));

@@ -84,7 +84,9 @@ export function parseCbrXml(xml: string): RateSnapshot[] {
     const nominal = firstGroup(/<Nominal>([^<]+)<\/Nominal>/, block);
     const value = firstGroup(/<Value>([^<]+)<\/Value>/, block);
     if (!charCode || !nominal || !value) continue;
-    const perUnit = normalizeDecimal(divDecimal(value.trim().replace(',', '.'), nominal.trim(), DEFAULT_PLACES));
+    const perUnit = normalizeDecimal(
+      divDecimal(value.trim().replace(',', '.'), nominal.trim(), DEFAULT_PLACES),
+    );
     quotes.push({ from: charCode.trim(), to: 'RUB', rate: perUnit, source: 'cbr', date });
   }
   return quotes;
@@ -153,7 +155,11 @@ function rateDirectOrInverse(
   if (direct) return { rate: direct.rate, date: direct.date, source: direct.source };
   const inverse = findOnOrBefore(quotes, to, from, on, lookbackDays);
   if (inverse) {
-    return { rate: divDecimal('1', inverse.rate, places), date: inverse.date, source: inverse.source };
+    return {
+      rate: divDecimal('1', inverse.rate, places),
+      date: inverse.date,
+      source: inverse.source,
+    };
   }
   return null;
 }

@@ -1,4 +1,9 @@
-import { parseCbrXml, parseFrankfurter, type FrankfurterResponse, type RateSnapshot } from '@multa/core';
+import {
+  parseCbrXml,
+  parseFrankfurter,
+  type FrankfurterResponse,
+  type RateSnapshot,
+} from '@multa/core';
 
 const CBR_URL = 'https://www.cbr.ru/scripts/XML_daily.asp';
 const FRANKFURTER_URL = 'https://api.frankfurter.app/latest?base=EUR';

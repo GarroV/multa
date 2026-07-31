@@ -4,13 +4,13 @@
 
 ## Что и где лежит
 
-| Что | Где | Примечание |
-|---|---|---|
-| Код | `C:\projects\multa` на MUSPELHEIM | **Не git-репозиторий**: код доставляется архивом (см. ниже) |
-| Секреты | `C:\projects\multa\.env` | Не в git; сгенерирован при первом деплое |
-| Данные Postgres | `C:\projects\multa\.data\postgres` | Bind-mount контейнера, переживает пересборку |
-| Скрипт деплоя | `C:\projects\multa\deploy.cmd` | `docker compose -f docker-compose.prod.yml up -d --build`, лог → `deploy.log` |
-| Бэкапы | `C:\backups\multa-postgres-1\` | Задача «PG Docker Backup», 03:30 ежедневно, ретеншн 14 дней |
+| Что             | Где                                | Примечание                                                                    |
+| --------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
+| Код             | `C:\projects\multa` на MUSPELHEIM  | **Не git-репозиторий**: код доставляется архивом (см. ниже)                   |
+| Секреты         | `C:\projects\multa\.env`           | Не в git; сгенерирован при первом деплое                                      |
+| Данные Postgres | `C:\projects\multa\.data\postgres` | Bind-mount контейнера, переживает пересборку                                  |
+| Скрипт деплоя   | `C:\projects\multa\deploy.cmd`     | `docker compose -f docker-compose.prod.yml up -d --build`, лог → `deploy.log` |
+| Бэкапы          | `C:\backups\multa-postgres-1\`     | Задача «PG Docker Backup», 03:30 ежедневно, ретеншн 14 дней                   |
 
 Контейнеры (`docker-compose.prod.yml`): `multa-postgres-1` (16-alpine, метка `backup.pgdump=true`), `multa-api-1` (порт 3000 только внутри сети), `multa-web-1` (Caddy, `0.0.0.0:80`).
 
@@ -32,9 +32,11 @@
    ```
    Архив содержит только версионированные файлы, поэтому `.env` и `.data\` не затрагиваются. Минус способа: файлы, удалённые в новых коммитах, остаются лежать на диске — на сборку не влияет, но при переезде на git это исчезнет.
 3. **Собрать и поднять:**
+
    ```bash
    ssh -o ServerAliveInterval=30 muspelheim 'C:\projects\multa\deploy.cmd'
    ```
+
    Миграции Drizzle применяются самим api при старте (он ждёт healthy-postgres): в логах видно `[api] миграции применены (migrations)`, и только после этого поднимается сервер. Первые строки логов api могут содержать `the database system is starting up` — это нормальный retry, не ошибка.
 
    Готовность api видна по healthcheck: `docker ps` показывает `health: starting` пока идут миграции и `healthy` после. `multa-web-1` ждёт именно healthy-api, поэтому первый заход не отдаёт 502.

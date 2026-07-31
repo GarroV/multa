@@ -100,7 +100,9 @@ describe('сборка плана каскадом', () => {
     expect(BigInt(withBudget.livingMinor)).toBe(30_000_000n);
 
     // Снятый бюджет убирает строку из плана целиком: нулевая категория — не строка, а её отсутствие.
-    const cleared = await expectOk<PlanDto>(await client.del(`/v1/plan/current/categories/${food}`));
+    const cleared = await expectOk<PlanDto>(
+      await client.del(`/v1/plan/current/categories/${food}`),
+    );
     expect(cleared.allocations.some((a) => a.targetId === food)).toBe(false);
     expect(BigInt(cleared.totalAllocatedMinor)).toBe(0n);
   });

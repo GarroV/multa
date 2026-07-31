@@ -31,7 +31,11 @@ export function Login() {
 
   return (
     <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <form onSubmit={submit} className="card" style={{ width: 'min(420px, 100%)', display: 'grid', gap: 14 }}>
+      <form
+        onSubmit={submit}
+        className="card"
+        style={{ width: 'min(420px, 100%)', display: 'grid', gap: 14 }}
+      >
         <div>
           <div className="brand" style={{ fontSize: 28, fontWeight: 600 }}>
             {t('auth.title')}
@@ -74,7 +78,11 @@ export function Login() {
         <button className="btn" type="submit" disabled={busy}>
           {busy ? t('common.loading') : mode === 'up' ? t('auth.signUp') : t('auth.signIn')}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => setMode(mode === 'up' ? 'in' : 'up')}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => setMode(mode === 'up' ? 'in' : 'up')}
+        >
           {mode === 'up' ? t('auth.toSignIn') : t('auth.toSignUp')}
         </button>
       </form>

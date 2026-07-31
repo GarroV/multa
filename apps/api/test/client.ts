@@ -138,7 +138,8 @@ export async function listCategories(client: TestClient): Promise<CategoryRow[]>
 export async function categoryId(client: TestClient, name: string): Promise<string> {
   const rows = await listCategories(client);
   const hit = rows.find((c) => c.name === name);
-  if (!hit) throw new Error(`категория «${name}» не найдена; есть: ${rows.map((r) => r.name).join(', ')}`);
+  if (!hit)
+    throw new Error(`категория «${name}» не найдена; есть: ${rows.map((r) => r.name).join(', ')}`);
   return hit.id;
 }
 

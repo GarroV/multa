@@ -92,8 +92,13 @@ const AMOUNT_RE = new RegExp(
 const DATE_RE = /(^|\s)(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?(?=\s|$)/;
 
 /** Дата «12.07» без года: ближайшая такая дата в прошлом — вводят факт, а не план. */
-function resolveShortDate(day: number, month: number, year: number | undefined, today: string): string | null {
-  const [ty, , ] = today.split('-').map(Number);
+function resolveShortDate(
+  day: number,
+  month: number,
+  year: number | undefined,
+  today: string,
+): string | null {
+  const [ty, ,] = today.split('-').map(Number);
   const pad = (n: number) => String(n).padStart(2, '0');
   const candidateYear = year ?? ty!;
   const full = (y: number) => `${y}-${pad(month)}-${pad(day)}`;
@@ -142,7 +147,10 @@ export function parseEntry(input: string, ctx: ParseEntryContext): ParsedEntry {
   for (const word of rest.trim().split(' ').filter(Boolean)) {
     const bare = word.toLowerCase().replace(/[.,!?]+$/, '');
     const named = CURRENCY_WORDS[bare];
-    const code = /^[a-z]{3}$/.test(bare) && KNOWN_CODES.has(bare.toUpperCase()) ? bare.toUpperCase() : undefined;
+    const code =
+      /^[a-z]{3}$/.test(bare) && KNOWN_CODES.has(bare.toUpperCase())
+        ? bare.toUpperCase()
+        : undefined;
     const found = named ?? code;
     if (!found) continue;
     currency = found;
@@ -193,7 +201,10 @@ export function parseEntry(input: string, ctx: ParseEntryContext): ParsedEntry {
       const bare = w.toLowerCase().replace(/[^\p{L}]/gu, '');
       if (!bare) continue;
       const hit = ctx.categories.find(
-        (c) => c.toLowerCase() === bare || c.toLowerCase().startsWith(bare) || bare.startsWith(c.toLowerCase()),
+        (c) =>
+          c.toLowerCase() === bare ||
+          c.toLowerCase().startsWith(bare) ||
+          bare.startsWith(c.toLowerCase()),
       );
       if (hit) {
         categoryName = hit;

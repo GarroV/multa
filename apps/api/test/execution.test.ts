@@ -35,7 +35,9 @@ async function transactionCount(client: TestClient): Promise<number> {
 describe('исполнение плановых строк', () => {
   test('подтверждение целиком закрывает строку и не оставляет остатка', async () => {
     const { client, debtId } = await withDebt();
-    const plan = await expectOk<PlanDto>(await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`));
+    const plan = await expectOk<PlanDto>(
+      await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`),
+    );
 
     expect(row(plan, debtId).executionStatus).toBe('confirmed');
     expect(BigInt(row(plan, debtId).executedMinor)).toBe(5_000_000n);
@@ -45,7 +47,9 @@ describe('исполнение плановых строк', () => {
   test('частичное подтверждение оставляет видимый остаток', async () => {
     const { client, debtId } = await withDebt();
     const plan = await expectOk<PlanDto>(
-      await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`, { executedMinor: '2000000' }),
+      await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`, {
+        executedMinor: '2000000',
+      }),
     );
 
     expect(row(plan, debtId).executionStatus).toBe('partial');
@@ -55,7 +59,9 @@ describe('исполнение плановых строк', () => {
 
   test('пропуск ставит skipped с нулём, а не «исполнено на 0»', async () => {
     const { client, debtId } = await withDebt();
-    const plan = await expectOk<PlanDto>(await client.post(`/v1/plan/current/items/debt/${debtId}/skip`));
+    const plan = await expectOk<PlanDto>(
+      await client.post(`/v1/plan/current/items/debt/${debtId}/skip`),
+    );
 
     expect(row(plan, debtId).executionStatus).toBe('skipped');
     expect(BigInt(row(plan, debtId).executedMinor)).toBe(0n);
@@ -76,11 +82,15 @@ describe('исполнение плановых строк', () => {
     const { client, debtId } = await withDebt();
     await expectOk<PlanDto>(await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`));
     const plan = await expectOk<PlanDto>(
-      await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`, { executedMinor: '1000000' }),
+      await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`, {
+        executedMinor: '1000000',
+      }),
     );
 
     expect(row(plan, debtId).executionStatus).toBe('partial');
-    const list = await expectOk<{ transactions: { amountMinor: string }[] }>(await client.get('/v1/transactions'));
+    const list = await expectOk<{ transactions: { amountMinor: string }[] }>(
+      await client.get('/v1/transactions'),
+    );
     expect(list.transactions).toHaveLength(1);
     expect(list.transactions[0]?.amountMinor).toBe('1000000');
   });
@@ -95,7 +105,9 @@ describe('исполнение плановых строк', () => {
   test('категория исполнения не требует: её факт приходит тратами', async () => {
     const client = await onboarded();
     const food = await categoryId(client, 'Продукты');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '4000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '4000000' }),
+    );
 
     const res = await client.post(`/v1/plan/current/items/category/${food}/confirm`);
     expect(res.status).toBe(400);
@@ -104,7 +116,9 @@ describe('исполнение плановых строк', () => {
 
   test('строки не в плане подтвердить нельзя', async () => {
     const client = await onboarded();
-    const res = await client.post('/v1/plan/current/items/debt/00000000-0000-0000-0000-000000000000/confirm');
+    const res = await client.post(
+      '/v1/plan/current/items/debt/00000000-0000-0000-0000-000000000000/confirm',
+    );
     expect(res.status).toBe(404);
   });
 });
@@ -114,7 +128,9 @@ describe('пересборка плана', () => {
   async function withCategoryAndDebt() {
     const { client, debtId } = await withDebt('30000000', '5000000');
     const food = await categoryId(client, 'Продукты');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '4000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '4000000' }),
+    );
     return { client, debtId, food };
   }
 
@@ -139,7 +155,9 @@ describe('пересборка плана', () => {
   test('перенос в категорию поднимает её бюджет', async () => {
     const { client, food } = await withCategoryAndDebt();
     const cafe = await categoryId(client, 'Кафе');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '1000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '1000000' }),
+    );
 
     const plan = await expectOk<PlanDto>(
       await client.post('/v1/plan/current/rebalance', {
@@ -175,7 +193,9 @@ describe('пересборка плана', () => {
   test('защищённая категория источником быть не может', async () => {
     const { client, food } = await withCategoryAndDebt();
     const cafe = await categoryId(client, 'Кафе');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '1000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '1000000' }),
+    );
     await expectOk(await client.patch(`/v1/categories/${food}`, { protected: true }));
 
     const res = await client.post('/v1/plan/current/rebalance', {
@@ -191,7 +211,9 @@ describe('пересборка плана', () => {
   test('больше, чем есть в источнике, не переносится', async () => {
     const { client, food } = await withCategoryAndDebt();
     const cafe = await categoryId(client, 'Кафе');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '1000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '1000000' }),
+    );
     const res = await client.post('/v1/plan/current/rebalance', {
       fromKind: 'category',
       fromId: food,
@@ -217,7 +239,9 @@ describe('пересборка плана', () => {
   test('варианты «откуда добавим» не предлагают долг и защищённую категорию', async () => {
     const { client, debtId, food } = await withCategoryAndDebt();
     const cafe = await categoryId(client, 'Кафе');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '2000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '2000000' }),
+    );
     await expectOk(await client.patch(`/v1/categories/${cafe}`, { protected: true }));
 
     const options = await expectOk<{ targetKind: string; targetId: string }[]>(

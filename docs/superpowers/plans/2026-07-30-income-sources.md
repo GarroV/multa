@@ -37,10 +37,10 @@ pnpm typecheck                          # tsc --noEmit во всех воркс�
 
 **Отклонения от текста спеки** (осознанные, зафиксированы здесь):
 
-| Спека | План | Почему |
-|---|---|---|
-| «web e2e Playwright» | vitest на чистые хелперы формы + браузерный смоук через chrome-devtools MCP | Playwright-харнеса в репозитории нет, он живёт в [#17](https://github.com/GarroV/multa/issues/17). Заводить его внутри этой задачи — отдельный кусок работы, не относящийся к модели дохода. |
-| `income: { expectedMinor, events, unresolved }` в `PlanDto` | `incomeMinor` (как сейчас) + `income: { events, unresolved }` | `plan.incomeMinor` уже читают [Today.tsx:78](../../../apps/web/src/screens/Today.tsx#L78) и [Plan.tsx:81](../../../apps/web/src/screens/Plan.tsx#L81). Два поля с одним фактом (`expectedMinor` и `incomeMinor`) — дрейф; оставляем одно имя. |
+| Спека                                                       | План                                                                        | Почему                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| «web e2e Playwright»                                        | vitest на чистые хелперы формы + браузерный смоук через chrome-devtools MCP | Playwright-харнеса в репозитории нет, он живёт в [#17](https://github.com/GarroV/multa/issues/17). Заводить его внутри этой задачи — отдельный кусок работы, не относящийся к модели дохода.                                                  |
+| `income: { expectedMinor, events, unresolved }` в `PlanDto` | `incomeMinor` (как сейчас) + `income: { events, unresolved }`               | `plan.incomeMinor` уже читают [Today.tsx:78](../../../apps/web/src/screens/Today.tsx#L78) и [Plan.tsx:81](../../../apps/web/src/screens/Plan.tsx#L81). Два поля с одним фактом (`expectedMinor` и `incomeMinor`) — дрейф; оставляем одно имя. |
 
 ---
 
@@ -48,35 +48,35 @@ pnpm typecheck                          # tsc --noEmit во всех воркс�
 
 **Создать:**
 
-| Файл | Ответственность |
-|---|---|
-| `packages/core/src/income.ts` | Типы `IncomeSource`/`IncomeSchedule`/`IncomeAmount`/`IncomeEvent`, `amountOfSource`, `incomeEventsIn`, `expectedIncomeForPeriod`, `rhythmMismatches`. Чистые функции, без FX и БД. |
-| `packages/core/src/income.test.ts` | Тесты ядра дохода. |
-| `apps/api/src/income/store.ts` | Доступ к `income_sources`: список, вставка, правка, удаление, атомарная замена набора; маппинг строка БД ↔ домен (bigint ↔ строка). |
-| `apps/api/src/routes/income.ts` | HTTP: `GET/POST/PATCH/DELETE /v1/income-sources`, `POST /v1/onboarding/income`. |
-| `apps/web/src/lib/income.ts` | Чистые хелперы формы: состояние формы → payload API, превью дат через `@multa/core`, разбор источника в состояние формы. |
-| `apps/web/src/lib/income.test.ts` | Тесты хелперов формы. |
-| `apps/web/src/components/RhythmPicker.tsx` | Выбор ритма: три варианта, редактируемые дни/дата, превью реальных дат, правило выходных. |
-| `apps/web/src/components/IncomeSourceList.tsx` | Список выплат/источников: метка, расписание, сумма или % от оклада, удаление, добавление. |
+| Файл                                           | Ответственность                                                                                                                                                                    |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/income.ts`                  | Типы `IncomeSource`/`IncomeSchedule`/`IncomeAmount`/`IncomeEvent`, `amountOfSource`, `incomeEventsIn`, `expectedIncomeForPeriod`, `rhythmMismatches`. Чистые функции, без FX и БД. |
+| `packages/core/src/income.test.ts`             | Тесты ядра дохода.                                                                                                                                                                 |
+| `apps/api/src/income/store.ts`                 | Доступ к `income_sources`: список, вставка, правка, удаление, атомарная замена набора; маппинг строка БД ↔ домен (bigint ↔ строка).                                                |
+| `apps/api/src/routes/income.ts`                | HTTP: `GET/POST/PATCH/DELETE /v1/income-sources`, `POST /v1/onboarding/income`.                                                                                                    |
+| `apps/web/src/lib/income.ts`                   | Чистые хелперы формы: состояние формы → payload API, превью дат через `@multa/core`, разбор источника в состояние формы.                                                           |
+| `apps/web/src/lib/income.test.ts`              | Тесты хелперов формы.                                                                                                                                                              |
+| `apps/web/src/components/RhythmPicker.tsx`     | Выбор ритма: три варианта, редактируемые дни/дата, превью реальных дат, правило выходных.                                                                                          |
+| `apps/web/src/components/IncomeSourceList.tsx` | Список выплат/источников: метка, расписание, сумма или % от оклада, удаление, добавление.                                                                                          |
 
 **Изменить:**
 
-| Файл | Что |
-|---|---|
-| `packages/core/src/periods.ts` | `WeekendRule`, `shiftForWeekend`, `addDays`, `monthlyDatesBetween`, `everyWeeksDatesBetween`, необязательный `weekendRule` в `PeriodConfig`. |
-| `packages/core/src/index.ts` | Экспорт `./income.ts`. |
-| `packages/core/package.json` | `exports` → `"./income": "./src/income.ts"`. |
-| `apps/api/src/db/schema/domain.ts` | Таблица `incomeSources`; `workspaces.paydayWeekendRule`; удалить `workspaces.expectedIncomeMinor`; `recurringItems.kind` без `'income'`. |
-| `apps/api/src/validation.ts` | Схемы источников/ритма/правила выходных; удалить `anchorsSchema` и `paydaySchema`. |
-| `apps/api/src/validation.test.ts` | Тесты новых схем; убрать тесты `paydaySchema`. |
-| `apps/api/src/app.ts` | `serializeWorkspace`, `/v1/me` с `onboardingComplete`, `PATCH /v1/workspace` (ритм + правило), подключение роута источников, удаление `POST /v1/onboarding/payday`. |
-| `apps/api/src/plan/assemble.ts` | Доход периода из событий, блок `income` в DTO, предзагрузка курсов, `percentOfMinor` из ядра вместо локального `pctOfMinor`. |
-| `apps/web/src/lib/queries.ts` | `WorkspaceDto` (`rhythm`, `weekendRule`, без `expectedIncomeMinor`), `MeDto.onboardingComplete`, DTO источников, хуки CRUD. |
-| `apps/web/src/App.tsx` | Гейт по `onboardingComplete`. |
-| `apps/web/src/screens/Onboarding.tsx` | `PaydayStep` → `IncomeStep`. |
-| `apps/web/src/screens/Settings.tsx` | Редактор ритма + источников вместо пресетов. |
-| `packages/i18n/src/en.ts`, `ru.ts` | Ключи `income.*`; удалить `onboarding.payday.preset.*`, `onboarding.payday.expectedAmount`, `settings.income`, `settings.anchors`. |
-| `docs/01-domain-model.md`, `02-data-schema.md`, `04-web-ux.md` | Синхронизация с кодом (Task 12). |
+| Файл                                                           | Что                                                                                                                                                                 |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/periods.ts`                                 | `WeekendRule`, `shiftForWeekend`, `addDays`, `monthlyDatesBetween`, `everyWeeksDatesBetween`, необязательный `weekendRule` в `PeriodConfig`.                        |
+| `packages/core/src/index.ts`                                   | Экспорт `./income.ts`.                                                                                                                                              |
+| `packages/core/package.json`                                   | `exports` → `"./income": "./src/income.ts"`.                                                                                                                        |
+| `apps/api/src/db/schema/domain.ts`                             | Таблица `incomeSources`; `workspaces.paydayWeekendRule`; удалить `workspaces.expectedIncomeMinor`; `recurringItems.kind` без `'income'`.                            |
+| `apps/api/src/validation.ts`                                   | Схемы источников/ритма/правила выходных; удалить `anchorsSchema` и `paydaySchema`.                                                                                  |
+| `apps/api/src/validation.test.ts`                              | Тесты новых схем; убрать тесты `paydaySchema`.                                                                                                                      |
+| `apps/api/src/app.ts`                                          | `serializeWorkspace`, `/v1/me` с `onboardingComplete`, `PATCH /v1/workspace` (ритм + правило), подключение роута источников, удаление `POST /v1/onboarding/payday`. |
+| `apps/api/src/plan/assemble.ts`                                | Доход периода из событий, блок `income` в DTO, предзагрузка курсов, `percentOfMinor` из ядра вместо локального `pctOfMinor`.                                        |
+| `apps/web/src/lib/queries.ts`                                  | `WorkspaceDto` (`rhythm`, `weekendRule`, без `expectedIncomeMinor`), `MeDto.onboardingComplete`, DTO источников, хуки CRUD.                                         |
+| `apps/web/src/App.tsx`                                         | Гейт по `onboardingComplete`.                                                                                                                                       |
+| `apps/web/src/screens/Onboarding.tsx`                          | `PaydayStep` → `IncomeStep`.                                                                                                                                        |
+| `apps/web/src/screens/Settings.tsx`                            | Редактор ритма + источников вместо пресетов.                                                                                                                        |
+| `packages/i18n/src/en.ts`, `ru.ts`                             | Ключи `income.*`; удалить `onboarding.payday.preset.*`, `onboarding.payday.expectedAmount`, `settings.income`, `settings.anchors`.                                  |
+| `docs/01-domain-model.md`, `02-data-schema.md`, `04-web-ux.md` | Синхронизация с кодом (Task 12).                                                                                                                                    |
 
 **Удалить:** `apps/web/src/lib/paydayPresets.ts`.
 
@@ -87,10 +87,12 @@ pnpm typecheck                          # tsc --noEmit во всех воркс�
 Даты и границы — предметная область `periods.ts`. `income.ts` будет импортировать эти примитивы оттуда: обратный импорт создал бы цикл.
 
 **Files:**
+
 - Modify: `packages/core/src/periods.ts`
 - Test: `packages/core/src/periods.test.ts`
 
 **Interfaces:**
+
 - Consumes: ничего (первая задача).
 - Produces:
   - `export type WeekendRule = 'as-is' | 'before' | 'after'`
@@ -231,7 +233,11 @@ function normalizeDates(dates: readonly string[]): string[] {
 }
 
 /** Даты «дней месяца» внутри окна [fromIso, toIso] с клампом к длине месяца. Отсортированы, без дублей. */
-export function monthlyDatesBetween(days: readonly number[], fromIso: string, toIso: string): string[] {
+export function monthlyDatesBetween(
+  days: readonly number[],
+  fromIso: string,
+  toIso: string,
+): string[] {
   const sortedDays = [...new Set(days)].sort((a, b) => a - b);
   const start = new Date(toUTC(fromIso));
   const end = new Date(toUTC(toIso));
@@ -295,10 +301,17 @@ function monthlyPaydays(days: number[], around: string, count: number): string[]
 export function generatePeriods(config: PeriodConfig, from: string, count: number): PayPeriod[] {
   switch (config.kind) {
     case 'monthly-days':
-      return buildFrom(withWeekendRule(monthlyPaydays(config.days, from, count), config.weekendRule), from, count);
+      return buildFrom(
+        withWeekendRule(monthlyPaydays(config.days, from, count), config.weekendRule),
+        from,
+        count,
+      );
     case 'every-weeks':
       return buildFrom(
-        withWeekendRule(everyWeeksPaydays(config.weeks, config.startsOn, from, count), config.weekendRule),
+        withWeekendRule(
+          everyWeeksPaydays(config.weeks, config.startsOn, from, count),
+          config.weekendRule,
+        ),
         from,
         count,
       );
@@ -336,11 +349,13 @@ git commit -m "feat(core): правило выходных и оконные г�
 ## Task 2: События источников внутри периода (`income.ts`)
 
 **Files:**
+
 - Create: `packages/core/src/income.ts`
 - Create: `packages/core/src/income.test.ts`
 - Modify: `packages/core/src/index.ts`, `packages/core/package.json`
 
 **Interfaces:**
+
 - Consumes: из Task 1 — `addDays`, `shiftForWeekend`, `monthlyDatesBetween`, `everyWeeksDatesBetween`, `WeekendRule`, `PayPeriod`.
 - Produces:
   - типы `IncomeSchedule`, `IncomeAmount`, `IncomeSource`, `IncomeEvent`
@@ -358,7 +373,9 @@ import { amountOfSource, incomeEventsIn, percentOfMinor, type IncomeSource } fro
 import type { PayPeriod } from './periods.ts';
 
 /** Источник по умолчанию: RUB, активный, фиксированный. Тесты переопределяют нужные поля. */
-function source(over: Partial<IncomeSource> & Pick<IncomeSource, 'id' | 'label' | 'schedule' | 'amount'>): IncomeSource {
+function source(
+  over: Partial<IncomeSource> & Pick<IncomeSource, 'id' | 'label' | 'schedule' | 'amount'>,
+): IncomeSource {
   return { currency: 'RUB', stability: 'fixed', active: true, ...over };
 }
 
@@ -401,7 +418,9 @@ describe('amountOfSource', () => {
   });
 
   it('percent считает от оклада источника', () => {
-    expect(amountOfSource({ kind: 'percent', percent: '40', ofMinor: 20_000_000n })).toBe(8_000_000n);
+    expect(amountOfSource({ kind: 'percent', percent: '40', ofMinor: 20_000_000n })).toBe(
+      8_000_000n,
+    );
   });
 });
 
@@ -429,8 +448,18 @@ describe('incomeEventsIn', () => {
 
   it('складывает приходы, схлопнувшиеся клампом короткого месяца', () => {
     const feb: PayPeriod = { startsOn: '2026-02-15', endsOn: '2026-03-15' };
-    const s30 = source({ id: 'a', label: '30-го', schedule: { kind: 'monthly-days', days: [30] }, amount: { kind: 'absolute', amountMinor: 100n } });
-    const s31 = source({ id: 'b', label: '31-го', schedule: { kind: 'monthly-days', days: [31] }, amount: { kind: 'absolute', amountMinor: 200n } });
+    const s30 = source({
+      id: 'a',
+      label: '30-го',
+      schedule: { kind: 'monthly-days', days: [30] },
+      amount: { kind: 'absolute', amountMinor: 100n },
+    });
+    const s31 = source({
+      id: 'b',
+      label: '31-го',
+      schedule: { kind: 'monthly-days', days: [31] },
+      amount: { kind: 'absolute', amountMinor: 200n },
+    });
     const events = incomeEventsIn([s30, s31], feb);
     expect(events.map((e) => [e.date, e.amountMinor])).toEqual([
       ['2026-02-28', 100n],
@@ -446,18 +475,33 @@ describe('incomeEventsIn', () => {
 
   it('затягивает приход, который правило выходных перенесло в период извне', () => {
     // 1 марта 2026 — воскресенье; при 'before' выплата приходит 27 февраля.
-    const first = source({ id: 'c', label: '1-го', schedule: { kind: 'monthly-days', days: [1] }, amount: { kind: 'absolute', amountMinor: 500n } });
+    const first = source({
+      id: 'c',
+      label: '1-го',
+      schedule: { kind: 'monthly-days', days: [1] },
+      amount: { kind: 'absolute', amountMinor: 500n },
+    });
     const feb: PayPeriod = { startsOn: '2026-02-20', endsOn: '2026-03-01' };
     expect(incomeEventsIn([first], feb, 'before').map((e) => e.date)).toEqual(['2026-02-27']);
   });
 
   it('irregular не даёт событий', () => {
-    const chaos = source({ id: 'd', label: 'Когда как', schedule: { kind: 'irregular' }, amount: { kind: 'absolute', amountMinor: 999n } });
+    const chaos = source({
+      id: 'd',
+      label: 'Когда как',
+      schedule: { kind: 'irregular' },
+      amount: { kind: 'absolute', amountMinor: 999n },
+    });
     expect(incomeEventsIn([chaos], july)).toEqual([]);
   });
 
   it('one-off даёт событие только внутри своего периода', () => {
-    const bonus = source({ id: 'e', label: 'Гонорар', schedule: { kind: 'one-off', date: '2026-07-15' }, amount: { kind: 'absolute', amountMinor: 5_000_000n } });
+    const bonus = source({
+      id: 'e',
+      label: 'Гонорар',
+      schedule: { kind: 'one-off', date: '2026-07-15' },
+      amount: { kind: 'absolute', amountMinor: 5_000_000n },
+    });
     expect(incomeEventsIn([bonus], july).map((e) => e.date)).toEqual(['2026-07-15']);
     expect(incomeEventsIn([bonus], { startsOn: '2026-07-25', endsOn: '2026-08-10' })).toEqual([]);
   });
@@ -474,7 +518,9 @@ describe('incomeEventsIn', () => {
   });
 
   it('нулевая сумма в план не идёт', () => {
-    expect(incomeEventsIn([{ ...advance, amount: { kind: 'absolute', amountMinor: 0n } }], july)).toEqual([]);
+    expect(
+      incomeEventsIn([{ ...advance, amount: { kind: 'absolute', amountMinor: 0n } }], july),
+    ).toEqual([]);
   });
 
   it('события отсортированы по дате', () => {
@@ -519,8 +565,7 @@ export type IncomeSchedule =
   | { kind: 'irregular' }; // «когда как» — в план не идёт, только факт
 
 export type IncomeAmount =
-  | { kind: 'absolute'; amountMinor: bigint }
-  | { kind: 'percent'; percent: string; ofMinor: bigint }; // аванс 40% от оклада
+  { kind: 'absolute'; amountMinor: bigint } | { kind: 'percent'; percent: string; ofMinor: bigint }; // аванс 40% от оклада
 
 export interface IncomeSource {
   readonly id: string;
@@ -557,7 +602,9 @@ export function percentOfMinor(ofMinor: bigint, percent: string): bigint {
 
 /** Сумма одного прихода источника в его валюте. */
 export function amountOfSource(amount: IncomeAmount): bigint {
-  return amount.kind === 'absolute' ? amount.amountMinor : percentOfMinor(amount.ofMinor, amount.percent);
+  return amount.kind === 'absolute'
+    ? amount.amountMinor
+    : percentOfMinor(amount.ofMinor, amount.percent);
 }
 
 /**
@@ -587,8 +634,8 @@ function datesIn(source: IncomeSource, period: PayPeriod, weekendRule: WeekendRu
   return rawDatesAround(source.schedule, period)
     .map((date) => shiftForWeekend(date, weekendRule))
     .filter((date) => date >= period.startsOn && date < period.endsOn)
-    .filter((date) => (source.startsOn === undefined || date >= source.startsOn))
-    .filter((date) => (source.endsOn === undefined || date <= source.endsOn))
+    .filter((date) => source.startsOn === undefined || date >= source.startsOn)
+    .filter((date) => source.endsOn === undefined || date <= source.endsOn)
     .sort();
 }
 
@@ -604,7 +651,13 @@ export function incomeEventsIn(
     const amountMinor = amountOfSource(source.amount);
     if (amountMinor <= 0n) continue; // пустой источник в план не тянем
     for (const date of datesIn(source, period, weekendRule)) {
-      events.push({ sourceId: source.id, label: source.label, date, amountMinor, currency: source.currency });
+      events.push({
+        sourceId: source.id,
+        label: source.label,
+        date,
+        amountMinor,
+        currency: source.currency,
+      });
     }
   }
   return events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -650,10 +703,12 @@ git commit -m "feat(core): события источников дохода вн
 ## Task 3: Доход периода в базовой валюте и рассинхрон ритма
 
 **Files:**
+
 - Modify: `packages/core/src/income.ts`
 - Test: `packages/core/src/income.test.ts`
 
 **Interfaces:**
+
 - Consumes: из Task 2 — `IncomeEvent`, `IncomeSource`, `incomeEventsIn`; из `money.ts` — `money`, `Money`.
 - Produces:
   - `export interface IncomeTotal { readonly incomeMinor: bigint; readonly events: readonly IncomeEvent[]; readonly unresolved: readonly IncomeEvent[] }`
@@ -780,7 +835,10 @@ export function rhythmMismatches(
   count = 2,
 ): string[] {
   return generatePeriods(rhythm, from, count)
-    .filter((period) => !incomeEventsIn(sources, period, weekendRule).some((e) => e.date === period.startsOn))
+    .filter(
+      (period) =>
+        !incomeEventsIn(sources, period, weekendRule).some((e) => e.date === period.startsOn),
+    )
     .map((period) => period.startsOn);
 }
 ```
@@ -819,10 +877,12 @@ git commit -m "feat(core): доход периода в базовой валю�
 ## Task 4: Схема БД и миграция
 
 **Files:**
+
 - Modify: `apps/api/src/db/schema/domain.ts`
 - Create: `apps/api/migrations/0001_add_income_sources.sql` (генерируется `drizzle-kit`, руками не писать)
 
 **Interfaces:**
+
 - Consumes: ничего из предыдущих задач.
 - Produces:
   - `export const incomeSources` (drizzle-таблица; `typeof incomeSources.$inferSelect` — строка БД)
@@ -938,10 +998,12 @@ git commit -m "feat(api): таблица income_sources, правило выхо
 ## Task 5: Zod-схемы источников и ритма
 
 **Files:**
+
 - Modify: `apps/api/src/validation.ts`
 - Test: `apps/api/src/validation.test.ts`
 
 **Interfaces:**
+
 - Consumes: ничего.
 - Produces:
   - `export const weekendRuleSchema` → `'as-is' | 'before' | 'after'`
@@ -991,42 +1053,74 @@ describe('incomeSourceSchema', () => {
   });
 
   it('сортирует и дедупит дни месяца', () => {
-    const parsed = incomeSourceSchema.parse({ ...base, schedule: { kind: 'monthly-days', days: [25, 10, 10] } });
+    const parsed = incomeSourceSchema.parse({
+      ...base,
+      schedule: { kind: 'monthly-days', days: [25, 10, 10] },
+    });
     expect(parsed.schedule).toEqual({ kind: 'monthly-days', days: [10, 25] });
   });
 
   it('отвергает день вне 1..31', () => {
-    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'monthly-days', days: [0] } }).success).toBe(false);
-    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'monthly-days', days: [32] } }).success).toBe(false);
+    expect(
+      incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'monthly-days', days: [0] } })
+        .success,
+    ).toBe(false);
+    expect(
+      incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'monthly-days', days: [32] } })
+        .success,
+    ).toBe(false);
   });
 
   it('отвергает процент вне (0, 100]', () => {
-    const percent = (p: string) => incomeSourceSchema.safeParse({ ...base, amount: { kind: 'percent', percent: p, ofMinor: '1' } }).success;
+    const percent = (p: string) =>
+      incomeSourceSchema.safeParse({
+        ...base,
+        amount: { kind: 'percent', percent: p, ofMinor: '1' },
+      }).success;
     expect(percent('0')).toBe(false);
     expect(percent('100.1')).toBe(false);
     expect(percent('100')).toBe(true);
   });
 
   it('отвергает нецелую сумму и нулевую сумму', () => {
-    expect(incomeSourceSchema.safeParse({ ...base, amount: { kind: 'absolute', amountMinor: '80.5' } }).success).toBe(false);
-    expect(incomeSourceSchema.safeParse({ ...base, amount: { kind: 'absolute', amountMinor: '0' } }).success).toBe(false);
+    expect(
+      incomeSourceSchema.safeParse({ ...base, amount: { kind: 'absolute', amountMinor: '80.5' } })
+        .success,
+    ).toBe(false);
+    expect(
+      incomeSourceSchema.safeParse({ ...base, amount: { kind: 'absolute', amountMinor: '0' } })
+        .success,
+    ).toBe(false);
   });
 
   it('отвергает неизвестный вид расписания', () => {
-    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'lunar' } }).success).toBe(false);
+    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'lunar' } }).success).toBe(
+      false,
+    );
   });
 
   it('требует дату в формате YYYY-MM-DD', () => {
-    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'one-off', date: '15.07.2026' } }).success).toBe(false);
-    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'one-off', date: '2026-07-15' } }).success).toBe(true);
+    expect(
+      incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'one-off', date: '15.07.2026' } })
+        .success,
+    ).toBe(false);
+    expect(
+      incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'one-off', date: '2026-07-15' } })
+        .success,
+    ).toBe(true);
   });
 
   it('принимает irregular без дополнительных полей', () => {
-    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'irregular' } }).success).toBe(true);
+    expect(incomeSourceSchema.safeParse({ ...base, schedule: { kind: 'irregular' } }).success).toBe(
+      true,
+    );
   });
 
   it('rowSchema парсит строку БД вместе с id', () => {
-    const parsed = incomeSourceRowSchema.parse({ ...base, id: '11111111-1111-1111-1111-111111111111' });
+    const parsed = incomeSourceRowSchema.parse({
+      ...base,
+      id: '11111111-1111-1111-1111-111111111111',
+    });
     expect(parsed.id).toBe('11111111-1111-1111-1111-111111111111');
   });
 
@@ -1037,7 +1131,10 @@ describe('incomeSourceSchema', () => {
 
 describe('rhythmSchema', () => {
   it('принимает дни месяца и цикл недель', () => {
-    expect(rhythmSchema.parse({ kind: 'monthly-days', days: [10, 25] })).toEqual({ kind: 'monthly-days', days: [10, 25] });
+    expect(rhythmSchema.parse({ kind: 'monthly-days', days: [10, 25] })).toEqual({
+      kind: 'monthly-days',
+      days: [10, 25],
+    });
     expect(rhythmSchema.parse({ kind: 'every-weeks', weeks: 2, startsOn: '2026-08-07' })).toEqual({
       kind: 'every-weeks',
       weeks: 2,
@@ -1064,11 +1161,19 @@ describe('onboardingIncomeSchema', () => {
   };
 
   it('требует хотя бы один источник', () => {
-    expect(onboardingIncomeSchema.safeParse({ rhythm: { kind: 'monthly-days', days: [25] }, sources: [] }).success).toBe(false);
+    expect(
+      onboardingIncomeSchema.safeParse({
+        rhythm: { kind: 'monthly-days', days: [25] },
+        sources: [],
+      }).success,
+    ).toBe(false);
   });
 
   it('дефолтит правило выходных на before', () => {
-    const parsed = onboardingIncomeSchema.parse({ rhythm: { kind: 'monthly-days', days: [25] }, sources: [source] });
+    const parsed = onboardingIncomeSchema.parse({
+      rhythm: { kind: 'monthly-days', days: [25] },
+      sources: [source],
+    });
     expect(parsed.weekendRule).toBe('before');
   });
 });
@@ -1106,12 +1211,20 @@ export const weekendRuleSchema = z.enum(['as-is', 'before', 'after']);
 /** Ритм планирования: только регулярные виды — из ритма выводятся границы периодов. */
 export const rhythmSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('monthly-days'), days: monthDays }),
-  z.object({ kind: z.literal('every-weeks'), weeks: z.number().int().min(1).max(12), startsOn: isoDate }),
+  z.object({
+    kind: z.literal('every-weeks'),
+    weeks: z.number().int().min(1).max(12),
+    startsOn: isoDate,
+  }),
 ]);
 
 export const incomeScheduleSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('monthly-days'), days: monthDays }),
-  z.object({ kind: z.literal('every-weeks'), weeks: z.number().int().min(1).max(12), startsOn: isoDate }),
+  z.object({
+    kind: z.literal('every-weeks'),
+    weeks: z.number().int().min(1).max(12),
+    startsOn: isoDate,
+  }),
   z.object({ kind: z.literal('one-off'), date: isoDate }),
   z.object({ kind: z.literal('irregular') }),
 ]);
@@ -1181,11 +1294,13 @@ git commit -m "feat(api): zod-схемы источников дохода и р
 ## Task 6: Хранилище и роуты источников
 
 **Files:**
+
 - Create: `apps/api/src/income/store.ts`
 - Create: `apps/api/src/routes/income.ts`
 - Modify: `apps/api/src/app.ts`
 
 **Interfaces:**
+
 - Consumes: Task 4 (`incomeSources`, `workspaces`), Task 5 (`incomeSourceSchema`, `incomeSourceRowSchema`, `incomeSourcePatchSchema`, `onboardingIncomeSchema`, `patchWorkspaceSchema`), Task 2 (`IncomeSource`).
 - Produces:
   - `listSources(workspaceId: string): Promise<IncomeSource[]>`
@@ -1279,7 +1394,11 @@ function toValues(workspaceId: string, input: SourceInput) {
 }
 
 export async function listSourceRows(workspaceId: string): Promise<SourceRow[]> {
-  return db.select().from(incomeSources).where(eq(incomeSources.workspaceId, workspaceId)).orderBy(incomeSources.sort);
+  return db
+    .select()
+    .from(incomeSources)
+    .where(eq(incomeSources.workspaceId, workspaceId))
+    .orderBy(incomeSources.sort);
 }
 
 /** Источники воркспейса в доменном виде — для сборки плана. */
@@ -1337,11 +1456,17 @@ export async function deleteSourceById(workspaceId: string, id: string): Promise
  * Онбординг: ритм + правило выходных + набор источников одной транзакцией.
  * Полусостояния быть не должно: либо шаг пройден целиком, либо ничего не изменилось.
  */
-export async function replaceOnboardingIncome(workspaceId: string, body: OnboardingIncome): Promise<SourceRow[]> {
+export async function replaceOnboardingIncome(
+  workspaceId: string,
+  body: OnboardingIncome,
+): Promise<SourceRow[]> {
   return db.transaction(async (tx) => {
     await tx
       .update(workspaces)
-      .set({ periodAnchors: { ...body.rhythm, weekendRule: body.weekendRule }, paydayWeekendRule: body.weekendRule })
+      .set({
+        periodAnchors: { ...body.rhythm, weekendRule: body.weekendRule },
+        paydayWeekendRule: body.weekendRule,
+      })
       .where(eq(workspaces.id, workspaceId));
     await tx.delete(incomeSources).where(eq(incomeSources.workspaceId, workspaceId));
     return tx
@@ -1442,7 +1567,9 @@ app.get('/v1/me', requireAuth, async (c) => {
   const user = c.get('user')!;
   const rows = await db.select().from(workspaces).where(eq(workspaces.ownerId, user.id)).limit(1);
   const ws = rows[0];
-  const onboardingComplete = ws ? ws.periodAnchors != null && (await hasActiveIncome(ws.id)) : false;
+  const onboardingComplete = ws
+    ? ws.periodAnchors != null && (await hasActiveIncome(ws.id))
+    : false;
   return c.json({
     user: { id: user.id, email: user.email, name: user.name },
     workspace: ws ? serializeWorkspace(ws) : null,
@@ -1454,19 +1581,19 @@ app.get('/v1/me', requireAuth, async (c) => {
 4. `PATCH /v1/workspace` — добавить ритм и правило выходных в `set`:
 
 ```ts
-  const updated = await db
-    .update(workspaces)
-    .set({
-      ...(body.baseCurrency ? { baseCurrency: body.baseCurrency.toUpperCase() } : {}),
-      ...(body.timezone ? { timezone: body.timezone } : {}),
-      ...(body.locale ? { locale: body.locale } : {}),
-      ...(body.weekendRule ? { paydayWeekendRule: body.weekendRule } : {}),
-      ...(body.rhythm
-        ? { periodAnchors: { ...body.rhythm, weekendRule: body.weekendRule ?? ws.paydayWeekendRule } }
-        : {}),
-    })
-    .where(eq(workspaces.id, ws.id))
-    .returning();
+const updated = await db
+  .update(workspaces)
+  .set({
+    ...(body.baseCurrency ? { baseCurrency: body.baseCurrency.toUpperCase() } : {}),
+    ...(body.timezone ? { timezone: body.timezone } : {}),
+    ...(body.locale ? { locale: body.locale } : {}),
+    ...(body.weekendRule ? { paydayWeekendRule: body.weekendRule } : {}),
+    ...(body.rhythm
+      ? { periodAnchors: { ...body.rhythm, weekendRule: body.weekendRule ?? ws.paydayWeekendRule } }
+      : {}),
+  })
+  .where(eq(workspaces.id, ws.id))
+  .returning();
 ```
 
 5. Удалить хендлер `POST /v1/onboarding/payday` целиком (строки 106–115).
@@ -1489,9 +1616,11 @@ git commit -m "feat(api): CRUD источников дохода и атомар
 ## Task 7: Доход периода в сборке плана
 
 **Files:**
+
 - Modify: `apps/api/src/plan/assemble.ts`
 
 **Interfaces:**
+
 - Consumes: Task 2–3 (`incomeEventsIn`, `expectedIncomeForPeriod`, `percentOfMinor`, `IncomeSource`), Task 6 (`listSources`).
 - Produces:
   - `PlanDto.income: { events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] }`
@@ -1529,8 +1658,12 @@ async function incomeForPeriod(
   asOf: string,
 ): Promise<{ incomeMinor: bigint; events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] }> {
   const events = incomeEventsIn(sources, period, ws.paydayWeekendRule as WeekendRule);
-  const foreign = [...new Set(events.map((e) => e.currency).filter((ccy) => ccy !== ws.baseCurrency))];
-  const snapshots = await Promise.all(foreign.map(async (ccy) => [ccy, await getRate(ccy, ws.baseCurrency, asOf)] as const));
+  const foreign = [
+    ...new Set(events.map((e) => e.currency).filter((ccy) => ccy !== ws.baseCurrency)),
+  ];
+  const snapshots = await Promise.all(
+    foreign.map(async (ccy) => [ccy, await getRate(ccy, ws.baseCurrency, asOf)] as const),
+  );
   const rates = new Map(snapshots);
   const total = expectedIncomeForPeriod(events, ws.baseCurrency, (m) => {
     const snap = rates.get(m.currency);
@@ -1616,10 +1749,10 @@ export async function getCurrentPlan(ws: Workspace, asOf: string): Promise<PlanD
 7. `setCategoryBudget` (строка 411) — `ensurePeriodRow` больше не может брать доход из воркспейса. Заменить на пересчёт по источникам:
 
 ```ts
-  const period = currentPeriod(ws, asOf);
-  const sources = await listSources(ws.id);
-  const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
-  const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
+const period = currentPeriod(ws, asOf);
+const sources = await listSources(ws.id);
+const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
 ```
 
 8. Импорт `listSources` добавить: `import { listSources } from '../income/store.ts';`
@@ -1643,18 +1776,56 @@ import { eq } from 'drizzle-orm';
 const owner = (await db.select().from(user).limit(1))[0]!;
 const [ws] = await db
   .insert(workspaces)
-  .values({ ownerId: owner.id, baseCurrency: 'RUB', periodAnchors: { kind: 'monthly-days', days: [10, 25], weekendRule: 'as-is' }, paydayWeekendRule: 'as-is' })
+  .values({
+    ownerId: owner.id,
+    baseCurrency: 'RUB',
+    periodAnchors: { kind: 'monthly-days', days: [10, 25], weekendRule: 'as-is' },
+    paydayWeekendRule: 'as-is',
+  })
   .returning();
 await db.insert(incomeSources).values([
-  { workspaceId: ws!.id, label: 'Аванс', currency: 'RUB', schedule: { kind: 'monthly-days', days: [10] }, amount: { kind: 'absolute', amountMinor: '8000000' } },
-  { workspaceId: ws!.id, label: 'Зарплата', currency: 'RUB', schedule: { kind: 'monthly-days', days: [25] }, amount: { kind: 'absolute', amountMinor: '12000000' } },
-  { workspaceId: ws!.id, label: 'Подработка', currency: 'RUB', schedule: { kind: 'every-weeks', weeks: 1, startsOn: '2026-07-03' }, amount: { kind: 'absolute', amountMinor: '1500000' }, stability: 'variable' },
+  {
+    workspaceId: ws!.id,
+    label: 'Аванс',
+    currency: 'RUB',
+    schedule: { kind: 'monthly-days', days: [10] },
+    amount: { kind: 'absolute', amountMinor: '8000000' },
+  },
+  {
+    workspaceId: ws!.id,
+    label: 'Зарплата',
+    currency: 'RUB',
+    schedule: { kind: 'monthly-days', days: [25] },
+    amount: { kind: 'absolute', amountMinor: '12000000' },
+  },
+  {
+    workspaceId: ws!.id,
+    label: 'Подработка',
+    currency: 'RUB',
+    schedule: { kind: 'every-weeks', weeks: 1, startsOn: '2026-07-03' },
+    amount: { kind: 'absolute', amountMinor: '1500000' },
+    stability: 'variable',
+  },
 ]);
 
 const first = await getCurrentPlan(ws!, '2026-07-12');
 const second = await getCurrentPlan(ws!, '2026-07-27');
-console.log('период', first.period, 'доход', first.incomeMinor, 'событий', first.income.events.length);
-console.log('период', second.period, 'доход', second.incomeMinor, 'событий', second.income.events.length);
+console.log(
+  'период',
+  first.period,
+  'доход',
+  first.incomeMinor,
+  'событий',
+  first.income.events.length,
+);
+console.log(
+  'период',
+  second.period,
+  'доход',
+  second.incomeMinor,
+  'событий',
+  second.income.events.length,
+);
 
 await db.delete(workspaces).where(eq(workspaces.id, ws!.id)); // cascade уносит источники и периоды
 ```
@@ -1680,10 +1851,12 @@ git commit -m "feat(api): доход периода считается по со
 ## Task 8: Строки интерфейса (ru + en)
 
 **Files:**
+
 - Modify: `packages/i18n/src/en.ts`, `packages/i18n/src/ru.ts`
 - Test: `packages/i18n/src/i18n.test.ts`
 
 **Interfaces:**
+
 - Consumes: ничего.
 - Produces: ключи `income.*`, `settings.rhythm`, `settings.sources`; удалены `onboarding.payday.preset.*`, `onboarding.payday.expectedAmount`, `settings.income`, `settings.anchors`.
 
@@ -1819,10 +1992,12 @@ git commit -m "feat(i18n): строки шага дохода, удалены к
 ## Task 9: DTO, хуки и чистые хелперы формы
 
 **Files:**
+
 - Modify: `apps/web/src/lib/queries.ts`, `apps/web/src/App.tsx`
 - Create: `apps/web/src/lib/income.ts`, `apps/web/src/lib/income.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 6–7 (форма ответов API), Task 1–3 (`generatePeriods`, `incomeEventsIn`, `rhythmMismatches`).
 - Produces:
   - `WorkspaceDto { id, baseCurrency, timezone, locale, rhythm, weekendRule }`, `MeDto { user, workspace, onboardingComplete }`
@@ -1842,7 +2017,13 @@ git commit -m "feat(i18n): строки шага дохода, удалены к
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { payoutsToSources, percentSum, previewDates, rhythmToConfig, type RhythmForm } from './income.ts';
+import {
+  payoutsToSources,
+  percentSum,
+  previewDates,
+  rhythmToConfig,
+  type RhythmForm,
+} from './income.ts';
 
 const twiceMonthly: RhythmForm = {
   kind: 'twiceMonthly',
@@ -1881,7 +2062,11 @@ describe('rhythmToConfig', () => {
 
 describe('previewDates', () => {
   it('показывает ближайшие даты выплат для «два раза в месяц»', () => {
-    expect(previewDates(twiceMonthly, '2026-08-01', 3)).toEqual(['2026-08-10', '2026-08-25', '2026-09-10']);
+    expect(previewDates(twiceMonthly, '2026-08-01', 3)).toEqual([
+      '2026-08-10',
+      '2026-08-25',
+      '2026-09-10',
+    ]);
   });
 
   it('для цикла в две недели даты плывут по календарю', () => {
@@ -1894,9 +2079,13 @@ describe('previewDates', () => {
 
   it('учитывает правило выходных', () => {
     // 25 июля 2026 — суббота.
-    expect(previewDates({ ...twiceMonthly, kind: 'monthly', days: [25], weekendRule: 'before' }, '2026-07-01', 1)).toEqual([
-      '2026-07-24',
-    ]);
+    expect(
+      previewDates(
+        { ...twiceMonthly, kind: 'monthly', days: [25], weekendRule: 'before' },
+        '2026-07-01',
+        1,
+      ),
+    ).toEqual(['2026-07-24']);
   });
 });
 
@@ -1909,13 +2098,33 @@ describe('payoutsToSources', () => {
   it('абсолютные суммы → источники с monthly-days и minor units', () => {
     const sources = payoutsToSources(payouts, { currency: 'RUB', usePercent: false, gross: '' });
     expect(sources).toEqual([
-      { label: 'Аванс', currency: 'RUB', schedule: { kind: 'monthly-days', days: [10] }, amount: { kind: 'absolute', amountMinor: '8000000' }, stability: 'fixed', active: true, sort: 0 },
-      { label: 'Зарплата', currency: 'RUB', schedule: { kind: 'monthly-days', days: [25] }, amount: { kind: 'absolute', amountMinor: '12000000' }, stability: 'fixed', active: true, sort: 1 },
+      {
+        label: 'Аванс',
+        currency: 'RUB',
+        schedule: { kind: 'monthly-days', days: [10] },
+        amount: { kind: 'absolute', amountMinor: '8000000' },
+        stability: 'fixed',
+        active: true,
+        sort: 0,
+      },
+      {
+        label: 'Зарплата',
+        currency: 'RUB',
+        schedule: { kind: 'monthly-days', days: [25] },
+        amount: { kind: 'absolute', amountMinor: '12000000' },
+        stability: 'fixed',
+        active: true,
+        sort: 1,
+      },
     ]);
   });
 
   it('проценты → amount percent с окладом в minor units', () => {
-    const sources = payoutsToSources(payouts, { currency: 'RUB', usePercent: true, gross: '200000' });
+    const sources = payoutsToSources(payouts, {
+      currency: 'RUB',
+      usePercent: true,
+      gross: '200000',
+    });
     expect(sources[0]!.amount).toEqual({ kind: 'percent', percent: '40', ofMinor: '20000000' });
   });
 
@@ -1931,10 +2140,12 @@ describe('payoutsToSources', () => {
 
 describe('percentSum', () => {
   it('складывает проценты выплат', () => {
-    expect(percentSum([
-      { label: 'a', day: 10, amount: '', percent: '40' },
-      { label: 'b', day: 25, amount: '', percent: '60' },
-    ])).toBe(100);
+    expect(
+      percentSum([
+        { label: 'a', day: 10, amount: '', percent: '40' },
+        { label: 'b', day: 25, amount: '', percent: '60' },
+      ]),
+    ).toBe(100);
   });
 
   it('пустой процент считает нулём', () => {
@@ -1991,10 +2202,19 @@ export interface SourcePayload {
 /** Форма ритма → PeriodConfig ядра. Дата якоря для цикла недель — ввод пользователя, не «сегодня». */
 export function rhythmToConfig(form: RhythmForm): PeriodConfig {
   if (form.kind === 'everyWeeks') {
-    return { kind: 'every-weeks', weeks: form.weeks, startsOn: form.anchorDate, weekendRule: form.weekendRule };
+    return {
+      kind: 'every-weeks',
+      weeks: form.weeks,
+      startsOn: form.anchorDate,
+      weekendRule: form.weekendRule,
+    };
   }
   const days = form.kind === 'monthly' ? form.days.slice(0, 1) : form.days;
-  return { kind: 'monthly-days', days: [...new Set(days)].sort((a, b) => a - b), weekendRule: form.weekendRule };
+  return {
+    kind: 'monthly-days',
+    days: [...new Set(days)].sort((a, b) => a - b),
+    weekendRule: form.weekendRule,
+  };
 }
 
 /**
@@ -2032,7 +2252,8 @@ export function payoutsToSources(
     let amount: unknown = null;
     if (opts.usePercent) {
       const pct = payout.percent.trim().replace(',', '.');
-      if (!grossMinor || !/^\d+(\.\d+)?$/.test(pct) || Number(pct) <= 0 || Number(pct) > 100) continue;
+      if (!grossMinor || !/^\d+(\.\d+)?$/.test(pct) || Number(pct) <= 0 || Number(pct) > 100)
+        continue;
       amount = { kind: 'percent', percent: pct, ofMinor: grossMinor };
     } else {
       const amountMinor = toMinor(payout.amount, opts.currency);
@@ -2167,7 +2388,7 @@ export function useDeleteIncomeSource() {
 Заменить строку 22:
 
 ```tsx
-  if (!me.onboardingComplete) return <Onboarding workspace={me.workspace} />;
+if (!me.onboardingComplete) return <Onboarding workspace={me.workspace} />;
 ```
 
 - [ ] **Step 7: Коммит**
@@ -2183,11 +2404,13 @@ git commit -m "feat(web): DTO источников дохода, хуки и ч�
 ## Task 10: Шаг «Когда приходят деньги»
 
 **Files:**
+
 - Create: `apps/web/src/components/RhythmPicker.tsx`, `apps/web/src/components/IncomeSourceList.tsx`
 - Modify: `apps/web/src/screens/Onboarding.tsx`
 - Delete: `apps/web/src/lib/paydayPresets.ts`
 
 **Interfaces:**
+
 - Consumes: Task 8 (ключи `income.*`), Task 9 (`RhythmForm`, `PayoutForm`, `previewDates`, `payoutsToSources`, `percentSum`, `rhythmToConfig`, `useSaveOnboardingIncome`).
 - Produces:
   - `<RhythmPicker value={RhythmForm} onChange={(next: RhythmForm) => void} />`
@@ -2202,13 +2425,19 @@ import { useI18n } from '../lib/i18n.tsx';
 import { previewDates, type RhythmForm, type RhythmKind } from '../lib/income.ts';
 import type { WeekendRule } from '@multa/core';
 
-const KINDS: { kind: RhythmKind; key: 'income.rhythm.twiceMonthly' | 'income.rhythm.monthly' | 'income.rhythm.everyWeeks' }[] = [
+const KINDS: {
+  kind: RhythmKind;
+  key: 'income.rhythm.twiceMonthly' | 'income.rhythm.monthly' | 'income.rhythm.everyWeeks';
+}[] = [
   { kind: 'twiceMonthly', key: 'income.rhythm.twiceMonthly' },
   { kind: 'monthly', key: 'income.rhythm.monthly' },
   { kind: 'everyWeeks', key: 'income.rhythm.everyWeeks' },
 ];
 
-const WEEKEND_RULES: { rule: WeekendRule; key: 'income.weekend.asIs' | 'income.weekend.before' | 'income.weekend.after' }[] = [
+const WEEKEND_RULES: {
+  rule: WeekendRule;
+  key: 'income.weekend.asIs' | 'income.weekend.before' | 'income.weekend.after';
+}[] = [
   { rule: 'before', key: 'income.weekend.before' },
   { rule: 'after', key: 'income.weekend.after' },
   { rule: 'as-is', key: 'income.weekend.asIs' },
@@ -2238,7 +2467,9 @@ export function RhythmPicker({
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('income.rhythm.title')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('income.rhythm.title')}
+        </label>
         <div className="row">
           {KINDS.map(({ kind, key }) => (
             <button
@@ -2252,7 +2483,9 @@ export function RhythmPicker({
             </button>
           ))}
         </div>
-        <p className="dim micro" style={{ marginTop: 8 }}>{t('income.rhythm.hint')}</p>
+        <p className="dim micro" style={{ marginTop: 8 }}>
+          {t('income.rhythm.hint')}
+        </p>
       </div>
 
       {value.kind === 'twiceMonthly' && (
@@ -2283,7 +2516,9 @@ export function RhythmPicker({
             style={{ width: 64 }}
             inputMode="numeric"
             value={value.days[0] ?? ''}
-            onChange={(e) => onChange({ ...value, days: [clampDay(e.target.value, value.days[0] ?? 1)] })}
+            onChange={(e) =>
+              onChange({ ...value, days: [clampDay(e.target.value, value.days[0] ?? 1)] })
+            }
           />
         </div>
       )}
@@ -2304,7 +2539,9 @@ export function RhythmPicker({
             />
           </div>
           <div>
-            <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('income.rhythm.anchorDate')}</label>
+            <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+              {t('income.rhythm.anchorDate')}
+            </label>
             <input
               className="field mono"
               type="date"
@@ -2316,7 +2553,9 @@ export function RhythmPicker({
       )}
 
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('income.weekend.label')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('income.weekend.label')}
+        </label>
         <div className="row">
           {WEEKEND_RULES.map(({ rule, key }) => (
             <button
@@ -2372,12 +2611,19 @@ export function IncomeSourceList({
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('income.amounts.title')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('income.amounts.title')}
+        </label>
         <p className="dim micro">{t('income.amounts.hint')}</p>
       </div>
 
       <div className="row">
-        <button type="button" className="chip" aria-pressed={usePercent} onClick={() => onTogglePercent(!usePercent)}>
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={usePercent}
+          onClick={() => onTogglePercent(!usePercent)}
+        >
           {t('income.amounts.percentToggle')}
         </button>
         {usePercent && (
@@ -2456,7 +2702,9 @@ export function IncomeSourceList({
       </div>
 
       {usePercent && (
-        <p className="dim micro">{t('income.amounts.percentSum', { sum: percentSum(payouts), gross: gross || '—' })}</p>
+        <p className="dim micro">
+          {t('income.amounts.percentSum', { sum: percentSum(payouts), gross: gross || '—' })}
+        </p>
       )}
     </div>
   );
@@ -2470,7 +2718,12 @@ export function IncomeSourceList({
 ```tsx
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { IncomeSourceList } from '../components/IncomeSourceList.tsx';
-import { payoutsToSources, rhythmToConfig, type PayoutForm, type RhythmForm } from '../lib/income.ts';
+import {
+  payoutsToSources,
+  rhythmToConfig,
+  type PayoutForm,
+  type RhythmForm,
+} from '../lib/income.ts';
 import { rhythmMismatches } from '@multa/core';
 import { useSaveOnboardingIncome } from '../lib/queries.ts';
 
@@ -2509,7 +2762,8 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
   const save = useSaveOnboardingIncome();
 
   const sources = payoutsToSources(payouts, { currency: base, usePercent, gross });
-  const canContinue = sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '');
+  const canContinue =
+    sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '');
   const mismatches = canContinue
     ? rhythmMismatches(
         rhythmToConfig(rhythm),
@@ -2532,7 +2786,9 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
     <OnboardingShell step={2}>
       <div>
         <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.payday.title')}</h1>
-        <p className="dim" style={{ marginTop: 8 }}>{t('onboarding.payday.subtitle')}</p>
+        <p className="dim" style={{ marginTop: 8 }}>
+          {t('onboarding.payday.subtitle')}
+        </p>
       </div>
       <RhythmPicker value={rhythm} onChange={setRhythm} today={today} />
       <IncomeSourceList
@@ -2545,7 +2801,9 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
         onGrossChange={setGross}
       />
       {mismatches.map((date) => (
-        <div className="note-band" key={date}>{t('income.amounts.mismatch', { date })}</div>
+        <div className="note-band" key={date}>
+          {t('income.amounts.mismatch', { date })}
+        </div>
       ))}
       {save.isError && <div className="note-band">{t('common.error')}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -2596,9 +2854,11 @@ git commit -m "feat(web): шаг дохода — ритм с превью да�
 ## Task 11: Редактор дохода в настройках
 
 **Files:**
+
 - Modify: `apps/web/src/screens/Settings.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 9 (`useIncomeSources`, `useCreateIncomeSource`, `useDeleteIncomeSource`, `WorkspaceDto.rhythm`), Task 10 (`RhythmPicker`).
 - Produces: экран настроек без пресетов; правка ритма через `PATCH /v1/workspace`.
 
@@ -2623,19 +2883,32 @@ function toRhythmForm(rhythm: unknown, weekendRule: RhythmForm['weekendRule']): 
   const r = rhythm as { kind?: string; days?: number[]; weeks?: number; startsOn?: string } | null;
   const today = todayISO();
   if (r?.kind === 'every-weeks') {
-    return { kind: 'everyWeeks', days: [10, 25], weeks: r.weeks ?? 2, anchorDate: r.startsOn ?? today, weekendRule };
+    return {
+      kind: 'everyWeeks',
+      days: [10, 25],
+      weeks: r.weeks ?? 2,
+      anchorDate: r.startsOn ?? today,
+      weekendRule,
+    };
   }
   if (r?.kind === 'monthly-days' && r.days?.length === 1) {
     return { kind: 'monthly', days: r.days, weeks: 2, anchorDate: today, weekendRule };
   }
-  return { kind: 'twiceMonthly', days: r?.days ?? [10, 25], weeks: 2, anchorDate: today, weekendRule };
+  return {
+    kind: 'twiceMonthly',
+    days: r?.days ?? [10, 25],
+    weeks: 2,
+    anchorDate: today,
+    weekendRule,
+  };
 }
 
 /** Сумма источника в major-строке — для отображения в списке. */
 function amountLabel(amount: unknown, currency: string): string {
   const a = amount as { kind?: string; amountMinor?: string; percent?: string; ofMinor?: string };
   if (a?.kind === 'percent') return `${a.percent}%`;
-  if (a?.kind === 'absolute' && a.amountMinor) return toMajorString(money(BigInt(a.amountMinor), currency));
+  if (a?.kind === 'absolute' && a.amountMinor)
+    return toMajorString(money(BigInt(a.amountMinor), currency));
   return '—';
 }
 
@@ -2657,7 +2930,9 @@ export function Settings() {
   const removeSource = useDeleteIncomeSource();
 
   const [currency, setCurrency] = useState(ws?.baseCurrency ?? 'RUB');
-  const [rhythm, setRhythm] = useState<RhythmForm>(toRhythmForm(ws?.rhythm ?? null, ws?.weekendRule ?? 'before'));
+  const [rhythm, setRhythm] = useState<RhythmForm>(
+    toRhythmForm(ws?.rhythm ?? null, ws?.weekendRule ?? 'before'),
+  );
   const [saved, setSaved] = useState(false);
 
   const save = useMutation({
@@ -2677,35 +2952,60 @@ export function Settings() {
     },
   });
 
-  if (!ws) return <div style={{ padding: 24 }} className="dim">{t('common.loading')}</div>;
+  if (!ws)
+    return (
+      <div style={{ padding: 24 }} className="dim">
+        {t('common.loading')}
+      </div>
+    );
 
   return (
     <div style={{ padding: 24, maxWidth: 560, display: 'grid', gap: 20 }}>
       <h1 className="section-title">{t('settings.title')}</h1>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('settings.currency')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('settings.currency')}
+        </label>
         <input
           className="field mono"
           value={currency}
           maxLength={3}
-          onChange={(e) => { setCurrency(e.target.value.toUpperCase()); setSaved(false); }}
+          onChange={(e) => {
+            setCurrency(e.target.value.toUpperCase());
+            setSaved(false);
+          }}
         />
       </div>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('settings.rhythm')}</label>
-        <RhythmPicker value={rhythm} onChange={(next) => { setRhythm(next); setSaved(false); }} today={todayISO()} />
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('settings.rhythm')}
+        </label>
+        <RhythmPicker
+          value={rhythm}
+          onChange={(next) => {
+            setRhythm(next);
+            setSaved(false);
+          }}
+          today={todayISO()}
+        />
       </div>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>{t('settings.sources')}</label>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('settings.sources')}
+        </label>
         <div className="card" style={{ display: 'grid', gap: 4 }}>
           {sources.map((s) => (
             <div key={s.id} className="list-item">
               <span>
                 {s.label} <span className="dim">· {scheduleLabel(s.schedule)}</span>
-                {s.stability === 'variable' && <span className="dim"> · {t('income.variable')}</span>}
+                {s.stability === 'variable' && (
+                  <span className="dim"> · {t('income.variable')}</span>
+                )}
               </span>
               <span className="row">
-                <span className="mono dim">{amountLabel(s.amount, s.currency)} {s.currency}</span>
+                <span className="mono dim">
+                  {amountLabel(s.amount, s.currency)} {s.currency}
+                </span>
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -2722,7 +3022,9 @@ export function Settings() {
       </div>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         {saved && <span className="dim">{t('common.saved')}</span>}
-        <button className="btn" disabled={save.isPending} onClick={() => save.mutate()}>{t('common.save')}</button>
+        <button className="btn" disabled={save.isPending} onClick={() => save.mutate()}>
+          {t('common.save')}
+        </button>
       </div>
     </div>
   );
@@ -2735,7 +3037,9 @@ export function Settings() {
 /** Ритм для API: без weekendRule — сервер склеивает его сам, чтобы правило жило в одном месте. */
 export function rhythmToPayload(form: RhythmForm): Record<string, unknown> {
   const config = rhythmToConfig(form);
-  const { weekendRule: _ignored, ...rest } = config as Record<string, unknown> & { weekendRule?: unknown };
+  const { weekendRule: _ignored, ...rest } = config as Record<string, unknown> & {
+    weekendRule?: unknown;
+  };
   return rest;
 }
 ```
@@ -2761,6 +3065,7 @@ git commit -m "feat(web): настройки — редактор ритма и 
 Изменение не готово, пока доки описывают старую модель (правило №4: доки — часть Definition of Done, сверять с кодом, а не по памяти).
 
 **Files:**
+
 - Modify: `docs/01-domain-model.md`, `docs/02-data-schema.md`, `docs/04-web-ux.md`
 
 - [ ] **Step 1: `02-data-schema.md` — сверить с `domain.ts`**
@@ -2802,6 +3107,7 @@ create index income_sources_ws_idx on income_sources (workspace_id, sort);
 
 ```markdown
 ### IncomeSource
+
 Источник дохода: метка, расписание (дни месяца | цикл в N недель | разово | «когда как»), сумма или процент от оклада, валюта, `fixed`/`variable`, срок жизни (`startsOn`/`endsOn`). Только деньги — **границы периодов задаёт ритм** (`workspaces.period_anchors`), и правка источника их не двигает. Ожидаемый доход периода = сумма событий всех активных источников внутри `[startsOn, endsOn)`; недельная подработка добавляет приходы внутрь периода, а не режет его на куски. `irregular` в план не идёт вообще (только факт), `variable` планируется по нижней оценке: завышенная цифра дня — самая дорогая ошибка продукта.
 
 **Доходы живут только здесь.** `RecurringItem` описывает регулярные расходы и взносы; `kind = 'income'` из него убран, чтобы не было двух правд об одном факте.
@@ -2909,32 +3215,32 @@ gh issue close 26 --comment "Готово: ритм планирования (wo
 
 **Покрытие спеки:**
 
-| Требование спеки | Задача |
-|---|---|
-| Ритм — настройка воркспейса, `period_anchors` остаётся | 4, 6 |
-| `payday_weekend_rule` на воркспейсе, дефолт `before` | 4, 5, 6 |
-| `income_sources` плоской таблицей | 4, 6 |
-| `expected_income_minor` удалена с воркспейса | 4, 7 |
-| `recurring_items.kind` без `'income'` | 4, 12 |
-| Типы `IncomeSource`/`Schedule`/`Amount`/`Event` | 2 |
-| `amountOfSource`, `percentOfMinor` | 2 (+ DRY в 7) |
-| `incomeEventsIn` (полуоткрытость, кламп, выходные, срок жизни, irregular, one-off) | 2 |
-| `expectedIncomeForPeriod` + `unresolved` | 3 |
-| `rhythmMismatches` | 3, 10 |
-| `weekendRule` в `PeriodConfig` и сдвиг до сборки периодов | 1 |
-| CRUD `/v1/income-sources` | 6 |
-| `POST /v1/onboarding/income` атомарно | 6 |
-| `PATCH /v1/workspace` (ритм + правило) | 6 |
-| Блок `income` в `/v1/plan/current`, доход по периоду | 7 |
-| Гейт онбординга «ритм + активный источник» | 6, 9 |
-| Zod: discriminatedUnion, day 1..31, percent (0,100], minor строкой | 5 |
-| Шаг: ритм с превью → суммы → доп. источники | 10 |
-| Редактируемые числа и обязательная дата якоря (#27) | 10 |
-| Тот же редактор в настройках, `paydayPresets.ts` удалён | 10, 11 |
-| i18n ru+en, старые ключи удалены | 8 |
-| Тесты core / api / web | 1, 2, 3, 5, 9 |
-| Доки 01/02/04 | 12 |
-| Смоук реального флоу | 13 |
+| Требование спеки                                                                   | Задача        |
+| ---------------------------------------------------------------------------------- | ------------- |
+| Ритм — настройка воркспейса, `period_anchors` остаётся                             | 4, 6          |
+| `payday_weekend_rule` на воркспейсе, дефолт `before`                               | 4, 5, 6       |
+| `income_sources` плоской таблицей                                                  | 4, 6          |
+| `expected_income_minor` удалена с воркспейса                                       | 4, 7          |
+| `recurring_items.kind` без `'income'`                                              | 4, 12         |
+| Типы `IncomeSource`/`Schedule`/`Amount`/`Event`                                    | 2             |
+| `amountOfSource`, `percentOfMinor`                                                 | 2 (+ DRY в 7) |
+| `incomeEventsIn` (полуоткрытость, кламп, выходные, срок жизни, irregular, one-off) | 2             |
+| `expectedIncomeForPeriod` + `unresolved`                                           | 3             |
+| `rhythmMismatches`                                                                 | 3, 10         |
+| `weekendRule` в `PeriodConfig` и сдвиг до сборки периодов                          | 1             |
+| CRUD `/v1/income-sources`                                                          | 6             |
+| `POST /v1/onboarding/income` атомарно                                              | 6             |
+| `PATCH /v1/workspace` (ритм + правило)                                             | 6             |
+| Блок `income` в `/v1/plan/current`, доход по периоду                               | 7             |
+| Гейт онбординга «ритм + активный источник»                                         | 6, 9          |
+| Zod: discriminatedUnion, day 1..31, percent (0,100], minor строкой                 | 5             |
+| Шаг: ритм с превью → суммы → доп. источники                                        | 10            |
+| Редактируемые числа и обязательная дата якоря (#27)                                | 10            |
+| Тот же редактор в настройках, `paydayPresets.ts` удалён                            | 10, 11        |
+| i18n ru+en, старые ключи удалены                                                   | 8             |
+| Тесты core / api / web                                                             | 1, 2, 3, 5, 9 |
+| Доки 01/02/04                                                                      | 12            |
+| Смоук реального флоу                                                               | 13            |
 
 **Не покрыто спекой намеренно:** блок 3 шага («ещё источники») в Task 10 отрисован кнопками-заготовками только в разметке первого блока выплат; полноценный экран доп. источников добавляется тем же `IncomeSourceList` в настройках (Task 11) — отдельного визарда для него нет, и это соответствует «пропускаемо» из спеки.
 

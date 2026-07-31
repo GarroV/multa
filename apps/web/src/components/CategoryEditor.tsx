@@ -40,7 +40,9 @@ function CategoryRow({
   // Строка может прийти без бюджета (только с фактом) — поле оставляем пустым, а не «0».
   const [rebalancing, setRebalancing] = useState(false);
   const [val, setVal] = useState(
-    budget && budget.plannedMinor !== '0' ? toMajorString(money(BigInt(budget.plannedMinor), base)) : '',
+    budget && budget.plannedMinor !== '0'
+      ? toMajorString(money(BigInt(budget.plannedMinor), base))
+      : '',
   );
 
   const commit = () => {
@@ -51,7 +53,8 @@ function CategoryRow({
     }
     const minor = parseMinor(s, base);
     if (minor === null) return; // невалидный ввод — не трогаем, не подставляем 0
-    if (!budget || minor !== budget.plannedMinor) setBudget.mutate({ id: cat.id, plannedMinor: minor });
+    if (!budget || minor !== budget.plannedMinor)
+      setBudget.mutate({ id: cat.id, plannedMinor: minor });
   };
 
   const trimmed = budget && BigInt(budget.shortfallMinor) > 0n;
@@ -62,7 +65,9 @@ function CategoryRow({
   const factLabel =
     spent > 0n && budget
       ? overspent
-        ? t('cat.overspent', { amount: `${formatMinor(budget.overspentMinor, base, locale)} ${base}` })
+        ? t('cat.overspent', {
+            amount: `${formatMinor(budget.overspentMinor, base, locale)} ${base}`,
+          })
         : `${t('cat.spent', { amount: formatMinor(budget.spentMinor, base, locale) })} · ${t('cat.remaining', { amount: `${formatMinor(budget.remainingMinor, base, locale)} ${base}` })}`
       : null;
   // Ошибка любой мутации строки не должна выглядеть как успех (тихий сбой) — подсвечиваем.
@@ -83,13 +88,19 @@ function CategoryRow({
         <span>{cat.name}</span>
         {trimmed && (
           <span className="badge-trim">
-            {t('plan.row.trimmed', { amount: `${formatMinor(budget!.shortfallMinor, base, locale)} ${base}` })}
+            {t('plan.row.trimmed', {
+              amount: `${formatMinor(budget!.shortfallMinor, base, locale)} ${base}`,
+            })}
           </span>
         )}
         {factLabel && (
           <span className={`sub num${overspent ? ' st-over' : ''}`}>· {factLabel}</span>
         )}
-        {rowError && <span className="danger" title={t('common.error')} style={{ fontSize: 13 }}>⚠ {t('common.retry')}</span>}
+        {rowError && (
+          <span className="danger" title={t('common.error')} style={{ fontSize: 13 }}>
+            ⚠ {t('common.retry')}
+          </span>
+        )}
       </span>
       <span className="row" style={{ gap: 8 }}>
         <input
@@ -101,7 +112,9 @@ function CategoryRow({
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
-        <span className="sub num" style={{ width: 32 }}>{base}</span>
+        <span className="sub num" style={{ width: 32 }}>
+          {base}
+        </span>
         {budget?.advice && (
           <span className="row" style={{ gap: 6 }}>
             <span className="dim" style={{ fontSize: 12 }}>
@@ -119,7 +132,9 @@ function CategoryRow({
                 setBudget.mutate({ id: cat.id, plannedMinor: next });
               }}
             >
-              {t('advice.apply', { amount: formatMinor(budget.advice.suggestedMinor, base, locale) })}
+              {t('advice.apply', {
+                amount: formatMinor(budget.advice.suggestedMinor, base, locale),
+              })}
             </button>
           </span>
         )}
@@ -144,7 +159,12 @@ function CategoryRow({
           />
         )}
         {!cat.isSystem && (
-          <button className="btn btn-ghost" style={{ padding: '4px 10px' }} title={t('common.delete')} onClick={() => del.mutate(cat.id)}>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 10px' }}
+            title={t('common.delete')}
+            onClick={() => del.mutate(cat.id)}
+          >
             ✕
           </button>
         )}
@@ -154,13 +174,23 @@ function CategoryRow({
 }
 
 /** Редактор бюджетов категорий на текущий период (04-web-ux §Категории). */
-export function CategoryEditor({ allocations, base, locale }: { allocations: PlanAllocation[]; base: string; locale: string }) {
+export function CategoryEditor({
+  allocations,
+  base,
+  locale,
+}: {
+  allocations: PlanAllocation[];
+  base: string;
+  locale: string;
+}) {
   const { t } = useI18n();
   const { data: categories = [] } = useCategories();
   const create = useCreateCategory();
   const [newName, setNewName] = useState('');
 
-  const budgetByCat = new Map(allocations.filter((a) => a.targetKind === 'category').map((a) => [a.targetId, a]));
+  const budgetByCat = new Map(
+    allocations.filter((a) => a.targetKind === 'category').map((a) => [a.targetId, a]),
+  );
 
   const add = () => {
     const name = newName.trim();
@@ -175,7 +205,13 @@ export function CategoryEditor({ allocations, base, locale }: { allocations: Pla
         <span className="sub">{t('plan.category.budgetHint')}</span>
       </div>
       {categories.map((cat) => (
-        <CategoryRow key={cat.id} cat={cat} budget={budgetByCat.get(cat.id)} base={base} locale={locale} />
+        <CategoryRow
+          key={cat.id}
+          cat={cat}
+          budget={budgetByCat.get(cat.id)}
+          base={base}
+          locale={locale}
+        />
       ))}
       <div className="form-row" style={{ marginTop: 10 }}>
         <input
@@ -185,9 +221,15 @@ export function CategoryEditor({ allocations, base, locale }: { allocations: Pla
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
         />
-        <button className="btn" disabled={create.isPending} onClick={add}>{t('common.add')}</button>
+        <button className="btn" disabled={create.isPending} onClick={add}>
+          {t('common.add')}
+        </button>
       </div>
-      {create.isError && <div className="sub danger" style={{ marginTop: 6 }}>⚠ {t('common.error')}</div>}
+      {create.isError && (
+        <div className="sub danger" style={{ marginTop: 6 }}>
+          ⚠ {t('common.error')}
+        </div>
+      )}
     </section>
   );
 }

@@ -55,7 +55,11 @@ export function OnboardingCurrency() {
         maxLength={3}
       />
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn" disabled={mutation.isPending || chosen.length !== 3} onClick={() => mutation.mutate()}>
+        <button
+          className="btn"
+          disabled={mutation.isPending || chosen.length !== 3}
+          onClick={() => mutation.mutate()}
+        >
           {t('common.next')}
         </button>
       </div>

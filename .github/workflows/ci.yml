@@ -42,6 +42,10 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Формат — до типов: он дешевле и ловит расхождение стиля, пока диффы ещё читаемы.
+      - name: Format
+        run: pnpm format:check
+
       - name: Typecheck
         run: pnpm typecheck
 

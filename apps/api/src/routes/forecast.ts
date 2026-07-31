@@ -31,8 +31,14 @@ forecastRoute.get('/forecast', async (c) => {
   if (!current) return c.json({ error: 'period_undeterminable' }, 409);
 
   const [debtRows, goalRows, recurringRows] = await Promise.all([
-    db.select().from(debts).where(and(eq(debts.workspaceId, ws.id), sql`${debts.closedAt} is null`)),
-    db.select().from(goals).where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
+    db
+      .select()
+      .from(debts)
+      .where(and(eq(debts.workspaceId, ws.id), sql`${debts.closedAt} is null`)),
+    db
+      .select()
+      .from(goals)
+      .where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
     db
       .select()
       .from(recurringItems)

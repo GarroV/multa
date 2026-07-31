@@ -3,7 +3,13 @@ import { Hono } from 'hono';
 import { auth } from '../auth.ts';
 import { db } from '../db/client.ts';
 import { user } from '../db/schema/auth.ts';
-import { DEMO_EMAIL, DEMO_PASSWORD, demoIsEmpty, findDemoWorkspace, seedDemo } from '../demo/seed.ts';
+import {
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+  demoIsEmpty,
+  findDemoWorkspace,
+  seedDemo,
+} from '../demo/seed.ts';
 import { logger } from '../logger.ts';
 import type { AppVariables } from '../middleware.ts';
 
@@ -21,13 +27,21 @@ async function ensureDemoUser(): Promise<string> {
   const existing = await findDemoWorkspace();
   if (existing) return existing.userId;
 
-  const rows = await db.select({ id: user.id }).from(user).where(eq(user.email, DEMO_EMAIL)).limit(1);
+  const rows = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, DEMO_EMAIL))
+    .limit(1);
   if (rows[0]) return rows[0].id;
 
   await auth.api.signUpEmail({
     body: { email: DEMO_EMAIL, password: DEMO_PASSWORD, name: 'Multa demo' },
   });
-  const created = await db.select({ id: user.id }).from(user).where(eq(user.email, DEMO_EMAIL)).limit(1);
+  const created = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, DEMO_EMAIL))
+    .limit(1);
   if (!created[0]) throw new Error('demo: не удалось создать пользователя');
   return created[0].id;
 }

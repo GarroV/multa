@@ -108,7 +108,9 @@ transactionsRoute.post('/transactions', async (c) => {
   const needsRate = body.currency !== ws.baseCurrency;
   const snap = needsRate ? await getRate(body.currency, ws.baseCurrency, occurredOn) : null;
   if (needsRate && !snap) return c.json({ error: 'rate_unavailable' }, 404);
-  const baseAmountMinor = snap ? convert(money(body.amountMinor, body.currency), snap).minor : body.amountMinor;
+  const baseAmountMinor = snap
+    ? convert(money(body.amountMinor, body.currency), snap).minor
+    : body.amountMinor;
 
   const { periodId } = await ensurePeriodForDate(ws, occurredOn);
 
@@ -162,7 +164,9 @@ async function parsePhrase(ws: Workspace, text: string) {
 
   const local = parseEntry(text, ctx);
   if (local.amountMinor !== null) {
-    const hit = local.categoryName ? catRows.find((c2) => c2.name === local.categoryName) : undefined;
+    const hit = local.categoryName
+      ? catRows.find((c2) => c2.name === local.categoryName)
+      : undefined;
     return {
       source: 'regex' as const,
       kind: local.kind,

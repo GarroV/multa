@@ -168,8 +168,10 @@ describe('onboardingIncomeSchema', () => {
 
   it('требует хотя бы один источник', () => {
     expect(
-      onboardingIncomeSchema.safeParse({ rhythm: { kind: 'monthly-days', days: [25] }, sources: [] })
-        .success,
+      onboardingIncomeSchema.safeParse({
+        rhythm: { kind: 'monthly-days', days: [25] },
+        sources: [],
+      }).success,
     ).toBe(false);
   });
 
@@ -212,12 +214,19 @@ describe('minor units (деньги на границе)', () => {
 describe('rateQuerySchema', () => {
   it('требует from и to', () => {
     expect(() => rateQuerySchema.parse({ from: 'EUR' })).toThrow();
-    expect(rateQuerySchema.parse({ from: 'EUR', to: 'RUB' })).toMatchObject({ from: 'EUR', to: 'RUB' });
+    expect(rateQuerySchema.parse({ from: 'EUR', to: 'RUB' })).toMatchObject({
+      from: 'EUR',
+      to: 'RUB',
+    });
   });
 });
 
 describe('transactionCreateSchema (факт трат, Спринт 3)', () => {
-  const body = (over: Record<string, unknown> = {}) => ({ amountMinor: '25000', currency: 'rub', ...over });
+  const body = (over: Record<string, unknown> = {}) => ({
+    amountMinor: '25000',
+    currency: 'rub',
+    ...over,
+  });
 
   it('отдаёт сумму bigint и нормализует валюту к верхнему регистру', () => {
     const parsed = transactionCreateSchema.parse(body());
@@ -231,7 +240,9 @@ describe('transactionCreateSchema (факт трат, Спринт 3)', () => {
   });
 
   it('дату принимает только как YYYY-MM-DD', () => {
-    expect(transactionCreateSchema.parse(body({ occurredOn: '2026-07-30' })).occurredOn).toBe('2026-07-30');
+    expect(transactionCreateSchema.parse(body({ occurredOn: '2026-07-30' })).occurredOn).toBe(
+      '2026-07-30',
+    );
     for (const bad of ['30.07.2026', '2026-7-30', 'сегодня', '2026-07-30T12:00:00Z']) {
       expect(transactionCreateSchema.safeParse(body({ occurredOn: bad })).success).toBe(false);
     }
@@ -249,7 +260,11 @@ describe('transactionCreateSchema (факт трат, Спринт 3)', () => {
 });
 
 describe('transactionCreateSchema — приход как факт (side hustle)', () => {
-  const body = (over: Record<string, unknown> = {}) => ({ amountMinor: '2500000', currency: 'RUB', ...over });
+  const body = (over: Record<string, unknown> = {}) => ({
+    amountMinor: '2500000',
+    currency: 'RUB',
+    ...over,
+  });
 
   it('по умолчанию это трата — kind не обязателен', () => {
     expect(transactionCreateSchema.parse(body()).kind).toBe('expense');
@@ -264,8 +279,9 @@ describe('transactionCreateSchema — приход как факт (side hustle)
 
   it('приход с категорией отвергает: категории — про траты, иначе факт попадёт в бюджет категории', () => {
     expect(
-      transactionCreateSchema.safeParse(body({ kind: 'income', categoryId: '3f0f0b3e-0f6e-4a1f-9a2e-2b7c3d4e5f60' }))
-        .success,
+      transactionCreateSchema.safeParse(
+        body({ kind: 'income', categoryId: '3f0f0b3e-0f6e-4a1f-9a2e-2b7c3d4e5f60' }),
+      ).success,
     ).toBe(false);
   });
 
@@ -281,6 +297,8 @@ describe('transactionListSchema', () => {
     expect(transactionListSchema.parse({})).toEqual({});
   });
   it('кривые даты отвергает', () => {
-    expect(transactionListSchema.safeParse({ from: '01-07-2026', to: '2026-07-30' }).success).toBe(false);
+    expect(transactionListSchema.safeParse({ from: '01-07-2026', to: '2026-07-30' }).success).toBe(
+      false,
+    );
   });
 });

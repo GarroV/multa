@@ -45,7 +45,8 @@ export const ru: Record<TranslationKey, string> = {
   'income.amounts.add': 'Добавить выплату',
   'income.amounts.mismatch': 'Период начинается {date}, но в этот день ничего не приходит.',
   'income.extra.title': 'Есть ещё источники дохода?',
-  'income.extra.hint': 'Подработка, разовый гонорар или «когда как» — можно пропустить и добавить позже.',
+  'income.extra.hint':
+    'Подработка, разовый гонорар или «когда как» — можно пропустить и добавить позже.',
   'income.extra.sideGig': 'Подработка, каждую неделю',
   'income.extra.oneOff': 'Разовый гонорар',
   'income.extra.irregular': 'Приходит когда как',
@@ -54,9 +55,11 @@ export const ru: Record<TranslationKey, string> = {
 
   // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
   'onboarding.debts.title': 'Платишь кредиты или рассрочки?',
-  'onboarding.debts.subtitle': 'Добавь — план первым делом отложит каждый платёж. Можно пропустить.',
+  'onboarding.debts.subtitle':
+    'Добавь — план первым делом отложит каждый платёж. Можно пропустить.',
   'onboarding.buckets.title': 'Тратишь в другой валюте?',
-  'onboarding.buckets.subtitle': 'Корзина размена: сколько дохода откладывать в другой валюте (аренда, жизнь). Можно пропустить.',
+  'onboarding.buckets.subtitle':
+    'Корзина размена: сколько дохода откладывать в другой валюте (аренда, жизнь). Можно пропустить.',
   'onboarding.finish': 'К моему плану',
   'onboarding.skipAll': 'пропустить настройку',
 
@@ -82,7 +85,8 @@ export const ru: Record<TranslationKey, string> = {
   'plan.summary.free': 'Свободно к концу периода',
   'plan.summary.perDay': 'На жизнь, в день',
   'plan.summary.toExchange': 'К размену',
-  'plan.compressed.note': 'На всё сразу не хватает — срезано {amount} {ccy}. Первыми уступают цели, потом конверты, потом категории; долги и корзины остаются целыми.',
+  'plan.compressed.note':
+    'На всё сразу не хватает — срезано {amount} {ccy}. Первыми уступают цели, потом конверты, потом категории; долги и корзины остаются целыми.',
   'plan.row.trimmed': 'срезано {amount}',
   'plan.category.budgetHint': 'бюджет на период',
   'cat.protected.on': 'Защищена — не режется автоматически при нехватке',
@@ -90,7 +94,8 @@ export const ru: Record<TranslationKey, string> = {
   'cat.new.placeholder': 'Новая категория',
   'plan.unresolved.title': 'Курс недоступен',
   'plan.unresolved.hint': 'Пока курс не подтянется, эти строки вне раскладки.',
-  'plan.unresolved.affectsHero': 'У части обязательств нет курса — цифра дня их не учитывает и может быть завышена.',
+  'plan.unresolved.affectsHero':
+    'У части обязательств нет курса — цифра дня их не учитывает и может быть завышена.',
   'plan.empty.noPlan': 'Пока раскладывать нечего — задай доход и добавь обязательства.',
   'plan.empty.needIncome': 'Настройку пропустили. Добавь источник дохода — план соберётся сам.',
   'plan.today.viewFull': 'Весь план →',
@@ -112,7 +117,8 @@ export const ru: Record<TranslationKey, string> = {
   'plan.act.edit': 'править',
   'plan.tag.protected': 'защищена',
   'signal.burn.title': 'При таком темпе деньги на жизнь кончатся {date}',
-  'signal.burn.body': 'Тратишь {perDay} в день, по плану было {perDayPlan}. Можно перекинуть бюджет или притормозить — оба варианта нормальны.',
+  'signal.burn.body':
+    'Тратишь {perDay} в день, по плану было {perDayPlan}. Можно перекинуть бюджет или притормозить — оба варианта нормальны.',
   'signal.burn.action': 'Пересобрать',
   'signal.ok': 'Темп в рамках плана',
 
@@ -228,13 +234,15 @@ export const ru: Record<TranslationKey, string> = {
   'spend.rateUnavailable': 'Курса на эту дату нет — возьми другую дату или валюту.',
   'spend.badAmount': 'Сумма — числом, например 1250 или 12,50',
   'spend.smart.placeholder': 'например «250 продукты» или «кофе 4.5 eur вчера»',
-  'spend.smart.hint': 'Пиши как сказал бы: сколько, куда, когда. Что не распозналось — поправишь ниже.',
+  'spend.smart.hint':
+    'Пиши как сказал бы: сколько, куда, когда. Что не распозналось — поправишь ниже.',
   'spend.smart.parsed': 'Понял так: {summary}',
   'spend.spentOfPlan': 'потрачено {spent} из {plan}',
   'spend.kind.expense': 'Трата',
   'spend.kind.income': 'Приход',
   'spend.titleIncome': 'Что пришло?',
-  'spend.subtitleIncome': 'Разовый приход, которого нет в источниках: подработка, возврат, подарок.',
+  'spend.subtitleIncome':
+    'Разовый приход, которого нет в источниках: подработка, возврат, подарок.',
   'spend.submitIncome': 'Записать приход',
   'plan.summary.extraIncome': 'Пришло вне плана',
   'exec.confirm': 'Сделал',
@@ -251,7 +259,8 @@ export const ru: Record<TranslationKey, string> = {
   'rebalance.empty': 'Взять неоткуда — долги и корзины остаются нетронутыми.',
   'rebalance.need': 'Нужно',
   'advice.raise': '{periods} периода подряд уходит около {amount} — поднять бюджет?',
-  'advice.lower': '{periods} периода не доходишь до плана — опустить до {amount} и освободить деньги?',
+  'advice.lower':
+    '{periods} периода не доходишь до плана — опустить до {amount} и освободить деньги?',
   'advice.apply': 'Поставить {amount}',
   'forecast.title': 'Что впереди',
   'forecast.debtClosed': '{name} закрывается',
@@ -274,7 +283,8 @@ export const ru: Record<TranslationKey, string> = {
   'receipt.done': 'Записано',
   'plan.summary.spent': 'Потрачено',
   'plan.summary.remaining': 'Осталось на жизнь',
-  'plan.overspent.note': 'Вышли за план на {amount} — дневной темп на нуле. Можно перекинуть бюджет из другой категории.',
+  'plan.overspent.note':
+    'Вышли за план на {amount} — дневной темп на нуле. Можно перекинуть бюджет из другой категории.',
   'cat.spent': 'потрачено {amount}',
   'cat.remaining': 'осталось {amount}',
   'cat.overspent': 'перерасход {amount}',

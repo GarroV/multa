@@ -59,7 +59,12 @@ describe('splitReceipt — позиции чека по категориям (С
   });
 
   it('позиций нет — вся сумма в «Общее» одним куском (правило фоллбека)', () => {
-    const r = splitReceipt({ items: [], categories, fallbackCategoryId: 'general', totalMinor: 234050n });
+    const r = splitReceipt({
+      items: [],
+      categories,
+      fallbackCategoryId: 'general',
+      totalMinor: 234050n,
+    });
 
     expect(r.byCategory).toEqual([{ categoryId: 'general', amountMinor: 234050n }]);
     expect(r.confidence).toBe('low');

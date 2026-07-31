@@ -20,8 +20,20 @@ import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
 import { logger } from './logger.ts';
-import { requireAuth, requireWorkspace, sessionMiddleware, type AppVariables, type Workspace } from './middleware.ts';
-import { applyRebalance, getCurrentPlan, rebalanceSuggestions, setCategoryBudget, setExecution } from './plan/assemble.ts';
+import {
+  requireAuth,
+  requireWorkspace,
+  sessionMiddleware,
+  type AppVariables,
+  type Workspace,
+} from './middleware.ts';
+import {
+  applyRebalance,
+  getCurrentPlan,
+  rebalanceSuggestions,
+  setCategoryBudget,
+  setExecution,
+} from './plan/assemble.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { demoRoute } from './routes/demo.ts';
 import { incomeRoute } from './routes/income.ts';
@@ -74,7 +86,9 @@ app.get('/v1/me', requireAuth, async (c) => {
   const ws = rows[0];
   // Онбординг завершён, когда есть ритм И хотя бы один активный источник дохода:
   // без ритма нет границ периода, без источника план собрался бы на нуле.
-  const onboardingComplete = ws ? ws.periodAnchors != null && (await hasActiveIncome(ws.id)) : false;
+  const onboardingComplete = ws
+    ? ws.periodAnchors != null && (await hasActiveIncome(ws.id))
+    : false;
   return c.json({
     user: { id: user.id, email: user.email, name: user.name },
     workspace: ws ? serializeWorkspace(ws) : null,
@@ -89,7 +103,11 @@ app.get('/v1/me', requireAuth, async (c) => {
 app.post('/v1/workspace', requireAuth, async (c) => {
   const user = c.get('user')!;
   const body = createWorkspaceSchema.parse(await c.req.json());
-  const existing = await db.select().from(workspaces).where(eq(workspaces.ownerId, user.id)).limit(1);
+  const existing = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.ownerId, user.id))
+    .limit(1);
   if (existing[0]) return c.json({ error: 'workspace_exists' }, 409);
   const inserted = await db
     .insert(workspaces)
@@ -118,7 +136,12 @@ app.patch('/v1/workspace', requireWorkspace, async (c) => {
       ...(body.weekendRule ? { paydayWeekendRule: body.weekendRule } : {}),
       // Правило выходных живёт и внутри ритма (его читает generatePeriods), и в колонке.
       ...(body.rhythm
-        ? { periodAnchors: { ...body.rhythm, weekendRule: body.weekendRule ?? ws.paydayWeekendRule } }
+        ? {
+            periodAnchors: {
+              ...body.rhythm,
+              weekendRule: body.weekendRule ?? ws.paydayWeekendRule,
+            },
+          }
         : {}),
     })
     .where(eq(workspaces.id, ws.id))
@@ -150,8 +173,10 @@ async function handleCategoryBudget(c: Context<{ Variables: AppVariables }>, pla
     const plan = await setCategoryBudget(ws, today(ws.timezone), id, plannedMinor);
     return c.json(plan);
   } catch (err) {
-    if (err instanceof Error && err.message === 'category_not_found') return c.json({ error: 'not_found' }, 404);
-    if (err instanceof Error && err.message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
+    if (err instanceof Error && err.message === 'category_not_found')
+      return c.json({ error: 'not_found' }, 404);
+    if (err instanceof Error && err.message === 'onboarding_incomplete')
+      return c.json({ error: 'onboarding_incomplete' }, 409);
     throw err;
   }
 }
@@ -169,16 +194,26 @@ async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'c
   const targetKind = c.req.param('kind') as TargetKind;
   const targetId = c.req.param('id');
   if (!targetId) return c.json({ error: 'not_found' }, 404);
-  const body = mode === 'confirm' ? executionSchema.parse(await c.req.json().catch(() => ({}))) : {};
+  const body =
+    mode === 'confirm' ? executionSchema.parse(await c.req.json().catch(() => ({}))) : {};
   try {
-    const plan = await setExecution(ws, today(ws.timezone), targetKind, targetId, mode, body.executedMinor);
+    const plan = await setExecution(
+      ws,
+      today(ws.timezone),
+      targetKind,
+      targetId,
+      mode,
+      body.executedMinor,
+    );
     return c.json(plan);
   } catch (err) {
     if (err instanceof Error && err.message === 'execution_not_applicable') {
       return c.json({ error: 'execution_not_applicable' }, 400);
     }
-    if (err instanceof Error && err.message === 'planned_item_not_found') return c.json({ error: 'not_found' }, 404);
-    if (err instanceof Error && err.message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
+    if (err instanceof Error && err.message === 'planned_item_not_found')
+      return c.json({ error: 'not_found' }, 404);
+    if (err instanceof Error && err.message === 'onboarding_incomplete')
+      return c.json({ error: 'onboarding_incomplete' }, 409);
     throw err;
   }
 }
@@ -190,7 +225,8 @@ app.get('/v1/plan/current/rebalance', requireWorkspace, async (c) => {
   try {
     return c.json(await rebalanceSuggestions(ws, today(ws.timezone), q.targetId, q.needMinor));
   } catch (err) {
-    if (err instanceof Error && err.message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
+    if (err instanceof Error && err.message === 'onboarding_incomplete')
+      return c.json({ error: 'onboarding_incomplete' }, 409);
     throw err;
   }
 });
@@ -223,8 +259,12 @@ app.post('/v1/plan/current/rebalance', requireWorkspace, async (c) => {
   }
 });
 
-app.post('/v1/plan/current/items/:kind/:id/confirm', requireWorkspace, (c) => handleExecution(c, 'confirm'));
-app.post('/v1/plan/current/items/:kind/:id/skip', requireWorkspace, (c) => handleExecution(c, 'skip'));
+app.post('/v1/plan/current/items/:kind/:id/confirm', requireWorkspace, (c) =>
+  handleExecution(c, 'confirm'),
+);
+app.post('/v1/plan/current/items/:kind/:id/skip', requireWorkspace, (c) =>
+  handleExecution(c, 'skip'),
+);
 
 // --- FX ---
 
@@ -264,7 +304,6 @@ app.route('/v1', receiptsRoute);
 
 // Регулярные платежи вне обязательств (#21): /v1/recurring-items
 app.route('/v1', recurringRoute);
-
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);

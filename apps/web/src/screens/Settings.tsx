@@ -109,7 +109,14 @@ export function Settings() {
     },
   });
 
-  if (!ws) return <div className="dense"><div className="panels"><span className="sub">{t('common.loading')}</span></div></div>;
+  if (!ws)
+    return (
+      <div className="dense">
+        <div className="panels">
+          <span className="sub">{t('common.loading')}</span>
+        </div>
+      </div>
+    );
 
   return (
     <div className="dense">
@@ -122,7 +129,12 @@ export function Settings() {
               <>
                 {saved && <span className="tag lime">{t('common.saved')}</span>}
                 {save.isError && <span className="tag mag">{t('common.error')}</span>}
-                <button type="button" className="act" disabled={save.isPending} onClick={() => save.mutate()}>
+                <button
+                  type="button"
+                  className="act"
+                  disabled={save.isPending}
+                  onClick={() => save.mutate()}
+                >
                   {t('common.save')}
                 </button>
               </>
@@ -130,7 +142,9 @@ export function Settings() {
           >
             <div className="prow">
               <span className="prow-day" aria-hidden />
-              <span className="prow-name"><span>{t('settings.currency')}</span></span>
+              <span className="prow-name">
+                <span>{t('settings.currency')}</span>
+              </span>
               <span className="prow-num">
                 <input
                   className="field num field-ccy"
@@ -147,7 +161,9 @@ export function Settings() {
             </div>
             <div className="prow">
               <span className="prow-day" aria-hidden />
-              <span className="prow-name"><span>{t('settings.rhythm')}</span></span>
+              <span className="prow-name">
+                <span>{t('settings.rhythm')}</span>
+              </span>
               <span className="prow-num" />
               <span />
               <span className="prow-bar" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
@@ -166,8 +182,12 @@ export function Settings() {
           <Panel label={t('settings.account')} accent="vio">
             <div className="prow">
               <span className="prow-day" aria-hidden />
-              <span className="prow-name"><span>{me?.user?.email ?? '—'}</span></span>
-              <span className="prow-num"><i>{me?.user?.name ?? ''}</i></span>
+              <span className="prow-name">
+                <span>{me?.user?.email ?? '—'}</span>
+              </span>
+              <span className="prow-num">
+                <i>{me?.user?.name ?? ''}</i>
+              </span>
               <span />
             </div>
             {/* TOTP-переключатель ещё не сделан (issue #19) — обещать его строкой в настройках нельзя. */}
@@ -230,7 +250,12 @@ export function Settings() {
           }
         >
           {sources.length === 0 && (
-            <div className="prow"><span /><span className="dim">{t('common.empty')}</span><span /><span /></div>
+            <div className="prow">
+              <span />
+              <span className="dim">{t('common.empty')}</span>
+              <span />
+              <span />
+            </div>
           )}
           {sources.map((s) => (
             <div className="prow" key={s.id}>
@@ -241,7 +266,9 @@ export function Settings() {
                 {s.currency !== ws.baseCurrency && <Tag tone="vio">{s.currency}</Tag>}
               </span>
               <span className="prow-num">
-                <b>{amountLabel(s.amount, s.currency, locale)} {s.currency}</b>
+                <b>
+                  {amountLabel(s.amount, s.currency, locale)} {s.currency}
+                </b>
               </span>
               <button
                 type="button"

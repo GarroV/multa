@@ -28,7 +28,9 @@ async function splitCategories(ws: Workspace) {
     .orderBy(asc(categories.sort));
   const fallback = rows.find((r) => r.isSystem) ?? rows[rows.length - 1];
   return {
-    list: rows.filter((r) => !r.isSystem).map((r) => ({ id: r.id, name: r.name, keywords: [r.name] })),
+    list: rows
+      .filter((r) => !r.isSystem)
+      .map((r) => ({ id: r.id, name: r.name, keywords: [r.name] })),
     fallbackId: fallback?.id ?? null,
   };
 }
@@ -70,7 +72,12 @@ receiptsRoute.post('/receipts/qr', async (c) => {
   const totalMinor = parsed.totalMinor ?? body.totalMinor ?? null;
   if (totalMinor === null) return c.json({ error: 'total_unknown' }, 422);
 
-  const split = splitReceipt({ items, categories: list, fallbackCategoryId: fallbackId, totalMinor });
+  const split = splitReceipt({
+    items,
+    categories: list,
+    fallbackCategoryId: fallbackId,
+    totalMinor,
+  });
 
   const inserted = await db
     .insert(receipts)
@@ -92,7 +99,10 @@ receiptsRoute.post('/receipts/qr', async (c) => {
       currency: parsed.currency,
       totalMinor: totalMinor.toString(),
       confidence: split.confidence,
-      split: split.byCategory.map((a) => ({ categoryId: a.categoryId, amountMinor: a.amountMinor.toString() })),
+      split: split.byCategory.map((a) => ({
+        categoryId: a.categoryId,
+        amountMinor: a.amountMinor.toString(),
+      })),
     },
     201,
   );
@@ -123,7 +133,8 @@ receiptsRoute.post('/receipts/:id/confirm', async (c) => {
     .from(categories)
     .where(and(eq(categories.workspaceId, ws.id), eq(categories.archived, false)));
   const allowed = new Set(owned.map((o) => o.id));
-  if (body.split.some((s) => !allowed.has(s.categoryId))) return c.json({ error: 'category_not_found' }, 404);
+  if (body.split.some((s) => !allowed.has(s.categoryId)))
+    return c.json({ error: 'category_not_found' }, 404);
 
   // Переписываем траты чека одной транзакцией БД: между удалением и вставкой нет момента,
   // когда чек подтверждён, а трат нет.
@@ -184,7 +195,9 @@ receiptsRoute.post('/receipts/photo', async (c) => {
       ...(recognized.merchant ? { merchant: recognized.merchant } : {}),
       totalMinor: recognized.totalMinor,
       currency: recognized.currency,
-      ...(recognized.purchasedOn ? { purchasedAt: new Date(`${recognized.purchasedOn}T12:00:00Z`) } : {}),
+      ...(recognized.purchasedOn
+        ? { purchasedAt: new Date(`${recognized.purchasedOn}T12:00:00Z`) }
+        : {}),
       items: recognized.items.map((i) => ({ name: i.name, amountMinor: i.amountMinor.toString() })),
     })
     .returning();
@@ -197,7 +210,10 @@ receiptsRoute.post('/receipts/photo', async (c) => {
       totalMinor: recognized.totalMinor.toString(),
       confidence: split.confidence,
       items: recognized.items.map((i) => ({ name: i.name, amountMinor: i.amountMinor.toString() })),
-      split: split.byCategory.map((a) => ({ categoryId: a.categoryId, amountMinor: a.amountMinor.toString() })),
+      split: split.byCategory.map((a) => ({
+        categoryId: a.categoryId,
+        amountMinor: a.amountMinor.toString(),
+      })),
     },
     201,
   );

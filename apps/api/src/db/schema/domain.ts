@@ -88,7 +88,9 @@ export const accounts = pgTable(
     name: text('name').notNull(),
     currency: ccy('currency').notNull(),
     kind: text('kind').notNull(),
-    balanceMinor: bigint('balance_minor', { mode: 'bigint' }).notNull().default(sql`0`),
+    balanceMinor: bigint('balance_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
     archived: boolean('archived').notNull().default(false),
   },
   (t) => [check('accounts_kind_ck', sql`${t.kind} in ('cash','card','savings','other')`)],
@@ -119,7 +121,9 @@ export const payPeriods = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     startsOn: date('starts_on').notNull(),
     endsOn: date('ends_on').notNull(),
-    expectedIncomeMinor: bigint('expected_income_minor', { mode: 'bigint' }).notNull().default(sql`0`),
+    expectedIncomeMinor: bigint('expected_income_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
     status: text('status').notNull().default('planned'),
   },
   (t) => [
@@ -155,7 +159,9 @@ export const envelopes = pgTable(
     currency: ccy('currency').notNull(),
     ruleKind: text('rule_kind').notNull(),
     ruleValue: numeric('rule_value', { precision: 12, scale: 4 }).notNull(),
-    balanceMinor: bigint('balance_minor', { mode: 'bigint' }).notNull().default(sql`0`),
+    balanceMinor: bigint('balance_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
   },
   (t) => [check('envelopes_rule_kind_ck', sql`${t.ruleKind} in ('fixed','percent')`)],
 );
@@ -168,7 +174,9 @@ export const goals = pgTable('goals', {
   name: text('name').notNull(),
   currency: ccy('currency').notNull(),
   targetMinor: bigint('target_minor', { mode: 'bigint' }).notNull(),
-  savedMinor: bigint('saved_minor', { mode: 'bigint' }).notNull().default(sql`0`),
+  savedMinor: bigint('saved_minor', { mode: 'bigint' })
+    .notNull()
+    .default(sql`0`),
   plannedPerPeriodMinor: bigint('planned_per_period_minor', { mode: 'bigint' })
     .notNull()
     .default(sql`0`),
@@ -201,12 +209,17 @@ export const plannedItems = pgTable(
     targetId: uuid('target_id').notNull(),
     plannedMinor: bigint('planned_minor', { mode: 'bigint' }).notNull(),
     executionStatus: text('execution_status').notNull().default('pending'),
-    executedMinor: bigint('executed_minor', { mode: 'bigint' }).notNull().default(sql`0`),
+    executedMinor: bigint('executed_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
     auto: boolean('auto').notNull().default(false),
   },
   (t) => [
     unique('planned_items_uq').on(t.periodId, t.targetKind, t.targetId),
-    check('planned_items_target_ck', sql`${t.targetKind} in ('category','debt','envelope','goal','bucket')`),
+    check(
+      'planned_items_target_ck',
+      sql`${t.targetKind} in ('category','debt','envelope','goal','bucket')`,
+    ),
     check(
       'planned_items_status_ck',
       sql`${t.executionStatus} in ('pending','confirmed','partial','skipped','n_a')`,
@@ -230,7 +243,10 @@ export const planRevisions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    check('plan_revisions_reason_ck', sql`${t.reason} in ('overspend','manual','income_change','auto_suggest')`),
+    check(
+      'plan_revisions_reason_ck',
+      sql`${t.reason} in ('overspend','manual','income_change','auto_suggest')`,
+    ),
   ],
 );
 
@@ -253,7 +269,10 @@ export const receipts = pgTable(
   },
   (t) => [
     check('receipts_status_ck', sql`${t.status} in ('pending','parsed','fallback','failed')`),
-    check('receipts_method_ck', sql`${t.method} is null or ${t.method} in ('qr_fns','qr_rs','vision')`),
+    check(
+      'receipts_method_ck',
+      sql`${t.method} is null or ${t.method} in ('qr_fns','qr_rs','vision')`,
+    ),
   ],
 );
 
@@ -284,8 +303,14 @@ export const transactions = pgTable(
     plannedItemId: uuid('planned_item_id').references(() => plannedItems.id),
   },
   (t) => [
-    check('transactions_kind_ck', sql`${t.kind} in ('expense','income','transfer_out','transfer_in','exchange')`),
-    check('transactions_source_ck', sql`${t.source} in ('manual','text','voice','receipt','recurring','import')`),
+    check(
+      'transactions_kind_ck',
+      sql`${t.kind} in ('expense','income','transfer_out','transfer_in','exchange')`,
+    ),
+    check(
+      'transactions_source_ck',
+      sql`${t.source} in ('manual','text','voice','receipt','recurring','import')`,
+    ),
     check(
       'transactions_target_ck',
       sql`${t.targetKind} is null or ${t.targetKind} in ('category','debt','envelope','goal')`,

@@ -23,7 +23,15 @@ function readAsDataUrl(file: File): Promise<string> {
  * Чек (04-web-ux §Ввод): сначала QR — он бесплатный и точный, фото только если QR нет.
  * Раскладка всегда показывается до записи: модель может ошибиться, а деньги пользователя — нет.
  */
-export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: string; onClose: () => void }) {
+export function ReceiptEntry({
+  base,
+  locale,
+  onClose,
+}: {
+  base: string;
+  locale: string;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   const { data: categories = [] } = useCategories();
   const qr = useParseReceiptQr();
@@ -41,7 +49,12 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
       <div className="sheet">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
           <div style={{ fontWeight: 600 }}>{t('receipt.title')}</div>
-          <button type="button" className="btn btn-ghost" onClick={onClose} title={t('common.cancel')}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            title={t('common.cancel')}
+          >
             ✕
           </button>
         </div>
@@ -100,7 +113,9 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
               </span>
             </div>
 
-            {parsed.confidence === 'low' && <div className="note-band">{t('receipt.lowConfidence')}</div>}
+            {parsed.confidence === 'low' && (
+              <div className="note-band">{t('receipt.lowConfidence')}</div>
+            )}
 
             <section className="tile">
               {parsed.split.map((row) => (
@@ -118,7 +133,10 @@ export function ReceiptEntry({ base, locale, onClose }: { base: string; locale: 
               className="btn"
               disabled={confirm.isPending}
               onClick={() =>
-                confirm.mutate({ id: parsed.receipt.id, split: parsed.split }, { onSuccess: onClose })
+                confirm.mutate(
+                  { id: parsed.receipt.id, split: parsed.split },
+                  { onSuccess: onClose },
+                )
               }
             >
               {confirm.isPending ? t('common.loading') : t('receipt.confirm')}

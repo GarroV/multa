@@ -98,7 +98,10 @@ export interface PlanDto {
   unresolved: PlanUnresolved[];
   burn: { perDayMinor: string; willLast: boolean; runsOutOn: string | null };
   /** Разбивка дохода периода по источникам. */
-  income: { events: IncomeEventDto[]; unresolved: (IncomeEventDto & { reason: 'rate_unavailable' })[] };
+  income: {
+    events: IncomeEventDto[];
+    unresolved: (IncomeEventDto & { reason: 'rate_unavailable' })[];
+  };
 }
 
 export function useMe() {
@@ -110,7 +113,12 @@ export function useMe() {
         return await api<MeDto>('/v1/me');
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          return { user: null, workspace: null, onboardingComplete: false, onboardingSkipped: false };
+          return {
+            user: null,
+            workspace: null,
+            onboardingComplete: false,
+            onboardingSkipped: false,
+          };
         }
         throw err;
       }
@@ -182,7 +190,8 @@ export function useEntities<T>(name: EntityName) {
 export function useCreateEntity(name: EntityName) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => api(`/v1/${name}`, { method: 'POST', body: JSON.stringify(body) }),
+    mutationFn: (body: unknown) =>
+      api(`/v1/${name}`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [name] }),
   });
 }
@@ -198,7 +207,11 @@ export function useDeleteEntity(name: EntityName) {
 // --- Категории (Спринт 2) ---
 
 export function useCategories() {
-  return useQuery({ queryKey: ['categories'], retry: false, queryFn: () => api<Category[]>('/v1/categories') });
+  return useQuery({
+    queryKey: ['categories'],
+    retry: false,
+    queryFn: () => api<Category[]>('/v1/categories'),
+  });
 }
 
 export function useCreateCategory() {
@@ -216,8 +229,15 @@ export function useCreateCategory() {
 export function usePatchCategory() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: string; name?: string; protected?: boolean; sort?: number }) =>
-      api<Category>(`/v1/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      name?: string;
+      protected?: boolean;
+      sort?: number;
+    }) => api<Category>(`/v1/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['categories'] });
       void qc.invalidateQueries({ queryKey: ['plan'] });
@@ -241,7 +261,10 @@ export function useSetCategoryBudget() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, plannedMinor }: { id: string; plannedMinor: string }) =>
-      api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'PUT', body: JSON.stringify({ plannedMinor }) }),
+      api<PlanDto>(`/v1/plan/current/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ plannedMinor }),
+      }),
     onSuccess: (plan) => qc.setQueryData(['plan'], plan),
   });
 }
@@ -249,7 +272,8 @@ export function useSetCategoryBudget() {
 export function useClearCategoryBudget() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: string) =>
+      api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'DELETE' }),
     onSuccess: (plan) => qc.setQueryData(['plan'], plan),
   });
 }
@@ -335,7 +359,11 @@ export interface TransactionsDto {
 
 /** Траты текущего периода (границы считает сервер по якорям выплат). */
 export function useTransactions() {
-  return useQuery({ queryKey: ['transactions'], retry: false, queryFn: () => api<TransactionsDto>('/v1/transactions') });
+  return useQuery({
+    queryKey: ['transactions'],
+    retry: false,
+    queryFn: () => api<TransactionsDto>('/v1/transactions'),
+  });
 }
 
 export interface SpendInput {
@@ -381,7 +409,15 @@ export function useCreateSpend() {
 export function useConfirmExecution() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ targetKind, targetId, executedMinor }: { targetKind: string; targetId: string; executedMinor?: string }) =>
+    mutationFn: ({
+      targetKind,
+      targetId,
+      executedMinor,
+    }: {
+      targetKind: string;
+      targetId: string;
+      executedMinor?: string;
+    }) =>
       api<PlanDto>(`/v1/plan/current/items/${targetKind}/${targetId}/confirm`, {
         method: 'POST',
         body: JSON.stringify(executedMinor ? { executedMinor } : {}),
@@ -406,7 +442,9 @@ export function useSkipExecution() {
 }
 
 export function useDeleteSpend() {
-  return useTransactionMutation<string>((id) => api(`/v1/transactions/${id}`, { method: 'DELETE' }));
+  return useTransactionMutation<string>((id) =>
+    api(`/v1/transactions/${id}`, { method: 'DELETE' }),
+  );
 }
 
 // --- Размен валюты (Спринт 3) ---
@@ -433,7 +471,11 @@ export interface ExchangeDto {
 }
 
 export function useExchangeOps() {
-  return useQuery({ queryKey: ['exchange-ops'], retry: false, queryFn: () => api<ExchangeDto>('/v1/exchange-ops') });
+  return useQuery({
+    queryKey: ['exchange-ops'],
+    retry: false,
+    queryFn: () => api<ExchangeDto>('/v1/exchange-ops'),
+  });
 }
 
 export interface ExchangeInput {
@@ -484,7 +526,9 @@ export function useRebalanceOptions(targetId: string | null, needMinor: string) 
     enabled: !!targetId && BigInt(needMinor || '0') > 0n,
     retry: false,
     queryFn: () =>
-      api<RebalanceOption[]>(`/v1/plan/current/rebalance?targetId=${targetId}&needMinor=${needMinor}`),
+      api<RebalanceOption[]>(
+        `/v1/plan/current/rebalance?targetId=${targetId}&needMinor=${needMinor}`,
+      ),
   });
 }
 
@@ -524,7 +568,9 @@ export function useForecast() {
     queryKey: ['forecast'],
     retry: false,
     queryFn: () =>
-      api<{ horizonPeriods: number; dueSoon: RecurringDue[]; events: ForecastEvent[] }>('/v1/forecast'),
+      api<{ horizonPeriods: number; dueSoon: RecurringDue[]; events: ForecastEvent[] }>(
+        '/v1/forecast',
+      ),
   });
 }
 
@@ -557,7 +603,10 @@ export function useParseReceiptQr() {
 export function useParseReceiptPhoto() {
   return useMutation({
     mutationFn: (imageUrl: string) =>
-      api<ReceiptParsed>('/v1/receipts/photo', { method: 'POST', body: JSON.stringify({ imageUrl }) }),
+      api<ReceiptParsed>('/v1/receipts/photo', {
+        method: 'POST',
+        body: JSON.stringify({ imageUrl }),
+      }),
   });
 }
 
@@ -591,6 +640,9 @@ export interface ParsedEntryDto {
 export function useParseEntry() {
   return useMutation({
     mutationFn: (text: string) =>
-      api<ParsedEntryDto>('/v1/transactions/parse', { method: 'POST', body: JSON.stringify({ text }) }),
+      api<ParsedEntryDto>('/v1/transactions/parse', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }),
   });
 }

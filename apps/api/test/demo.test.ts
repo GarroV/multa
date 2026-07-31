@@ -37,7 +37,8 @@ describe('вход в демо', () => {
     expect(BigInt(plan.compressedMinor)).toBe(0n);
     // Порог, а не «больше нуля»: строка на 30 RUB вместо 3 000 выглядит как ошибка данных
     // (так уже случилось с fixed-конвертом, где ruleValue — minor units).
-    for (const a of plan.allocations) expect(BigInt(a.allocatedMinor)).toBeGreaterThanOrEqual(100_000n);
+    for (const a of plan.allocations)
+      expect(BigInt(a.allocatedMinor)).toBeGreaterThanOrEqual(100_000n);
     expect(BigInt(plan.canSpendPerDayMinor)).toBeGreaterThan(0n);
   });
 
@@ -54,7 +55,9 @@ describe('вход в демо', () => {
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));
     const plan = await expectOk<PlanDto>(await guest.get('/v1/plan/current'));
-    const from = new Date(new Date(`${plan.period.startsOn}T00:00:00Z`).getTime() - 200 * 86_400_000)
+    const from = new Date(
+      new Date(`${plan.period.startsOn}T00:00:00Z`).getTime() - 200 * 86_400_000,
+    )
       .toISOString()
       .slice(0, 10);
     const past = await expectOk<{ transactions: unknown[] }>(
@@ -66,9 +69,10 @@ describe('вход в демо', () => {
   test('размены с разными спредами показывают копилку потерь', async () => {
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));
-    const fx = await expectOk<{ ops: { spreadPct: string | null; note: string | null }[]; totalLost: unknown[] }>(
-      await guest.get('/v1/exchange-ops'),
-    );
+    const fx = await expectOk<{
+      ops: { spreadPct: string | null; note: string | null }[];
+      totalLost: unknown[];
+    }>(await guest.get('/v1/exchange-ops'));
     expect(fx.ops.length).toBeGreaterThanOrEqual(3);
     expect(fx.totalLost.length).toBeGreaterThan(0);
 
@@ -102,18 +106,25 @@ describe('вход в демо', () => {
     await expectOk(await guest.post('/v1/demo/enter'));
     const cats = await expectOk<{ id: string; name: string }[]>(await guest.get('/v1/categories'));
     const food = cats.find((c) => c.name === 'Groceries')!;
-    await expectOk(await guest.post('/v1/transactions', {
-      amountMinor: '999900',
-      currency: 'RUB',
-      categoryId: food.id,
-      note: 'спонтанная трата смотрящего',
-    }), 201);
+    await expectOk(
+      await guest.post('/v1/transactions', {
+        amountMinor: '999900',
+        currency: 'RUB',
+        categoryId: food.id,
+        note: 'спонтанная трата смотрящего',
+      }),
+      201,
+    );
 
-    const dirty = await expectOk<{ transactions: { note: string | null }[] }>(await guest.get('/v1/transactions'));
+    const dirty = await expectOk<{ transactions: { note: string | null }[] }>(
+      await guest.get('/v1/transactions'),
+    );
     expect(dirty.transactions.some((t) => t.note === 'спонтанная трата смотрящего')).toBe(true);
 
     await expectOk(await guest.post('/v1/demo/reset'));
-    const clean = await expectOk<{ transactions: { note: string | null }[] }>(await guest.get('/v1/transactions'));
+    const clean = await expectOk<{ transactions: { note: string | null }[] }>(
+      await guest.get('/v1/transactions'),
+    );
     expect(clean.transactions.some((t) => t.note === 'спонтанная трата смотрящего')).toBe(false);
   });
 
@@ -126,7 +137,9 @@ describe('вход в демо', () => {
 
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));
-    const list = await expectOk<{ transactions: { id: string }[] }>(await guest.get('/v1/transactions'));
+    const list = await expectOk<{ transactions: { id: string }[] }>(
+      await guest.get('/v1/transactions'),
+    );
     expect(list.transactions.map((t) => t.id)).not.toContain(created.id);
     expect((await guest.del(`/v1/transactions/${created.id}`)).status).toBe(404);
   });

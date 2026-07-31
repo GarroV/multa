@@ -71,7 +71,10 @@ describe('summarizePlan — производные ага-момента', () =>
 });
 
 describe('summarizeFact — цифра дня от факта (Спринт 3)', () => {
-  const living = (livingMinor: bigint) => summarizePlan(cascade(livingMinor, [item('category', 'food', livingMinor)]), { daysInPeriod: 16 });
+  const living = (livingMinor: bigint) =>
+    summarizePlan(cascade(livingMinor, [item('category', 'food', livingMinor)]), {
+      daysInPeriod: 16,
+    });
 
   it('без трат делит остаток на ОСТАВШИЕСЯ дни, а не на длину периода', () => {
     // Регрессия: цифра дня делилась на daysInPeriod (16) и в середине периода занижала темп.
@@ -115,12 +118,24 @@ describe('summarizeFact — цифра дня от факта (Спринт 3)',
 
 describe('categorySpending — остаток по категории', () => {
   it('остаток = бюджет − факт; перерасход отдаётся отдельно', () => {
-    expect(categorySpending(20000n, 12000n)).toEqual({ spentMinor: 12000n, remainingMinor: 8000n, overspentMinor: 0n });
-    expect(categorySpending(20000n, 26000n)).toEqual({ spentMinor: 26000n, remainingMinor: -6000n, overspentMinor: 6000n });
+    expect(categorySpending(20000n, 12000n)).toEqual({
+      spentMinor: 12000n,
+      remainingMinor: 8000n,
+      overspentMinor: 0n,
+    });
+    expect(categorySpending(20000n, 26000n)).toEqual({
+      spentMinor: 26000n,
+      remainingMinor: -6000n,
+      overspentMinor: 6000n,
+    });
   });
 
   it('категория без бюджета: любая трата — перерасход', () => {
-    expect(categorySpending(0n, 500n)).toEqual({ spentMinor: 500n, remainingMinor: -500n, overspentMinor: 500n });
+    expect(categorySpending(0n, 500n)).toEqual({
+      spentMinor: 500n,
+      remainingMinor: -500n,
+      overspentMinor: 500n,
+    });
   });
 });
 
@@ -134,7 +149,11 @@ describe('assemblePlan — сборка целиком', () => {
     ];
     const { result, summary } = assemblePlan(100000n, plan, { daysInPeriod: 20 });
     // порядок строк — по приоритету
-    expect(result.allocations.map((a) => a.targetKind)).toEqual(['debt', 'bucket', 'envelope', 'category', 'goal'].filter((k) => plan.some((p) => p.targetKind === k)));
+    expect(result.allocations.map((a) => a.targetKind)).toEqual(
+      ['debt', 'bucket', 'envelope', 'category', 'goal'].filter((k) =>
+        plan.some((p) => p.targetKind === k),
+      ),
+    );
     // 20000+60000+20000+30000 = 130000 > 100000 → цель режется первой на 30000
     expect(result.compressedMinor).toBe(30000n);
     expect(result.totalAllocatedMinor).toBeLessThanOrEqual(100000n); // инвариант 3

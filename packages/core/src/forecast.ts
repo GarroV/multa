@@ -66,7 +66,13 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
     const periods = periodsToCover(debt.remainingMinor, debt.paymentMinor);
     if (periods === null || periods > periodsAhead) continue;
     const on = dateOf(periods);
-    events.push({ kind: 'debt_closed', targetId: debt.id, name: debt.name, on, periodsAway: periods });
+    events.push({
+      kind: 'debt_closed',
+      targetId: debt.id,
+      name: debt.name,
+      on,
+      periodsAway: periods,
+    });
     // Закрытый долг освобождает платёж — 01-domain-model предлагает переложить его в конверт/цель.
     events.push({
       kind: 'freed_money',
@@ -93,7 +99,13 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       });
       continue;
     }
-    events.push({ kind: 'goal_reached', targetId: goal.id, name: goal.name, on: dateOf(periods), periodsAway: periods });
+    events.push({
+      kind: 'goal_reached',
+      targetId: goal.id,
+      name: goal.name,
+      on: dateOf(periods),
+      periodsAway: periods,
+    });
   }
 
   return events.sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));

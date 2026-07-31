@@ -46,11 +46,17 @@ exchangeRoute.get('/exchange-ops', async (c) => {
   const lossByCurrency = new Map<string, bigint>();
   for (const row of rows) {
     if (row.spreadMinor == null) continue;
-    lossByCurrency.set(row.toCurrency, (lossByCurrency.get(row.toCurrency) ?? 0n) + row.spreadMinor);
+    lossByCurrency.set(
+      row.toCurrency,
+      (lossByCurrency.get(row.toCurrency) ?? 0n) + row.spreadMinor,
+    );
   }
   return c.json({
     ops,
-    totalLost: [...lossByCurrency].map(([currency, minor]) => ({ currency, minor: minor.toString() })),
+    totalLost: [...lossByCurrency].map(([currency, minor]) => ({
+      currency,
+      minor: minor.toString(),
+    })),
   });
 });
 

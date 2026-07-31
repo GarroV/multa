@@ -24,7 +24,10 @@ describe('budgetAdvice — обучение плана на факте (Спри
   });
 
   it('медиана чётного числа периодов — среднее двух средних', () => {
-    const advice = budgetAdvice({ plannedMinor: 10000n, history: [20000n, 30000n, 24000n, 26000n] });
+    const advice = budgetAdvice({
+      plannedMinor: 10000n,
+      history: [20000n, 30000n, 24000n, 26000n],
+    });
 
     expect(advice?.suggestedMinor).toBe(25000n); // (24000 + 26000) / 2
   });

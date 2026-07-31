@@ -27,16 +27,28 @@ export function Rebalance({
   const apply = useApplyRebalance();
 
   return (
-    <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t('rebalance.open')}>
+    <div
+      className="sheet-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('rebalance.open')}
+    >
       <div className="sheet">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>{t('rebalance.title', { category: categoryName })}</div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>
+              {t('rebalance.title', { category: categoryName })}
+            </div>
             <div className="dim mono" style={{ marginTop: 4, fontSize: 13 }}>
               {t('rebalance.need')} {formatMinor(needMinor, base, locale)} {base}
             </div>
           </div>
-          <button type="button" className="btn btn-ghost" onClick={onClose} title={t('common.cancel')}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            title={t('common.cancel')}
+          >
             ✕
           </button>
         </div>
@@ -51,7 +63,11 @@ export function Rebalance({
           <div key={`${o.targetKind}:${o.targetId}`} className="list-item">
             <span className="row" style={{ gap: 8 }}>
               <span>{o.name}</span>
-              {o.usual && <span className="chip" style={{ padding: '2px 8px', fontSize: 11 }}>{t('rebalance.usual')}</span>}
+              {o.usual && (
+                <span className="chip" style={{ padding: '2px 8px', fontSize: 11 }}>
+                  {t('rebalance.usual')}
+                </span>
+              )}
               <span className="dim mono" style={{ fontSize: 13 }}>
                 {formatMinor(o.availableMinor, base, locale)} {base}
               </span>
@@ -62,7 +78,12 @@ export function Rebalance({
               disabled={apply.isPending}
               onClick={() =>
                 apply.mutate(
-                  { fromKind: o.targetKind, fromId: o.targetId, toId: categoryId, amountMinor: o.takeMinor },
+                  {
+                    fromKind: o.targetKind,
+                    fromId: o.targetId,
+                    toId: categoryId,
+                    amountMinor: o.takeMinor,
+                  },
                   { onSuccess: onClose },
                 )
               }

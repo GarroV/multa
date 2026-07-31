@@ -27,10 +27,16 @@ export const TEXT_ENTRY_SCHEMA = {
   type: 'object',
   properties: {
     kind: { type: 'string', enum: ['expense', 'income'] },
-    amountMajor: { type: 'string', description: 'сумма в основных единицах, точка как разделитель' },
+    amountMajor: {
+      type: 'string',
+      description: 'сумма в основных единицах, точка как разделитель',
+    },
     currency: { type: ['string', 'null'], description: 'ISO 4217, если названа' },
     occurredOn: { type: ['string', 'null'], description: 'YYYY-MM-DD, если названа' },
-    categoryName: { type: ['string', 'null'], description: 'ровно из переданного списка категорий' },
+    categoryName: {
+      type: ['string', 'null'],
+      description: 'ровно из переданного списка категорий',
+    },
     note: { type: ['string', 'null'] },
   },
   required: ['kind', 'amountMajor', 'currency', 'occurredOn', 'categoryName', 'note'],
@@ -52,7 +58,8 @@ export interface ParsedTextEntry {
   readonly note: string | null;
 }
 
-const isAmount = (v: unknown): v is string => typeof v === 'string' && /^-?\d+(\.\d{1,2})?$/.test(v.trim());
+const isAmount = (v: unknown): v is string =>
+  typeof v === 'string' && /^-?\d+(\.\d{1,2})?$/.test(v.trim());
 
 export function parseTextPayload(raw: string, ctx: TextEntryContext): ParsedTextEntry | null {
   let data: Record<string, unknown>;
@@ -76,15 +83,26 @@ export function parseTextPayload(raw: string, ctx: TextEntryContext): ParsedText
   const categoryRaw = typeof data.categoryName === 'string' ? data.categoryName.trim() : '';
   // Категорию принимаем только из списка воркспейса: выдуманная строка создала бы мусор.
   const known = ctx.categories?.some((c) => c.toLowerCase() === categoryRaw.toLowerCase());
-  const categoryName = kind === 'income' || !categoryRaw || (ctx.categories && !known) ? null : categoryRaw;
+  const categoryName =
+    kind === 'income' || !categoryRaw || (ctx.categories && !known) ? null : categoryRaw;
 
   const note = typeof data.note === 'string' && data.note.trim() !== '' ? data.note.trim() : null;
 
-  return { kind, amountMinor: fromMajor(amount.trim(), currency).minor, currency, occurredOn, categoryName, note };
+  return {
+    kind,
+    amountMinor: fromMajor(amount.trim(), currency).minor,
+    currency,
+    occurredOn,
+    categoryName,
+    note,
+  };
 }
 
 /** Разбирает свободную фразу. null — ключа нет, сеть отказала или ответу нельзя доверять. */
-export async function parseEntryWithLlm(text: string, ctx: TextEntryContext): Promise<ParsedTextEntry | null> {
+export async function parseEntryWithLlm(
+  text: string,
+  ctx: TextEntryContext,
+): Promise<ParsedTextEntry | null> {
   if (!openaiKey()) {
     logger.warn('textLlm: OPENAI_API_KEY не задан — фоллбэк недоступен');
     return null;

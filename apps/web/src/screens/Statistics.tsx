@@ -31,7 +31,17 @@ function Centered({ children }: { children: ReactNode }) {
   return <div className="center-screen">{children}</div>;
 }
 
-function Metric({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'accent' | 'over' }) {
+function Metric({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: 'accent' | 'over';
+}) {
   return (
     <div className="kpi">
       <span className="kpi-label">{label}</span>
@@ -164,7 +174,10 @@ function StatsBody({ plan }: { plan: PlanDto }) {
         <Metric
           label={t('stats.planVsFact')}
           value={fact.deltaPct === null ? '—' : pct(fact.deltaPct)}
-          sub={t('stats.planVsFact.sub', { spent: fmt(fact.spentMinor), plan: fmt(fact.plannedMinor) })}
+          sub={t('stats.planVsFact.sub', {
+            spent: fmt(fact.spentMinor),
+            plan: fmt(fact.plannedMinor),
+          })}
           tone={fact.deltaPct !== null && fact.deltaPct > 0 ? 'over' : undefined}
         />
         <Metric
@@ -262,11 +275,17 @@ function StatsBody({ plan }: { plan: PlanDto }) {
                 </span>
                 <span className="prow-num">
                   <b>{m.pct.toFixed(0)}%</b>
-                  <i>{formatMinor(m.minor.toString(), base, locale)} {base}</i>
+                  <i>
+                    {formatMinor(m.minor.toString(), base, locale)} {base}
+                  </i>
                 </span>
                 <span />
                 <span className="prow-bar">
-                  <Bar share={m.pct} tone={m.currency === base ? 'cyan' : 'vio'} label={m.currency} />
+                  <Bar
+                    share={m.pct}
+                    tone={m.currency === base ? 'cyan' : 'vio'}
+                    label={m.currency}
+                  />
                   <span />
                 </span>
               </div>
@@ -305,7 +324,8 @@ function StatsBody({ plan }: { plan: PlanDto }) {
                   </span>
                   <span className="prow-num">
                     <b className={gain ? 'st-ok' : 'st-warn'}>
-                      {formatMinor((gain ? -minor : minor).toString(), l.currency, locale)} {l.currency}
+                      {formatMinor((gain ? -minor : minor).toString(), l.currency, locale)}{' '}
+                      {l.currency}
                     </b>
                   </span>
                   <span />
@@ -350,11 +370,18 @@ export function Statistics() {
       <Centered>
         <div className="center-stack">
           <span className="sub">{t('common.error')}</span>
-          <button className="btn" onClick={() => void refetch()}>{t('common.retry')}</button>
+          <button className="btn" onClick={() => void refetch()}>
+            {t('common.retry')}
+          </button>
         </div>
       </Centered>
     );
   }
-  if (!plan) return <Centered><span className="dim">—</span></Centered>;
+  if (!plan)
+    return (
+      <Centered>
+        <span className="dim">—</span>
+      </Centered>
+    );
   return <StatsBody plan={plan} />;
 }

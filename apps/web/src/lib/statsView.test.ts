@@ -156,7 +156,10 @@ describe('spreadAverage', () => {
   });
 
   test('операции без официального курса в среднее не попадают', () => {
-    const avg = spreadAverage([op({ spreadPct: '2.00' }), op({ spreadPct: null, officialRate: null })]);
+    const avg = spreadAverage([
+      op({ spreadPct: '2.00' }),
+      op({ spreadPct: null, officialRate: null }),
+    ]);
     expect(avg?.count).toBe(1);
     expect(avg?.pct).toBeCloseTo(2, 6);
   });

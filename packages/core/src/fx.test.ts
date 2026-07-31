@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  divDecimal,
-  normalizeDecimal,
-  parseCbrXml,
-  parseFrankfurter,
-  resolveRate,
-} from './fx.ts';
+import { divDecimal, normalizeDecimal, parseCbrXml, parseFrankfurter, resolveRate } from './fx.ts';
 import type { RateSnapshot } from './money.ts';
 
 describe('divDecimal / normalizeDecimal', () => {

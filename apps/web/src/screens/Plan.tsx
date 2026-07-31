@@ -132,13 +132,14 @@ function CategoryRow({ a, base, locale }: { a: PlanAllocation; base: string; loc
       <span className="prow-bar">
         <Bar share={share} tone={over ? 'mag' : share > 85 ? 'amber' : 'cyan'} label={a.name} />
         <span className="prow-num">
-          <i>{formatMinor(a.remainingMinor, base, locale)} {base}</i>
+          <i>
+            {formatMinor(a.remainingMinor, base, locale)} {base}
+          </i>
         </span>
       </span>
     </div>
   );
 }
-
 
 /**
  * Что впереди: горизонт за границей периода. Карта периода отвечает «что успеет случиться до
@@ -165,7 +166,9 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
           <span className="prow-name">
             <span className={e.kind === 'goal_at_risk' ? 'st-warn' : undefined}>{label(e)}</span>
           </span>
-          <span className="prow-num"><i>{e.on}</i></span>
+          <span className="prow-num">
+            <i>{e.on}</i>
+          </span>
           <span />
         </div>
       ))}
@@ -173,15 +176,7 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
   );
 }
 
-function Kpi({
-  label,
-  tag,
-  children,
-}: {
-  label: string;
-  tag?: ReactNode;
-  children: ReactNode;
-}) {
+function Kpi({ label, tag, children }: { label: string; tag?: ReactNode; children: ReactNode }) {
   return (
     <div className="kpi">
       <span className="kpi-label">
@@ -208,7 +203,8 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   const categories = plan.allocations.filter((a) => a.targetKind === 'category');
   const compressed = BigInt(plan.compressedMinor) > 0n;
   const living = BigInt(plan.livingMinor);
-  const spentShare = living > 0n ? Number((BigInt(plan.spentLivingMinor) * 1000n) / living) / 10 : 0;
+  const spentShare =
+    living > 0n ? Number((BigInt(plan.spentLivingMinor) * 1000n) / living) / 10 : 0;
   const risky = !plan.burn.willLast && plan.burn.runsOutOn;
 
   const obligationGroups = (['debt', 'envelope', 'goal', 'bucket'] as const)
@@ -224,7 +220,10 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           </span>
           <Bar share={spentShare} tone={BigInt(plan.overspentMinor) > 0n ? 'mag' : 'cyan'} />
           <span className="kpi-sub">
-            {t('spend.spentOfPlan', { spent: fmt(plan.spentLivingMinor), plan: fmt(plan.livingMinor) })}
+            {t('spend.spentOfPlan', {
+              spent: fmt(plan.spentLivingMinor),
+              plan: fmt(plan.livingMinor),
+            })}
           </span>
         </Kpi>
 
@@ -237,12 +236,17 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           </span>
         </Kpi>
 
-        <Kpi label={t('plan.summary.toExchange')} tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}>
+        <Kpi
+          label={t('plan.summary.toExchange')}
+          tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}
+        >
           {buckets.length === 0 && <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>}
           <div className="kpi-rows">
             {buckets.map((b) => (
               <div key={b.targetId}>
-                <span>{withCcy(b.allocatedMinor)} → {b.toCurrency ?? b.sourceCurrency}</span>
+                <span>
+                  {withCcy(b.allocatedMinor)} → {b.toCurrency ?? b.sourceCurrency}
+                </span>
                 <span className="dim">{b.name}</span>
               </div>
             ))}
@@ -283,9 +287,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {plan.unresolved.length > 0 && (
         <div className="risk-band info">
           <span className="risk-text">{t('plan.unresolved.affectsHero')}</span>
-          <span className="panel-sum">
-            {plan.unresolved.map((u) => u.name).join(' · ')}
-          </span>
+          <span className="panel-sum">{plan.unresolved.map((u) => u.name).join(' · ')}</span>
         </div>
       )}
 
@@ -297,10 +299,17 @@ function PlanBody({ plan }: { plan: PlanDto }) {
             label={t('plan.panel.income')}
             sum={withCcy(plan.incomeMinor)}
             accent="lime"
-            tools={<Link className="act" to="/settings">{t('plan.act.edit')}</Link>}
+            tools={
+              <Link className="act" to="/settings">
+                {t('plan.act.edit')}
+              </Link>
+            }
           >
             {plan.income.events.length === 0 && (
-              <div className="prow"><span /><span className="dim">{t('common.empty')}</span></div>
+              <div className="prow">
+                <span />
+                <span className="dim">{t('common.empty')}</span>
+              </div>
             )}
             {plan.income.events.map((e) => (
               <div className="prow" key={`${e.sourceId}:${e.date}`}>
@@ -310,7 +319,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                   {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
                 </span>
                 <span className="prow-num">
-                  <b>{formatMinor(e.amountMinor, e.currency, locale)} {e.currency}</b>
+                  <b>
+                    {formatMinor(e.amountMinor, e.currency, locale)} {e.currency}
+                  </b>
                 </span>
                 <span />
               </div>
@@ -318,8 +329,12 @@ function PlanBody({ plan }: { plan: PlanDto }) {
             {BigInt(plan.extraIncomeMinor) > 0n && (
               <div className="prow">
                 <span className="prow-day" aria-hidden />
-                <span className="prow-name"><span>{t('plan.summary.extraIncome')}</span></span>
-                <span className="prow-num"><b className="st-ok">{withCcy(plan.extraIncomeMinor)}</b></span>
+                <span className="prow-name">
+                  <span>{t('plan.summary.extraIncome')}</span>
+                </span>
+                <span className="prow-num">
+                  <b className="st-ok">{withCcy(plan.extraIncomeMinor)}</b>
+                </span>
                 <span />
               </div>
             )}
@@ -327,19 +342,30 @@ function PlanBody({ plan }: { plan: PlanDto }) {
 
           <Panel
             label={t('plan.groups.category')}
-            sum={t('plan.panel.perPeriod', { amount: withCcy(categories.reduce((s, c) => s + BigInt(c.allocatedMinor), 0n)) })}
+            sum={t('plan.panel.perPeriod', {
+              amount: withCcy(categories.reduce((s, c) => s + BigInt(c.allocatedMinor), 0n)),
+            })}
             tools={
-              <button type="button" className="act" aria-pressed={editingCats} onClick={() => setEditingCats((v) => !v)}>
+              <button
+                type="button"
+                className="act"
+                aria-pressed={editingCats}
+                onClick={() => setEditingCats((v) => !v)}
+              >
                 {t('plan.act.edit')}
               </button>
             }
           >
             {categories.length === 0 && !editingCats && (
-              <div className="prow"><span /><span className="dim">{t('common.empty')}</span></div>
+              <div className="prow">
+                <span />
+                <span className="dim">{t('common.empty')}</span>
+              </div>
             )}
-            {!editingCats && categories.map((a) => (
-              <CategoryRow key={a.targetId} a={a} base={base} locale={locale} />
-            ))}
+            {!editingCats &&
+              categories.map((a) => (
+                <CategoryRow key={a.targetId} a={a} base={base} locale={locale} />
+              ))}
             {editingCats && (
               <div style={{ padding: '10px 14px' }}>
                 <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
@@ -357,7 +383,11 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               sum={t('plan.panel.perPeriod', {
                 amount: withCcy(g.rows.reduce((s, r) => s + BigInt(r.allocatedMinor), 0n)),
               })}
-              tools={<Link className="act" to="/obligations">{t('plan.act.edit')}</Link>}
+              tools={
+                <Link className="act" to="/obligations">
+                  {t('plan.act.edit')}
+                </Link>
+              }
             >
               {g.rows.map((a) => (
                 <AllocationRow key={a.targetId} a={a} base={base} locale={locale} />
@@ -370,7 +400,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               <div className="prow">
                 <span />
                 <span className="dim">{t('plan.empty.noPlan')}</span>
-                <Link className="act" to="/obligations">{t('nav.obligations')}</Link>
+                <Link className="act" to="/obligations">
+                  {t('nav.obligations')}
+                </Link>
                 <span />
               </div>
             </Panel>
@@ -379,13 +411,21 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           <ForecastPanel base={base} locale={locale} />
 
           {plan.unresolved.length > 0 && (
-            <Panel label={t('plan.unresolved.title')} accent="amber" foot={<span className="sub">{t('plan.unresolved.hint')}</span>}>
+            <Panel
+              label={t('plan.unresolved.title')}
+              accent="amber"
+              foot={<span className="sub">{t('plan.unresolved.hint')}</span>}
+            >
               {plan.unresolved.map((u) => (
                 <div className="prow" key={`${u.targetKind}:${u.targetId}`}>
                   <span className="prow-day" aria-hidden />
-                  <span className="prow-name"><span>{u.name}</span></span>
+                  <span className="prow-name">
+                    <span>{u.name}</span>
+                  </span>
                   <span className="prow-num">
-                    <b>{formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}</b>
+                    <b>
+                      {formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}
+                    </b>
                   </span>
                   <span />
                 </div>
@@ -409,11 +449,18 @@ export function Plan() {
       <Centered>
         <div className="center-stack">
           <span className="sub">{t('common.error')}</span>
-          <button className="btn" onClick={() => void refetch()}>{t('common.retry')}</button>
+          <button className="btn" onClick={() => void refetch()}>
+            {t('common.retry')}
+          </button>
         </div>
       </Centered>
     );
   }
-  if (!plan) return <Centered><span className="dim">—</span></Centered>;
+  if (!plan)
+    return (
+      <Centered>
+        <span className="dim">—</span>
+      </Centered>
+    );
   return <PlanBody plan={plan} />;
 }

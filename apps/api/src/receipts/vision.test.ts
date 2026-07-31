@@ -34,7 +34,11 @@ describe('parseVisionPayload — разбор ответа vision-модели',
   });
 
   it('нет итога — чек бесполезен: null, а не выдуманная сумма из позиций', () => {
-    expect(parseVisionPayload(JSON.stringify({ currency: 'RSD', items: [{ name: 'Хлеб', amountMajor: '89' }] }))).toBeNull();
+    expect(
+      parseVisionPayload(
+        JSON.stringify({ currency: 'RSD', items: [{ name: 'Хлеб', amountMajor: '89' }] }),
+      ),
+    ).toBeNull();
   });
 
   it('нулевой или отрицательный итог отвергается', () => {
@@ -64,7 +68,9 @@ describe('parseVisionPayload — разбор ответа vision-модели',
   });
 
   it('дата не в формате YYYY-MM-DD отбрасывается, чек остаётся', () => {
-    const r = parseVisionPayload(JSON.stringify({ currency: 'RUB', totalMajor: '100', purchasedOn: '29.07.2026' }));
+    const r = parseVisionPayload(
+      JSON.stringify({ currency: 'RUB', totalMajor: '100', purchasedOn: '29.07.2026' }),
+    );
 
     expect(r?.purchasedOn).toBeNull();
     expect(r?.totalMinor).toBe(10000n);

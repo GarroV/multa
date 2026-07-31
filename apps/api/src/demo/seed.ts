@@ -49,7 +49,11 @@ export interface DemoWorkspace {
 
 /** Демо-пользователь и его воркспейс, если они уже созданы. */
 export async function findDemoWorkspace(): Promise<DemoWorkspace | null> {
-  const users = await db.select({ id: user.id }).from(user).where(eq(user.email, DEMO_EMAIL)).limit(1);
+  const users = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, DEMO_EMAIL))
+    .limit(1);
   const u = users[0];
   if (!u) return null;
   const ws = await db
@@ -120,7 +124,13 @@ async function ensureDemoRates(asOf: string, days: readonly string[]): Promise<v
     .insert(fxRates)
     .values(
       dates.flatMap((onDate) =>
-        DEMO_RATES.map((r) => ({ source: 'manual', base: r.base, quote: 'RUB', onDate, rate: r.rate })),
+        DEMO_RATES.map((r) => ({
+          source: 'manual',
+          base: r.base,
+          quote: 'RUB',
+          onDate,
+          rate: r.rate,
+        })),
       ),
     )
     .onConflictDoNothing();
@@ -189,7 +199,10 @@ export async function seedDemo(userId: string): Promise<string> {
   await wipe(workspaceId);
   const asOf = today(DEMO_TZ);
   // Даты, на которые демо смотрит курсом: сегодня и дни разменов ниже.
-  await ensureDemoRates(asOf, [20, 35, 50, 65].map((back) => shift(asOf, -back)));
+  await ensureDemoRates(
+    asOf,
+    [20, 35, 50, 65].map((back) => shift(asOf, -back)),
+  );
 
   const catRows = await db
     .insert(categories)
@@ -280,8 +293,20 @@ export async function seedDemo(userId: string): Promise<string> {
 
   // Валютные корзины: тот самый сценарий продукта — доход в рублях, жизнь в EUR и RSD.
   await db.insert(currencyBuckets).values([
-    { workspaceId, name: 'Rent basket', fromCurrency: 'RUB', toCurrency: 'EUR', amountMinor: 6_000_000n },
-    { workspaceId, name: 'Daily life basket', fromCurrency: 'RUB', toCurrency: 'RSD', amountMinor: 2_000_000n },
+    {
+      workspaceId,
+      name: 'Rent basket',
+      fromCurrency: 'RUB',
+      toCurrency: 'EUR',
+      amountMinor: 6_000_000n,
+    },
+    {
+      workspaceId,
+      name: 'Daily life basket',
+      fromCurrency: 'RUB',
+      toCurrency: 'RSD',
+      amountMinor: 2_000_000n,
+    },
   ]);
 
   await db.insert(recurringItems).values([
@@ -327,7 +352,9 @@ export async function seedDemo(userId: string): Promise<string> {
     },
   ]);
 
-  const ws = (await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1))[0]!;
+  const ws = (
+    await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1)
+  )[0]!;
 
   // Бюджеты текущего периода. Пишем прямо в planned_items: сборка плана их подхватит.
   const current = await ensurePeriodForDate(ws, asOf);
@@ -371,8 +398,20 @@ export async function seedDemo(userId: string): Promise<string> {
   // Факт текущего периода: Groceries почти исчерпаны (даёт burn-сигнал), Transport ещё пуст.
   const eurRate = await getRate('EUR', 'RUB', asOf);
   const rsdRate = await getRate('RSD', 'RUB', asOf);
-  const currentFacts: { name: string; minor: bigint; currency: 'RUB' | 'EUR' | 'RSD'; day: string; note?: string }[] = [
-    { name: 'Groceries', minor: 1_800_000n, currency: 'RUB', day: shift(asOf, -3), note: 'groceries for the week' },
+  const currentFacts: {
+    name: string;
+    minor: bigint;
+    currency: 'RUB' | 'EUR' | 'RSD';
+    day: string;
+    note?: string;
+  }[] = [
+    {
+      name: 'Groceries',
+      minor: 1_800_000n,
+      currency: 'RUB',
+      day: shift(asOf, -3),
+      note: 'groceries for the week',
+    },
     { name: 'Eating out', minor: 610_000n, currency: 'RUB', day: shift(asOf, -2) },
     { name: 'Eating out', minor: 450n, currency: 'EUR', day: shift(asOf, -1), note: 'coffee' },
     { name: 'Home', minor: 214_000n, currency: 'RSD', day: shift(asOf, -1) },
@@ -407,7 +446,14 @@ export async function seedDemo(userId: string): Promise<string> {
    * суммы стояли константами, и на экране статистики средний спред выходил −0,4% при отдельных
    * операциях «+9,4%» и «−30,8%», то есть меняла как будто платил сверху рыночного курса.
    */
-  const fxHistory: { from: 'RUB'; to: 'EUR' | 'RSD'; fromMinor: bigint; spreadBp: bigint; back: number; note: string }[] = [
+  const fxHistory: {
+    from: 'RUB';
+    to: 'EUR' | 'RSD';
+    fromMinor: bigint;
+    spreadBp: bigint;
+    back: number;
+    note: string;
+  }[] = [
     { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 180n, back: 20, note: 'Menjačnica' },
     { from: 'RUB', to: 'RSD', fromMinor: 4_000_000n, spreadBp: 90n, back: 35, note: 'Menjačnica' },
     { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 260n, back: 50, note: 'Bank' },
@@ -455,6 +501,8 @@ export async function demoIsEmpty(workspaceId: string): Promise<boolean> {
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(categories)
-    .where(and(eq(categories.workspaceId, workspaceId), inArray(categories.archived, [true, false])));
+    .where(
+      and(eq(categories.workspaceId, workspaceId), inArray(categories.archived, [true, false])),
+    );
   return (rows[0]?.n ?? 0) === 0;
 }

@@ -240,7 +240,11 @@ export const rebalanceApplySchema = z.object({
 /** Расписание платежа. Доходы описываются своей схемой — здесь только расходы и взносы. */
 export const recurringScheduleSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('monthly-days'), days: monthDays }),
-  z.object({ kind: z.literal('every-weeks'), weeks: z.number().int().min(1).max(12), startsOn: isoDate }),
+  z.object({
+    kind: z.literal('every-weeks'),
+    weeks: z.number().int().min(1).max(12),
+    startsOn: isoDate,
+  }),
   z.object({ kind: z.literal('one-off'), date: isoDate }),
   z.object({ kind: z.literal('irregular') }),
 ]);
@@ -277,14 +281,15 @@ export const receiptPhotoSchema = z.object({
     .string()
     .min(20)
     .max(8_000_000)
-    .refine((v) => v.startsWith('data:image/') || v.startsWith('https://'), 'ожидается data:image/... или https://'),
+    .refine(
+      (v) => v.startsWith('data:image/') || v.startsWith('https://'),
+      'ожидается data:image/... или https://',
+    ),
 });
 
 /** Подтверждение раскладки чека: суммы по категориям, как их видит пользователь. */
 export const receiptConfirmSchema = z.object({
-  split: z
-    .array(z.object({ categoryId: z.string().uuid(), amountMinor: positiveMinor }))
-    .min(1),
+  split: z.array(z.object({ categoryId: z.string().uuid(), amountMinor: positiveMinor })).min(1),
 });
 
 /** Фильтр списка транзакций. Без параметров — текущий период. */

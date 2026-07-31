@@ -63,7 +63,11 @@ export async function getRate(from: string, to: string, on: string): Promise<Rat
 
 /** Возраст самых свежих курсов в часах (для healthcheck; null если пусто). */
 export async function fxFreshnessHours(): Promise<number | null> {
-  const rows = await db.select({ d: fxRates.onDate }).from(fxRates).orderBy(desc(fxRates.onDate)).limit(1);
+  const rows = await db
+    .select({ d: fxRates.onDate })
+    .from(fxRates)
+    .orderBy(desc(fxRates.onDate))
+    .limit(1);
   const latest = rows[0]?.d;
   if (!latest) return null;
   return Math.round((Date.now() - new Date(`${latest}T00:00:00Z`).getTime()) / 3_600_000);

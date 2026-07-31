@@ -87,7 +87,12 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
     );
   return rows
     .filter((r) => r.plannedMinor > 0n)
-    .map((r) => ({ targetId: r.targetId, name: r.name, isProtected: r.isProtected, baseMinor: r.plannedMinor }));
+    .map((r) => ({
+      targetId: r.targetId,
+      name: r.name,
+      isProtected: r.isProtected,
+      baseMinor: r.plannedMinor,
+    }));
 }
 
 /**
@@ -95,7 +100,10 @@ async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> 
  * Берём последние 6 закрытых периодов: год истории для «привычки» не нужен, а сезонность
  * (декабрь) не должна тянуть совет через полгода.
  */
-async function loadCategoryHistory(ws: Workspace, beforeStartsOn: string): Promise<Map<string, bigint[]>> {
+async function loadCategoryHistory(
+  ws: Workspace,
+  beforeStartsOn: string,
+): Promise<Map<string, bigint[]>> {
   const rows = await db
     .select({
       targetId: transactions.targetId,
@@ -124,13 +132,18 @@ async function loadCategoryHistory(ws: Workspace, beforeStartsOn: string): Promi
     if (periods.size >= 6 && !periods.has(row.startsOn)) continue;
     periods.add(row.startsOn);
     seenPeriods.set(row.targetId, periods);
-    byCategory.set(row.targetId, [...(byCategory.get(row.targetId) ?? []), BigInt(row.total ?? '0')]);
+    byCategory.set(row.targetId, [
+      ...(byCategory.get(row.targetId) ?? []),
+      BigInt(row.total ?? '0'),
+    ]);
   }
   return byCategory;
 }
 
 /** Статусы исполнения плановых строк периода: ключ `kind:id`. */
-async function loadExecutions(periodId: string): Promise<Map<string, { status: ExecutionStatus; executedMinor: bigint }>> {
+async function loadExecutions(
+  periodId: string,
+): Promise<Map<string, { status: ExecutionStatus; executedMinor: bigint }>> {
   const rows = await db
     .select({
       targetKind: plannedItems.targetKind,
@@ -141,7 +154,10 @@ async function loadExecutions(periodId: string): Promise<Map<string, { status: E
     .from(plannedItems)
     .where(eq(plannedItems.periodId, periodId));
   return new Map(
-    rows.map((r) => [`${r.targetKind}:${r.targetId}`, { status: r.status as ExecutionStatus, executedMinor: r.executedMinor }]),
+    rows.map((r) => [
+      `${r.targetKind}:${r.targetId}`,
+      { status: r.status as ExecutionStatus, executedMinor: r.executedMinor },
+    ]),
   );
 }
 
@@ -151,7 +167,11 @@ async function loadExecutions(periodId: string): Promise<Map<string, { status: E
  * бюджетов в существующем периоде сохраняется, а новый период «собирается сам».
  * Внутренняя проверка have.length — защита от гонки (страховка, не основной гейт).
  */
-async function carryOverCategories(ws: Workspace, periodId: string, startsOn: string): Promise<void> {
+async function carryOverCategories(
+  ws: Workspace,
+  periodId: string,
+  startsOn: string,
+): Promise<void> {
   const have = await db
     .select({ id: plannedItems.id })
     .from(plannedItems)
@@ -253,10 +273,19 @@ async function resolveObligations(
 ): Promise<{ resolved: ResolvedItem[]; unresolved: UnresolvedItem[] }> {
   const base = ws.baseCurrency;
   const [debtRows, bucketRows, envelopeRows, goalRows] = await Promise.all([
-    db.select().from(debts).where(and(eq(debts.workspaceId, ws.id), sql`${debts.closedAt} is null`)),
-    db.select().from(currencyBuckets).where(and(eq(currencyBuckets.workspaceId, ws.id), eq(currencyBuckets.active, true))),
+    db
+      .select()
+      .from(debts)
+      .where(and(eq(debts.workspaceId, ws.id), sql`${debts.closedAt} is null`)),
+    db
+      .select()
+      .from(currencyBuckets)
+      .where(and(eq(currencyBuckets.workspaceId, ws.id), eq(currencyBuckets.active, true))),
     db.select().from(envelopes).where(eq(envelopes.workspaceId, ws.id)),
-    db.select().from(goals).where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
+    db
+      .select()
+      .from(goals)
+      .where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
   ]);
 
   const resolved: ResolvedItem[] = [];
@@ -273,14 +302,30 @@ async function resolveObligations(
     if (sourceMinor <= 0n) return; // нулевые/пустые обязательства в план не тянем
     const baseMinor = extra?.baseOverride ?? (await toBase(sourceMinor, sourceCurrency, base, on));
     if (baseMinor === null) {
-      unresolved.push({ targetKind, targetId, name, sourceCurrency, sourceMinor: sourceMinor.toString(), reason: 'rate_unavailable' });
+      unresolved.push({
+        targetKind,
+        targetId,
+        name,
+        sourceCurrency,
+        sourceMinor: sourceMinor.toString(),
+        reason: 'rate_unavailable',
+      });
       return;
     }
-    resolved.push({ targetKind, targetId, name, sourceCurrency, sourceMinor, baseMinor, ...(extra?.toCurrency ? { toCurrency: extra.toCurrency } : {}) });
+    resolved.push({
+      targetKind,
+      targetId,
+      name,
+      sourceCurrency,
+      sourceMinor,
+      baseMinor,
+      ...(extra?.toCurrency ? { toCurrency: extra.toCurrency } : {}),
+    });
   };
 
   for (const d of debtRows) await push('debt', d.id, d.name, d.currency, d.paymentMinor);
-  for (const b of bucketRows) await push('bucket', b.id, b.name, b.fromCurrency, b.amountMinor, { toCurrency: b.toCurrency });
+  for (const b of bucketRows)
+    await push('bucket', b.id, b.name, b.fromCurrency, b.amountMinor, { toCurrency: b.toCurrency });
   for (const e of envelopeRows) {
     if (e.ruleKind === 'percent') {
       // Процент считается от дохода — сразу в base, без FX. Тот же хелпер, что и для выплат.
@@ -307,7 +352,12 @@ async function ensurePeriodRow(
 ): Promise<{ id: string; created: boolean }> {
   const inserted = await db
     .insert(payPeriods)
-    .values({ workspaceId: ws.id, startsOn: period.startsOn, endsOn: period.endsOn, expectedIncomeMinor: incomeMinor })
+    .values({
+      workspaceId: ws.id,
+      startsOn: period.startsOn,
+      endsOn: period.endsOn,
+      expectedIncomeMinor: incomeMinor,
+    })
     .onConflictDoUpdate({
       target: [payPeriods.workspaceId, payPeriods.startsOn],
       // endsOn/доход могли измениться (правка якорей/дохода) — синхронизируем.
@@ -328,14 +378,29 @@ async function persistPlannedItems(
     // Удаляем управляемые строки, чьи обязательства удалены/закрыты (категории не трогаем).
     const staleFilter =
       liveIds.length > 0
-        ? and(eq(plannedItems.periodId, periodId), inArray(plannedItems.targetKind, [...MANAGED_KINDS]), notInArray(plannedItems.targetId, liveIds))
-        : and(eq(plannedItems.periodId, periodId), inArray(plannedItems.targetKind, [...MANAGED_KINDS]));
+        ? and(
+            eq(plannedItems.periodId, periodId),
+            inArray(plannedItems.targetKind, [...MANAGED_KINDS]),
+            notInArray(plannedItems.targetId, liveIds),
+          )
+        : and(
+            eq(plannedItems.periodId, periodId),
+            inArray(plannedItems.targetKind, [...MANAGED_KINDS]),
+          );
     await tx.delete(plannedItems).where(staleFilter);
 
     if (rows.length === 0) return;
     await tx
       .insert(plannedItems)
-      .values(rows.map((r) => ({ workspaceId: ws.id, periodId, targetKind: r.targetKind, targetId: r.targetId, plannedMinor: r.plannedMinor })))
+      .values(
+        rows.map((r) => ({
+          workspaceId: ws.id,
+          periodId,
+          targetKind: r.targetKind,
+          targetId: r.targetId,
+          plannedMinor: r.plannedMinor,
+        })),
+      )
       .onConflictDoUpdate({
         target: [plannedItems.periodId, plannedItems.targetKind, plannedItems.targetId],
         // planned_minor пересобирается; execution_status/executed_minor сохраняются (исполнение Спринта 3+).
@@ -367,7 +432,9 @@ async function incomeForPeriod(
   asOf: string,
 ): Promise<{ incomeMinor: bigint; events: IncomeEventDto[]; unresolved: IncomeUnresolvedDto[] }> {
   const events = incomeEventsIn(sources, period, ws.paydayWeekendRule as WeekendRule);
-  const foreign = [...new Set(events.map((e) => e.currency).filter((ccy) => ccy !== ws.baseCurrency))];
+  const foreign = [
+    ...new Set(events.map((e) => e.currency).filter((ccy) => ccy !== ws.baseCurrency)),
+  ];
   const snapshots = await Promise.all(
     foreign.map(async (ccy) => [ccy, await getRate(ccy, ws.baseCurrency, asOf)] as const),
   );
@@ -503,7 +570,8 @@ function executionFields(
   allocatedMinor: bigint,
   saved: { status: ExecutionStatus; executedMinor: bigint } | undefined,
 ): { executionStatus: ExecutionStatus; executedMinor: string; remainderMinor: string } {
-  if (targetKind === 'category') return { executionStatus: 'n_a', executedMinor: '0', remainderMinor: '0' };
+  if (targetKind === 'category')
+    return { executionStatus: 'n_a', executedMinor: '0', remainderMinor: '0' };
   const executedMinor = saved?.executedMinor ?? 0n;
   const derived = executionOf(allocatedMinor, executedMinor);
   const status = saved?.status === 'skipped' ? 'skipped' : derived.status;
@@ -524,7 +592,11 @@ function adviceFields(
   const advice = budgetAdvice({ plannedMinor, history });
   if (!advice) return {};
   return {
-    advice: { kind: advice.kind, suggestedMinor: advice.suggestedMinor.toString(), periods: advice.periods },
+    advice: {
+      kind: advice.kind,
+      suggestedMinor: advice.suggestedMinor.toString(),
+      periods: advice.periods,
+    },
   };
 }
 
@@ -550,18 +622,44 @@ async function assembleForPeriod(
 
   // Обязательства (base уже посчитан) + категории (бюджет уже в base). Порядок каскада — в assemblePlan.
   const plan: PlanItem[] = [
-    ...resolved.map((r) => ({ targetKind: r.targetKind, targetId: r.targetId, plannedMinor: r.baseMinor })),
-    ...cats.map((c) => ({ targetKind: 'category' as const, targetId: c.targetId, plannedMinor: c.baseMinor, protected: c.isProtected })),
+    ...resolved.map((r) => ({
+      targetKind: r.targetKind,
+      targetId: r.targetId,
+      plannedMinor: r.baseMinor,
+    })),
+    ...cats.map((c) => ({
+      targetKind: 'category' as const,
+      targetId: c.targetId,
+      plannedMinor: c.baseMinor,
+      protected: c.isProtected,
+    })),
   ];
   const totalDays = daysInPeriod(period);
   const { result, summary } = assemblePlan(incomeMinor, plan, { daysInPeriod: totalDays });
 
   // Дескрипторы для обогащения (имя/исходная валюта). Категории — в base-валюте.
-  const desc = new Map<string, { name: string; sourceCurrency: string; sourceMinor: bigint; toCurrency?: string }>();
-  for (const r of resolved) desc.set(`${r.targetKind}:${r.targetId}`, { name: r.name, sourceCurrency: r.sourceCurrency, sourceMinor: r.sourceMinor, ...(r.toCurrency ? { toCurrency: r.toCurrency } : {}) });
-  for (const c of cats) desc.set(`category:${c.targetId}`, { name: c.name, sourceCurrency: ws.baseCurrency, sourceMinor: c.baseMinor });
+  const desc = new Map<
+    string,
+    { name: string; sourceCurrency: string; sourceMinor: bigint; toCurrency?: string }
+  >();
+  for (const r of resolved)
+    desc.set(`${r.targetKind}:${r.targetId}`, {
+      name: r.name,
+      sourceCurrency: r.sourceCurrency,
+      sourceMinor: r.sourceMinor,
+      ...(r.toCurrency ? { toCurrency: r.toCurrency } : {}),
+    });
+  for (const c of cats)
+    desc.set(`category:${c.targetId}`, {
+      name: c.name,
+      sourceCurrency: ws.baseCurrency,
+      sourceMinor: c.baseMinor,
+    });
 
-  const fact = summarizeFact(summary, { spentLivingMinor: spending.livingMinor, daysLeft: daysLeftInPeriod(period, asOf) });
+  const fact = summarizeFact(summary, {
+    spentLivingMinor: spending.livingMinor,
+    daysLeft: daysLeftInPeriod(period, asOf),
+  });
   const executions = await loadExecutions(periodId);
   const history = await loadCategoryHistory(ws, period.startsOn);
   const burn = burnRate({
@@ -588,7 +686,11 @@ async function assembleForPeriod(
       spentMinor: cat.spentMinor.toString(),
       remainingMinor: cat.remainingMinor.toString(),
       overspentMinor: cat.overspentMinor.toString(),
-      ...executionFields(a.targetKind, a.allocatedMinor, executions.get(`${a.targetKind}:${a.targetId}`)),
+      ...executionFields(
+        a.targetKind,
+        a.allocatedMinor,
+        executions.get(`${a.targetKind}:${a.targetId}`),
+      ),
       ...(a.targetKind === 'category'
         ? { protectedCategory: cats.find((c) => c.targetId === a.targetId)?.isProtected === true }
         : {}),
@@ -633,7 +735,11 @@ async function assembleForPeriod(
     periodId,
     result.allocations
       .filter((a) => a.targetKind !== 'category')
-      .map((a) => ({ targetKind: a.targetKind, targetId: a.targetId, plannedMinor: a.allocatedMinor })),
+      .map((a) => ({
+        targetKind: a.targetKind,
+        targetId: a.targetId,
+        plannedMinor: a.allocatedMinor,
+      })),
   );
 
   return {
@@ -739,11 +845,24 @@ export async function setCategoryBudget(
   if (plannedMinor <= 0n) {
     await db
       .delete(plannedItems)
-      .where(and(eq(plannedItems.periodId, periodId), eq(plannedItems.targetKind, 'category'), eq(plannedItems.targetId, categoryId)));
+      .where(
+        and(
+          eq(plannedItems.periodId, periodId),
+          eq(plannedItems.targetKind, 'category'),
+          eq(plannedItems.targetId, categoryId),
+        ),
+      );
   } else {
     await db
       .insert(plannedItems)
-      .values({ workspaceId: ws.id, periodId, targetKind: 'category', targetId: categoryId, plannedMinor, executionStatus: 'n_a' })
+      .values({
+        workspaceId: ws.id,
+        periodId,
+        targetKind: 'category',
+        targetId: categoryId,
+        plannedMinor,
+        executionStatus: 'n_a',
+      })
       .onConflictDoUpdate({
         target: [plannedItems.periodId, plannedItems.targetKind, plannedItems.targetId],
         set: { plannedMinor: sql`excluded.planned_minor` },
@@ -807,7 +926,9 @@ export async function setExecution(
   const status = mode === 'skip' ? 'skipped' : executionOf(item.plannedMinor, executedMinor).status;
 
   // Транзакции этой строки пересоздаём: одна строка плана — одна транзакция исполнения.
-  await db.delete(transactions).where(and(eq(transactions.workspaceId, ws.id), eq(transactions.plannedItemId, item.id)));
+  await db
+    .delete(transactions)
+    .where(and(eq(transactions.workspaceId, ws.id), eq(transactions.plannedItemId, item.id)));
   if (executedMinor > 0n) {
     await db.insert(transactions).values({
       workspaceId: ws.id,
@@ -927,13 +1048,19 @@ export async function applyRebalance(
       plannedMinor: plannedItems.plannedMinor,
     })
     .from(plannedItems)
-    .where(and(eq(plannedItems.periodId, periodId), inArray(plannedItems.targetId, [input.fromId, input.toId])));
+    .where(
+      and(
+        eq(plannedItems.periodId, periodId),
+        inArray(plannedItems.targetId, [input.fromId, input.toId]),
+      ),
+    );
   const from = rows.find((r) => r.targetId === input.fromId);
   const to = rows.find((r) => r.targetId === input.toId);
   if (!from || !to) throw new Error('planned_item_not_found');
   // Тип источника берём из БД, а не из запроса: клиент мог назвать долг «категорией»
   // и обойти защиту (железное правило 7 — данные от клиента не авторитетны).
-  if (from.targetKind === 'debt' || from.targetKind === 'bucket') throw new Error('source_protected');
+  if (from.targetKind === 'debt' || from.targetKind === 'bucket')
+    throw new Error('source_protected');
   // Получателем может быть только категория: желаемые суммы обязательств на каждой сборке
   // берутся из своих таблиц (payment_minor, planned_per_period_minor, правило конверта), и
   // прибавка к planned_items им ничего не даёт — источник урезался бы, а платёж не рос.

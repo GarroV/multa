@@ -9,10 +9,22 @@
  * Сжатие при нехватке — забота cascade() (goals → envelopes → незащищённые categories).
  */
 
-import { cascade, type Allocation, type CascadeResult, type PlanItem, type TargetKind } from './cascade.ts';
+import {
+  cascade,
+  type Allocation,
+  type CascadeResult,
+  type PlanItem,
+  type TargetKind,
+} from './cascade.ts';
 
 /** Порядок отображения строк плана = порядок раздачи каскада. */
-export const PLAN_PRIORITY: readonly TargetKind[] = ['debt', 'bucket', 'envelope', 'category', 'goal'];
+export const PLAN_PRIORITY: readonly TargetKind[] = [
+  'debt',
+  'bucket',
+  'envelope',
+  'category',
+  'goal',
+];
 
 const priorityIndex = (kind: TargetKind): number => {
   const i = PLAN_PRIORITY.indexOf(kind);
@@ -23,10 +35,15 @@ const priorityIndex = (kind: TargetKind): number => {
  * Стабильная сортировка строк плана по приоритету каскада (внутри уровня — исходный порядок).
  * Не мутирует вход.
  */
-export function orderPlanItems<T extends { readonly targetKind: TargetKind }>(items: readonly T[]): T[] {
+export function orderPlanItems<T extends { readonly targetKind: TargetKind }>(
+  items: readonly T[],
+): T[] {
   return items
     .map((item, index) => ({ item, index }))
-    .sort((a, b) => priorityIndex(a.item.targetKind) - priorityIndex(b.item.targetKind) || a.index - b.index)
+    .sort(
+      (a, b) =>
+        priorityIndex(a.item.targetKind) - priorityIndex(b.item.targetKind) || a.index - b.index,
+    )
     .map(({ item }) => item);
 }
 
@@ -48,7 +65,10 @@ const sumBy = (allocations: readonly Allocation[], kind: TargetKind): bigint =>
  * Производные ага-момента из результата каскада.
  * `daysInPeriod` — делитель цифры дня; при 0 цифра дня = 0 (защита от деления на ноль).
  */
-export function summarizePlan(result: CascadeResult, opts: { readonly daysInPeriod: number }): PlanSummary {
+export function summarizePlan(
+  result: CascadeResult,
+  opts: { readonly daysInPeriod: number },
+): PlanSummary {
   const toExchangeMinor = sumBy(result.allocations, 'bucket');
   const categoryMinor = sumBy(result.allocations, 'category');
   const livingRaw = categoryMinor + result.freeMinor;

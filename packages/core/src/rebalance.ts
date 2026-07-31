@@ -46,7 +46,8 @@ export interface RebalanceInput {
 
 export function rebalanceOptions(input: RebalanceInput): RebalanceOption[] {
   const candidates = input.rows.filter(
-    (r) => GIVE_ORDER.includes(r.targetKind) && r.targetId !== input.targetId && r.protected !== true,
+    (r) =>
+      GIVE_ORDER.includes(r.targetKind) && r.targetId !== input.targetId && r.protected !== true,
   );
 
   const options: RebalanceOption[] = [];

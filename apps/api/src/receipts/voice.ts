@@ -79,7 +79,10 @@ export async function transcribe(dataUrl: string, language = 'ru'): Promise<stri
     form.append('model', MODEL);
     form.append('language', language);
     // Подсказка модели: короткие фразы про траты, чтобы «четыреста восемьдесят» не стало «400 80».
-    form.append('prompt', 'Короткая фраза о трате или приходе денег: сумма, категория, валюта, когда.');
+    form.append(
+      'prompt',
+      'Короткая фраза о трате или приходе денег: сумма, категория, валюта, когда.',
+    );
 
     const res = await fetch(WHISPER_URL, {
       method: 'POST',

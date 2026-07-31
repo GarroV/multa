@@ -16,8 +16,14 @@ import { categoryCreateSchema, categoryPatchSchema } from '../validation.ts';
  * Бюджеты не задаются: пользователь проставит их на экране «План».
  */
 const PRESETS: Record<'ru' | 'en', { regular: string[]; system: string }> = {
-  ru: { regular: ['Продукты', 'Кафе', 'Транспорт', 'Дом', 'Здоровье', 'Развлечения'], system: 'Общее' },
-  en: { regular: ['Groceries', 'Eating out', 'Transport', 'Home', 'Health', 'Fun'], system: 'General' },
+  ru: {
+    regular: ['Продукты', 'Кафе', 'Транспорт', 'Дом', 'Здоровье', 'Развлечения'],
+    system: 'Общее',
+  },
+  en: {
+    regular: ['Groceries', 'Eating out', 'Transport', 'Home', 'Health', 'Fun'],
+    system: 'General',
+  },
 };
 
 export async function seedPresetCategories(workspaceId: string, locale: string): Promise<void> {
@@ -47,7 +53,12 @@ categoriesRoute.post('/categories', async (c) => {
   const body = categoryCreateSchema.parse(await c.req.json());
   const inserted = await db
     .insert(categories)
-    .values({ workspaceId: ws.id, name: body.name, icon: body.icon, protected: body.protected ?? false })
+    .values({
+      workspaceId: ws.id,
+      name: body.name,
+      icon: body.icon,
+      protected: body.protected ?? false,
+    })
     .returning();
   return c.json(inserted[0]!, 201);
 });

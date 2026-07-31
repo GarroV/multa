@@ -1,0 +1,8 @@
+# Генерируемое и вендорное: формат этих файлов задаёт не наш стиль, а инструмент.
+pnpm-lock.yaml
+**/dist/**
+**/.turbo/**
+**/coverage/**
+apps/api/migrations/**
+design/prototype.html
+reference-data/**

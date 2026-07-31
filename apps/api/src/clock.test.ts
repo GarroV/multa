@@ -4,14 +4,20 @@ import { isoDateInTimeZone } from './clock.ts';
 describe('isoDateInTimeZone', () => {
   it('поздним вечером отдаёт местную дату, а не UTC-вчера', () => {
     // 23:30 в Белграде — для пользователя это ещё 29-е.
-    expect(isoDateInTimeZone(new Date('2026-07-29T21:30:00Z'), 'Europe/Belgrade')).toBe('2026-07-29');
+    expect(isoDateInTimeZone(new Date('2026-07-29T21:30:00Z'), 'Europe/Belgrade')).toBe(
+      '2026-07-29',
+    );
     // 00:30 уже 30-го: UTC всё ещё показывает 29-е — именно на этом трата уезжала в чужой день.
-    expect(isoDateInTimeZone(new Date('2026-07-29T22:30:00Z'), 'Europe/Belgrade')).toBe('2026-07-30');
+    expect(isoDateInTimeZone(new Date('2026-07-29T22:30:00Z'), 'Europe/Belgrade')).toBe(
+      '2026-07-30',
+    );
   });
 
   it('учитывает смещение зоны в обе стороны от UTC', () => {
     expect(isoDateInTimeZone(new Date('2026-07-29T20:00:00Z'), 'Asia/Tokyo')).toBe('2026-07-30'); // UTC+9
-    expect(isoDateInTimeZone(new Date('2026-07-30T02:00:00Z'), 'America/New_York')).toBe('2026-07-29'); // UTC−4
+    expect(isoDateInTimeZone(new Date('2026-07-30T02:00:00Z'), 'America/New_York')).toBe(
+      '2026-07-29',
+    ); // UTC−4
   });
 
   it('в UTC совпадает с ISO-датой', () => {
@@ -24,6 +30,8 @@ describe('isoDateInTimeZone', () => {
   });
 
   it('месяц и день всегда двузначные (формат для колонки date)', () => {
-    expect(isoDateInTimeZone(new Date('2026-01-05T10:00:00Z'), 'Europe/Belgrade')).toBe('2026-01-05');
+    expect(isoDateInTimeZone(new Date('2026-01-05T10:00:00Z'), 'Europe/Belgrade')).toBe(
+      '2026-01-05',
+    );
   });
 });

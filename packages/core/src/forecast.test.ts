@@ -28,7 +28,10 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       goals: [],
     });
 
-    expect(events.find((e) => e.kind === 'freed_money')).toMatchObject({ amountMinor: 4500000n, periodsAway: 2 });
+    expect(events.find((e) => e.kind === 'freed_money')).toMatchObject({
+      amountMinor: 4500000n,
+      periodsAway: 2,
+    });
   });
 
   it('цель достигается в срок — событие достижения', () => {
@@ -37,10 +40,21 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       periodsAhead: 12,
       periodLengthDays: 15,
       debts: [],
-      goals: [{ id: 'moto', name: 'Мотоцикл', targetMinor: 30000n, savedMinor: 10000n, perPeriodMinor: 5000n }],
+      goals: [
+        {
+          id: 'moto',
+          name: 'Мотоцикл',
+          targetMinor: 30000n,
+          savedMinor: 10000n,
+          perPeriodMinor: 5000n,
+        },
+      ],
     });
 
-    expect(events.find((e) => e.kind === 'goal_reached')).toMatchObject({ targetId: 'moto', periodsAway: 4 });
+    expect(events.find((e) => e.kind === 'goal_reached')).toMatchObject({
+      targetId: 'moto',
+      periodsAway: 4,
+    });
   });
 
   it('цель не успевает в горизонт — предупреждение о риске, а не тишина', () => {
@@ -49,7 +63,15 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       periodsAhead: 3,
       periodLengthDays: 15,
       debts: [],
-      goals: [{ id: 'moto', name: 'Мотоцикл', targetMinor: 300000n, savedMinor: 0n, perPeriodMinor: 5000n }],
+      goals: [
+        {
+          id: 'moto',
+          name: 'Мотоцикл',
+          targetMinor: 300000n,
+          savedMinor: 0n,
+          perPeriodMinor: 5000n,
+        },
+      ],
     });
 
     expect(events.find((e) => e.kind === 'goal_at_risk')).toMatchObject({ targetId: 'moto' });
@@ -62,7 +84,9 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       periodsAhead: 6,
       periodLengthDays: 15,
       debts: [],
-      goals: [{ id: 'moto', name: 'Мотоцикл', targetMinor: 30000n, savedMinor: 0n, perPeriodMinor: 0n }],
+      goals: [
+        { id: 'moto', name: 'Мотоцикл', targetMinor: 30000n, savedMinor: 0n, perPeriodMinor: 0n },
+      ],
     });
 
     expect(events.find((e) => e.kind === 'goal_at_risk')).toMatchObject({ targetId: 'moto' });
@@ -74,7 +98,15 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       periodsAhead: 6,
       periodLengthDays: 15,
       debts: [],
-      goals: [{ id: 'moto', name: 'Мотоцикл', targetMinor: 30000n, savedMinor: 30000n, perPeriodMinor: 5000n }],
+      goals: [
+        {
+          id: 'moto',
+          name: 'Мотоцикл',
+          targetMinor: 30000n,
+          savedMinor: 30000n,
+          perPeriodMinor: 5000n,
+        },
+      ],
     });
 
     expect(events).toEqual([]);
@@ -98,7 +130,9 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       periodsAhead: 12,
       periodLengthDays: 15,
       debts: [{ id: 'd1', name: 'Долг', remainingMinor: 900000n, paymentMinor: 450000n }],
-      goals: [{ id: 'g1', name: 'Цель', targetMinor: 30000n, savedMinor: 10000n, perPeriodMinor: 5000n }],
+      goals: [
+        { id: 'g1', name: 'Цель', targetMinor: 30000n, savedMinor: 10000n, perPeriodMinor: 5000n },
+      ],
     });
 
     const dates = events.map((e) => e.on);

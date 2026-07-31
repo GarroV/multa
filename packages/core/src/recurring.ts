@@ -39,9 +39,16 @@ function datesIn(schedule: RecurringSchedule, period: PayPeriod): string[] {
     case 'monthly-days':
       return monthlyDatesBetween(schedule.days, period.startsOn, period.endsOn);
     case 'every-weeks':
-      return everyWeeksDatesBetween(schedule.weeks, schedule.startsOn, period.startsOn, period.endsOn);
+      return everyWeeksDatesBetween(
+        schedule.weeks,
+        schedule.startsOn,
+        period.startsOn,
+        period.endsOn,
+      );
     case 'one-off':
-      return schedule.date >= period.startsOn && schedule.date < period.endsOn ? [schedule.date] : [];
+      return schedule.date >= period.startsOn && schedule.date < period.endsOn
+        ? [schedule.date]
+        : [];
     case 'irregular':
       return [];
   }
@@ -55,7 +62,13 @@ export function recurringDueIn(items: readonly RecurringItem[], period: PayPerio
     for (const on of datesIn(item.schedule, period)) {
       // Полуинтервал: endsOn — это уже следующий период.
       if (on < period.startsOn || on >= period.endsOn) continue;
-      due.push({ id: item.id, name: item.name, amountMinor: item.amountMinor, currency: item.currency, on });
+      due.push({
+        id: item.id,
+        name: item.name,
+        amountMinor: item.amountMinor,
+        currency: item.currency,
+        on,
+      });
     }
   }
   return due.sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));

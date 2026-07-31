@@ -46,7 +46,9 @@ for (const { path, table, schema } of ENTITIES) {
 
   obligations.delete(`/${path}/:id`, async (c) => {
     const ws = c.get('workspace')!;
-    await db.delete(table).where(and(eq(table.id, c.req.param('id')), eq(table.workspaceId, ws.id)));
+    await db
+      .delete(table)
+      .where(and(eq(table.id, c.req.param('id')), eq(table.workspaceId, ws.id)));
     return c.body(null, 204);
   });
 }

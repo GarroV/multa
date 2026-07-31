@@ -23,10 +23,16 @@ describe('факт трат в плане', () => {
   test('трата уменьшает остаток категории и остаток на жизнь', async () => {
     const client = await onboarded({ payoutMinor: '30000000' });
     const food = await categoryId(client, 'Продукты');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '4000000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '4000000' }),
+    );
 
     await expectOk(
-      await client.post('/v1/transactions', { amountMinor: '150000', currency: 'RUB', categoryId: food }),
+      await client.post('/v1/transactions', {
+        amountMinor: '150000',
+        currency: 'RUB',
+        categoryId: food,
+      }),
       201,
     );
 
@@ -40,10 +46,16 @@ describe('факт трат в плане', () => {
   test('перерасход категории показывается отдельно, остаток не уходит в минус скрытно', async () => {
     const client = await onboarded({ payoutMinor: '30000000' });
     const cafe = await categoryId(client, 'Кафе');
-    await expectOk<PlanDto>(await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '500000' }));
+    await expectOk<PlanDto>(
+      await client.put(`/v1/plan/current/categories/${cafe}`, { plannedMinor: '500000' }),
+    );
 
     await expectOk(
-      await client.post('/v1/transactions', { amountMinor: '800000', currency: 'RUB', categoryId: cafe },),
+      await client.post('/v1/transactions', {
+        amountMinor: '800000',
+        currency: 'RUB',
+        categoryId: cafe,
+      }),
       201,
     );
 
@@ -69,7 +81,11 @@ describe('факт трат в плане', () => {
       .slice(0, 10);
 
     await expectOk(
-      await client.post('/v1/transactions', { amountMinor: '700000', currency: 'RUB', occurredOn: before }),
+      await client.post('/v1/transactions', {
+        amountMinor: '700000',
+        currency: 'RUB',
+        occurredOn: before,
+      }),
       201,
     );
 
@@ -77,7 +93,9 @@ describe('факт трат в плане', () => {
     expect(BigInt(plan.spentLivingMinor)).toBe(0n);
 
     // Список по умолчанию — тоже текущий период; явный диапазон должен её находить.
-    const current = await expectOk<{ transactions: unknown[] }>(await client.get('/v1/transactions'));
+    const current = await expectOk<{ transactions: unknown[] }>(
+      await client.get('/v1/transactions'),
+    );
     expect(current.transactions).toHaveLength(0);
     const explicit = await expectOk<{ transactions: { occurredOn: string }[] }>(
       await client.get(`/v1/transactions?from=${before}&to=${period.startsOn}`),
@@ -139,7 +157,11 @@ describe('факт трат в плане', () => {
     expect(withCategory.status).toBe(400);
 
     await expectOk(
-      await client.post('/v1/transactions', { kind: 'income', amountMinor: '2000000', currency: 'RUB' }),
+      await client.post('/v1/transactions', {
+        kind: 'income',
+        amountMinor: '2000000',
+        currency: 'RUB',
+      }),
       201,
     );
     const plan = await getPlan(client);
@@ -151,7 +173,11 @@ describe('факт трат в плане', () => {
     const client = await onboarded({ payoutMinor: '30000000' });
     const food = await categoryId(client, 'Продукты');
     const tx = await expectOk<{ id: string }>(
-      await client.post('/v1/transactions', { amountMinor: '300000', currency: 'RUB', categoryId: food }),
+      await client.post('/v1/transactions', {
+        amountMinor: '300000',
+        currency: 'RUB',
+        categoryId: food,
+      }),
       201,
     );
     expect((await client.del(`/v1/transactions/${tx.id}`)).status).toBe(204);

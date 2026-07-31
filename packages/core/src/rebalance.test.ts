@@ -3,12 +3,54 @@ import { rebalanceOptions } from './rebalance.ts';
 
 /** План: еда 20k (кончается), прочее 10k свободно, конверт 8k, цель 5k, долг 45k. */
 const rows = [
-  { targetKind: 'category' as const, targetId: 'food', name: 'Еда', allocatedMinor: 20000n, spentMinor: 20000n, protected: false },
-  { targetKind: 'category' as const, targetId: 'misc', name: 'Прочее', allocatedMinor: 10000n, spentMinor: 2000n, protected: false },
-  { targetKind: 'category' as const, targetId: 'rent', name: 'Аренда', allocatedMinor: 30000n, spentMinor: 0n, protected: true },
-  { targetKind: 'envelope' as const, targetId: 'inv', name: 'Инвестиции', allocatedMinor: 8000n, spentMinor: 0n, protected: false },
-  { targetKind: 'goal' as const, targetId: 'moto', name: 'Мотоцикл', allocatedMinor: 5000n, spentMinor: 0n, protected: false },
-  { targetKind: 'debt' as const, targetId: 'ozon', name: 'Озон', allocatedMinor: 45000n, spentMinor: 0n, protected: false },
+  {
+    targetKind: 'category' as const,
+    targetId: 'food',
+    name: 'Еда',
+    allocatedMinor: 20000n,
+    spentMinor: 20000n,
+    protected: false,
+  },
+  {
+    targetKind: 'category' as const,
+    targetId: 'misc',
+    name: 'Прочее',
+    allocatedMinor: 10000n,
+    spentMinor: 2000n,
+    protected: false,
+  },
+  {
+    targetKind: 'category' as const,
+    targetId: 'rent',
+    name: 'Аренда',
+    allocatedMinor: 30000n,
+    spentMinor: 0n,
+    protected: true,
+  },
+  {
+    targetKind: 'envelope' as const,
+    targetId: 'inv',
+    name: 'Инвестиции',
+    allocatedMinor: 8000n,
+    spentMinor: 0n,
+    protected: false,
+  },
+  {
+    targetKind: 'goal' as const,
+    targetId: 'moto',
+    name: 'Мотоцикл',
+    allocatedMinor: 5000n,
+    spentMinor: 0n,
+    protected: false,
+  },
+  {
+    targetKind: 'debt' as const,
+    targetId: 'ozon',
+    name: 'Озон',
+    allocatedMinor: 45000n,
+    spentMinor: 0n,
+    protected: false,
+  },
 ];
 
 describe('rebalanceOptions — откуда взять денег (Спринт 4)', () => {

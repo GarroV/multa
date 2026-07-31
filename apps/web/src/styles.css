@@ -167,7 +167,9 @@ body {
   -webkit-font-smoothing: antialiased;
   /* Табличные цифры глобально: суммы сравнивают взглядом по колонке. */
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 1;
+  font-feature-settings:
+    'tnum' 1,
+    'zero' 1;
 }
 
 .mono {
@@ -207,7 +209,9 @@ body {
   border-radius: 6px;
   padding: 6px 12px;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 .btn:hover:not(:disabled) {
   background: color-mix(in oklab, var(--accent) 10%, transparent);
@@ -230,7 +234,10 @@ body {
   font-size: 13px;
   cursor: pointer;
   font: inherit;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
 .chip:hover {
   color: var(--text-hi);
@@ -459,7 +466,9 @@ a {
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 1;
+  font-feature-settings:
+    'tnum' 1,
+    'zero' 1;
   text-align: right;
   white-space: nowrap;
 }
@@ -521,14 +530,13 @@ a {
   height: 28px;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
-  background:
-    repeating-linear-gradient(
-      to right,
-      var(--line) 0,
-      var(--line) 1px,
-      transparent 1px,
-      transparent calc(100% / var(--days, 16))
-    );
+  background: repeating-linear-gradient(
+    to right,
+    var(--line) 0,
+    var(--line) 1px,
+    transparent 1px,
+    transparent calc(100% / var(--days, 16))
+  );
   overflow: hidden;
 }
 .period-bar > .spent {
@@ -562,9 +570,15 @@ a {
 }
 
 /* Статусы исполнения и остатков — цветом, но без заливок. */
-.st-ok { color: var(--ok); }
-.st-warn { color: var(--warn); }
-.st-over { color: var(--over); }
+.st-ok {
+  color: var(--ok);
+}
+.st-warn {
+  color: var(--warn);
+}
+.st-over {
+  color: var(--over);
+}
 
 /* Быстрые действия — одна компактная строка над обзором: ввод не должен искать себя. */
 .actions {
@@ -640,9 +654,15 @@ a {
   font-size: 15px;
   color: var(--text-hi);
 }
-.stat.accent { color: var(--accent); }
-.stat.warn { color: var(--warn); }
-.stat.over { color: var(--over); }
+.stat.accent {
+  color: var(--accent);
+}
+.stat.warn {
+  color: var(--warn);
+}
+.stat.over {
+  color: var(--over);
+}
 
 /* Ряды форм: подпись слева, контролы справа, без инлайновых отступов. */
 .form-row {
@@ -651,17 +671,31 @@ a {
   gap: 8px;
   flex-wrap: wrap;
 }
-.field-xs { width: 104px; text-align: right; }
-.field-sm { width: 120px; text-align: right; }
-.field-ccy { width: 66px; text-transform: uppercase; }
-.grow { flex: 1; min-width: 140px; }
+.field-xs {
+  width: 104px;
+  text-align: right;
+}
+.field-sm {
+  width: 120px;
+  text-align: right;
+}
+.field-ccy {
+  width: 66px;
+  text-transform: uppercase;
+}
+.grow {
+  flex: 1;
+  min-width: 140px;
+}
 
 /* Мелкая подпись рядом со значением — вторичная информация не должна кричать. */
 .sub {
   color: var(--text-dim);
   font-size: 12px;
 }
-.danger { color: var(--over); }
+.danger {
+  color: var(--over);
+}
 
 /* ============================================================================
  * Плотная раскладка по прототипу (issue #30). Идея простая: экран — это ведомость,
@@ -821,10 +855,22 @@ a {
   color: var(--cyan);
   box-shadow: var(--g-dot);
 }
-.pmap-dot.risk { background: var(--mag); color: var(--mag); }
-.pmap-dot.income { background: var(--lime); color: var(--lime); }
-.pmap-dot.fx { background: var(--vio); color: var(--vio); }
-.pmap-dot.due { background: var(--amber); color: var(--amber); }
+.pmap-dot.risk {
+  background: var(--mag);
+  color: var(--mag);
+}
+.pmap-dot.income {
+  background: var(--lime);
+  color: var(--lime);
+}
+.pmap-dot.fx {
+  background: var(--vio);
+  color: var(--vio);
+}
+.pmap-dot.due {
+  background: var(--amber);
+  color: var(--amber);
+}
 .pmap-cap {
   font-size: 11px;
   color: var(--mid);
@@ -833,10 +879,18 @@ a {
 /* «Сейчас» подсвечивается по смыслу, а не по позиции в разметке: раньше цвет доставался
    первой метке периода, даже если это была зарплата. cyan-hi, а не cyan, — в светлой теме
    чистый cyan даёт на 11px контраст 2.5. */
-.pmap-cap.now { color: var(--cyan-hi); }
+.pmap-cap.now {
+  color: var(--cyan-hi);
+}
 /* Крайние подписи не должны вылезать за экран: у них своя точка отсчёта. */
-.pmap-mark[style*='--at: 0%'] { transform: none; justify-items: start; }
-.pmap-mark[style*='--at: 100%'] { transform: translateX(-100%); justify-items: end; }
+.pmap-mark[style*='--at: 0%'] {
+  transform: none;
+  justify-items: start;
+}
+.pmap-mark[style*='--at: 100%'] {
+  transform: translateX(-100%);
+  justify-items: end;
+}
 
 /* --- Панели: две колонки на широком экране, одна на узком --- */
 .panels {
@@ -873,10 +927,18 @@ a {
   flex: none;
   background: var(--cyan);
 }
-.panel-mark.mag { background: var(--mag); }
-.panel-mark.vio { background: var(--vio); }
-.panel-mark.lime { background: var(--lime); }
-.panel-mark.amber { background: var(--amber); }
+.panel-mark.mag {
+  background: var(--mag);
+}
+.panel-mark.vio {
+  background: var(--vio);
+}
+.panel-mark.lime {
+  background: var(--lime);
+}
+.panel-mark.amber {
+  background: var(--amber);
+}
 .panel-name {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -918,11 +980,26 @@ a {
   padding: 2px 6px;
   white-space: nowrap;
 }
-.tag.cyan { color: var(--cyan); border-color: rgba(var(--cyan-rgb), 0.45); }
-.tag.mag { color: var(--mag); border-color: rgba(var(--mag-rgb), 0.45); }
-.tag.vio { color: var(--vio); border-color: rgba(var(--vio-rgb), 0.45); }
-.tag.lime { color: var(--lime); border-color: rgba(var(--lime-rgb), 0.45); }
-.tag.amber { color: var(--amber); border-color: rgba(var(--amber-rgb), 0.45); }
+.tag.cyan {
+  color: var(--cyan);
+  border-color: rgba(var(--cyan-rgb), 0.45);
+}
+.tag.mag {
+  color: var(--mag);
+  border-color: rgba(var(--mag-rgb), 0.45);
+}
+.tag.vio {
+  color: var(--vio);
+  border-color: rgba(var(--vio-rgb), 0.45);
+}
+.tag.lime {
+  color: var(--lime);
+  border-color: rgba(var(--lime-rgb), 0.45);
+}
+.tag.amber {
+  color: var(--amber);
+  border-color: rgba(var(--amber-rgb), 0.45);
+}
 
 /* Кнопка-действие в строке: маленькая, появляется акцентом при наведении на строку. */
 .act {
@@ -938,14 +1015,20 @@ a {
   padding: 3px 8px;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
 }
 .act:hover:not(:disabled) {
   color: var(--cyan);
   border-color: rgba(var(--cyan-rgb), 0.5);
   background: rgba(var(--cyan-rgb), 0.08);
 }
-.act:disabled { opacity: 0.45; cursor: not-allowed; }
+.act:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* --- Строка ведомости --- */
 .prow {
@@ -957,8 +1040,12 @@ a {
   padding: 6px 14px;
   border-bottom: 1px solid var(--line);
 }
-.prow:last-child { border-bottom: none; }
-.prow:hover { background: var(--hover1); }
+.prow:last-child {
+  border-bottom: none;
+}
+.prow:hover {
+  background: var(--hover1);
+}
 .prow-day {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -991,7 +1078,9 @@ a {
   gap: 1px;
   justify-items: end;
 }
-.prow-num > b { font-weight: 500; }
+.prow-num > b {
+  font-weight: 500;
+}
 .prow-num > i {
   font-style: normal;
   font-size: 11px;
@@ -1021,10 +1110,18 @@ a {
   background: var(--cyan);
   box-shadow: var(--bar-sheen);
 }
-.bar.lime > i { background: var(--lime); }
-.bar.vio > i { background: var(--vio); }
-.bar.amber > i { background: var(--amber); }
-.bar.mag > i { background: var(--mag); }
+.bar.lime > i {
+  background: var(--lime);
+}
+.bar.vio > i {
+  background: var(--vio);
+}
+.bar.amber > i {
+  background: var(--amber);
+}
+.bar.mag > i {
+  background: var(--mag);
+}
 
 /* --- Донат каскада: дуги dasharray по кругу длиной 100 --- */
 .donut {
@@ -1037,7 +1134,9 @@ a {
   fill: none;
   stroke-width: 7;
 }
-.donut .track { stroke: var(--line); }
+.donut .track {
+  stroke: var(--line);
+}
 .legend {
   display: grid;
   gap: 3px;
@@ -1056,15 +1155,30 @@ a {
   border-radius: 50%;
   flex: none;
 }
-.legend .name { color: var(--mid); }
-.legend .val { margin-left: auto; color: var(--ink); }
+.legend .name {
+  color: var(--mid);
+}
+.legend .val {
+  margin-left: auto;
+  color: var(--ink);
+}
 
 /* Точки и дуги делят одну палитру ролей — легенда читается без подписи цвета. */
-.k-debt { background: var(--mag); }
-.k-bucket { background: var(--vio); }
-.k-envelope { background: var(--cyan); }
-.k-category { background: var(--cyan-hi); }
-.k-goal { background: var(--lime); }
+.k-debt {
+  background: var(--mag);
+}
+.k-bucket {
+  background: var(--vio);
+}
+.k-envelope {
+  background: var(--cyan);
+}
+.k-category {
+  background: var(--cyan-hi);
+}
+.k-goal {
+  background: var(--lime);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .act,
@@ -1115,7 +1229,9 @@ a {
   border-bottom: 2px solid transparent;
   text-decoration: none;
 }
-.tab:hover { color: var(--ink); }
+.tab:hover {
+  color: var(--ink);
+}
 .tab-active {
   color: var(--ink);
   border-bottom-color: var(--cyan);
@@ -1146,13 +1262,19 @@ a {
   padding: 4px 8px;
   cursor: pointer;
 }
-.seg-btn + .seg-btn { border-left: 1px solid var(--line-strong); }
-.seg-btn:hover { color: var(--ink); }
+.seg-btn + .seg-btn {
+  border-left: 1px solid var(--line-strong);
+}
+.seg-btn:hover {
+  color: var(--ink);
+}
 .seg-btn[aria-pressed='true'] {
   color: var(--ink);
   background: rgba(var(--cyan-rgb), 0.14);
 }
-.app-main { min-width: 0; }
+.app-main {
+  min-width: 0;
+}
 @media (max-width: 720px) {
   .topbar {
     height: auto;
@@ -1160,8 +1282,14 @@ a {
     gap: 8px;
     padding: 8px 12px;
   }
-  .tabs { order: 3; width: 100%; overflow-x: auto; }
-  .tab { height: 34px; }
+  .tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .tab {
+    height: 34px;
+  }
 }
 
 /* Ввод размена живёт в подвале панели статистики: два поля пары и дата в одну строку. */

@@ -4,7 +4,9 @@ import { parseReceiptQr } from './receiptQr.ts';
 describe('parseReceiptQr — разбор QR фискального чека (Спринт 5)', () => {
   it('ФНС РФ: вытаскивает сумму, дату и реквизиты для запроса позиций', () => {
     // Формат ФНС: t=дата&s=сумма&fn=ФН&i=номер ФД&fp=фискальный признак&n=тип
-    const r = parseReceiptQr('t=20260730T1215&s=2340.50&fn=9960440301234567&i=12345&fp=1234567890&n=1');
+    const r = parseReceiptQr(
+      't=20260730T1215&s=2340.50&fn=9960440301234567&i=12345&fp=1234567890&n=1',
+    );
 
     expect(r).toEqual({
       provider: 'fns_ru',
@@ -21,7 +23,9 @@ describe('parseReceiptQr — разбор QR фискального чека (С
   });
 
   it('Сербия: ссылка suf.purs.gov.rs распознаётся по домену, сумма из параметров', () => {
-    const r = parseReceiptQr('https://suf.purs.gov.rs/v/?vl=AjQ5T0tYSjU2NDlPS1hKNTaqAQAAtQEAAECEVQIAAAA%3D');
+    const r = parseReceiptQr(
+      'https://suf.purs.gov.rs/v/?vl=AjQ5T0tYSjU2NDlPS1hKNTaqAQAAtQEAAECEVQIAAAA%3D',
+    );
 
     expect(r?.provider).toBe('suf_rs');
     expect(r?.currency).toBe('RSD');
@@ -45,8 +49,12 @@ describe('parseReceiptQr — разбор QR фискального чека (С
   });
 
   it('дата с секундами и без — обе читаются', () => {
-    expect(parseReceiptQr('t=20260730T121533&s=100&fn=1&i=2&fp=3&n=1')?.purchasedAt).toBe('2026-07-30T12:15:33Z');
-    expect(parseReceiptQr('t=20260730T1215&s=100&fn=1&i=2&fp=3&n=1')?.purchasedAt).toBe('2026-07-30T12:15:00Z');
+    expect(parseReceiptQr('t=20260730T121533&s=100&fn=1&i=2&fp=3&n=1')?.purchasedAt).toBe(
+      '2026-07-30T12:15:33Z',
+    );
+    expect(parseReceiptQr('t=20260730T1215&s=100&fn=1&i=2&fp=3&n=1')?.purchasedAt).toBe(
+      '2026-07-30T12:15:00Z',
+    );
   });
 
   it('битая дата не роняет разбор — чек остаётся, дату уточнит пользователь', () => {

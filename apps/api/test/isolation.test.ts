@@ -28,14 +28,18 @@ describe('изоляция workspace', () => {
       201,
     );
 
-    const bobList = await expectOk<{ transactions: { id: string }[] }>(await bob.get('/v1/transactions'));
+    const bobList = await expectOk<{ transactions: { id: string }[] }>(
+      await bob.get('/v1/transactions'),
+    );
     expect(bobList.transactions.map((t) => t.id)).not.toContain(created.id);
 
     const deleted = await bob.del(`/v1/transactions/${created.id}`);
     expect(deleted.status).toBe(404);
 
     // Запись должна остаться живой: 404 без фактического удаления, а не «удалил и соврал».
-    const aliceList = await expectOk<{ transactions: { id: string }[] }>(await alice.get('/v1/transactions'));
+    const aliceList = await expectOk<{ transactions: { id: string }[] }>(
+      await alice.get('/v1/transactions'),
+    );
     expect(aliceList.transactions.map((t) => t.id)).toContain(created.id);
   });
 
@@ -58,7 +62,9 @@ describe('изоляция workspace', () => {
     const bob = await onboarded();
     const aliceCategory = await categoryId(alice, 'Кафе');
 
-    const res = await bob.put(`/v1/plan/current/categories/${aliceCategory}`, { plannedMinor: '5000000' });
+    const res = await bob.put(`/v1/plan/current/categories/${aliceCategory}`, {
+      plannedMinor: '5000000',
+    });
     expect(res.status).toBe(404);
 
     // У Алисы бюджет так и не появился — иначе Боб менял бы чужой план.
@@ -82,10 +88,14 @@ describe('изоляция workspace', () => {
       201,
     );
 
-    expect((await bob.patch(`/v1/recurring-items/${item.id}`, { name: 'Взломано' })).status).toBe(404);
+    expect((await bob.patch(`/v1/recurring-items/${item.id}`, { name: 'Взломано' })).status).toBe(
+      404,
+    );
     expect((await bob.del(`/v1/recurring-items/${item.id}`)).status).toBe(404);
 
-    const mine = await expectOk<{ id: string; name: string }[]>(await alice.get('/v1/recurring-items'));
+    const mine = await expectOk<{ id: string; name: string }[]>(
+      await alice.get('/v1/recurring-items'),
+    );
     expect(mine.find((r) => r.id === item.id)?.name).toBe('Интернет');
   });
 });
