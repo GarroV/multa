@@ -932,6 +932,11 @@ export async function ensurePeriodForDate(
 }
 
 /** Текущий период по ритму воркспейса. Бросает при незавершённом онбординге/неопределимом периоде. */
+/** Текущий период воркспейса — нужен и вне сборки плана (аналитика, issue #51). */
+export function currentPeriodFor(ws: Workspace, asOf: string): PayPeriod {
+  return currentPeriod(ws, asOf);
+}
+
 function currentPeriod(ws: Workspace, asOf: string): PayPeriod {
   if (!ws.periodAnchors) throw new Error('onboarding_incomplete');
   const [current] = generatePeriods(ws.periodAnchors as PeriodConfig, asOf, 2);

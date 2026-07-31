@@ -111,6 +111,14 @@ export const incomeReceiptSchema = z.object({
  * здесь `minor`, а не `positiveMinor`. Вид счёта ограничен теми же значениями, что в check-констрейнте
  * базы: расхождение между схемой и Zod дало бы 500 вместо понятного 400.
  */
+/**
+ * Горизонт аналитики (issue #51). Диапазон ограничен: один период — не история, а десятки периодов
+ * превращают спарклайн в кашу. Мусор отклоняем, а не подменяем дефолтом молча.
+ */
+export const analyticsQuerySchema = z.object({
+  periods: z.coerce.number().int().min(2).max(24).default(6),
+});
+
 export const accountSchema = z.object({
   name: z.string().min(1).max(60),
   currency: ccy,

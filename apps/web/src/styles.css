@@ -1370,3 +1370,24 @@ a {
   justify-items: center;
   text-align: center;
 }
+
+/* Спарклайн: ряд фактов за периоды. Столбики, а не линия — значений мало, и каждое читается. */
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+.spark > i {
+  display: block;
+  width: 4px;
+  min-height: 1px;
+  height: var(--h, 10%);
+  border-radius: 1px;
+  background: var(--cyan);
+  opacity: 0.75;
+}
+.spark > i.over {
+  background: var(--mag);
+  opacity: 1;
+}

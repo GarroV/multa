@@ -6,10 +6,12 @@ import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   isOnboardingIncomplete,
+  useCategoryAnalytics,
   useDeleteExchange,
   useExchangeOps,
   useForecast,
   usePlan,
+  type CategoryAnalyticsRow,
   type ExchangeOp,
   type PlanAllocation,
   type PlanDto,
@@ -144,6 +146,78 @@ function AdviceRow({ a, base, locale }: { a: PlanAllocation; base: string; local
       </span>
       <span />
     </div>
+  );
+}
+
+/** Столбики факта по периодам: значений мало, и каждое читается — линия здесь ничего не добавит. */
+function Spark({
+  series,
+  plannedMinor,
+}: {
+  series: { spentMinor: string }[];
+  plannedMinor: bigint;
+}) {
+  const values = [...series].reverse().map((p) => BigInt(p.spentMinor));
+  const max = values.reduce((m, v) => (v > m ? v : m), plannedMinor > 0n ? plannedMinor : 1n);
+  return (
+    <span className="spark" aria-hidden>
+      {values.map((v, i) => (
+        <i
+          key={i}
+          className={plannedMinor > 0n && v > plannedMinor ? 'over' : undefined}
+          style={{ ['--h' as string]: `${Math.max(6, Number((v * 100n) / max))}%` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Категории против медианы факта (issue #51). Сравнение с медианой шести периодов, а не с одним:
+ * один месяц с ремонтом не повод переписывать бюджет. Вердикт приходит с сервера — это доменное
+ * правило ядра, а не подпись в разметке.
+ */
+function CategoryAnalyticsPanel({ base, locale }: { base: string; locale: string }) {
+  const { t } = useI18n();
+  const { data = [] } = useCategoryAnalytics(6);
+  const withHistory = data.filter((r) => r.series.length > 0);
+  if (withHistory.length === 0) return null;
+  const hasVolatile = withHistory.some((r) => r.verdict === 'volatile');
+
+  const tone = (verdict: CategoryAnalyticsRow['verdict']) =>
+    verdict === 'volatile'
+      ? 'mag'
+      : verdict === 'raise'
+        ? 'amber'
+        : verdict === 'lower'
+          ? 'lime'
+          : 'quiet';
+
+  return (
+    <Panel
+      label={t('stats.byPeriods', { periods: 6 })}
+      accent="cyan"
+      foot={hasVolatile ? <span className="sub">{t('stats.volatileHint')}</span> : undefined}
+    >
+      {withHistory.map((row) => (
+        <div className="prow" key={row.categoryId}>
+          <span className="prow-day" aria-hidden />
+          <span className="prow-name">
+            <span>{row.name}</span>
+            <Tag tone={tone(row.verdict)}>{t(`stats.verdict.${row.verdict}`)}</Tag>
+          </span>
+          <span className="prow-num">
+            <b>{formatMinor(row.medianMinor, base, locale)}</b>
+            <i>
+              {t('stats.plan')} {formatMinor(row.plannedMinor, base, locale)}
+              {row.deltaPct !== null &&
+                ` · ${row.deltaPct > 0 ? '+' : ''}${row.deltaPct.toFixed(0)}%`}
+            </i>
+          </span>
+          <Spark series={row.series} plannedMinor={BigInt(row.plannedMinor)} />
+        </div>
+      ))}
+    </Panel>
   );
 }
 
@@ -291,6 +365,8 @@ function StatsBody({ plan }: { plan: PlanDto }) {
               </div>
             ))}
           </Panel>
+
+          <CategoryAnalyticsPanel base={base} locale={locale} />
 
           {advices.length > 0 && (
             <Panel

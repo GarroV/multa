@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetAdvice } from './learning.ts';
+import { budgetAdvice, categoryVerdict } from './learning.ts';
 
 describe('budgetAdvice — обучение плана на факте (Спринт 4)', () => {
   it('три периода подряд перерасход — предлагает поднять план до медианы факта', () => {
@@ -45,5 +45,60 @@ describe('budgetAdvice — обучение плана на факте (Спри
 
   it('пустая история — нечему учиться', () => {
     expect(budgetAdvice({ plannedMinor: 20000n, history: [] })).toBeNull();
+  });
+});
+
+describe('categoryVerdict', () => {
+  const planned = 20_000_00n;
+
+  it('мало истории — «пока не знаем», а не выдуманный вердикт', () => {
+    expect(categoryVerdict({ plannedMinor: planned, history: [20_000_00n] }).kind).toBe('unknown');
+  });
+
+  it('факт держится около плана — стабильно', () => {
+    const v = categoryVerdict({
+      plannedMinor: planned,
+      history: [19_500_00n, 20_400_00n, 20_100_00n, 19_900_00n],
+    });
+    expect(v.kind).toBe('stable');
+    expect(v.medianMinor).toBe(20_000_00n);
+  });
+
+  it('стабильно выше плана — поднять, и сумма равна медиане', () => {
+    const v = categoryVerdict({
+      plannedMinor: planned,
+      history: [24_000_00n, 23_800_00n, 24_400_00n],
+    });
+    expect(v.kind).toBe('raise');
+    expect(v.medianMinor).toBe(24_000_00n);
+    expect(v.deltaPct).toBeGreaterThan(15);
+  });
+
+  it('стабильно ниже плана — снизить', () => {
+    expect(
+      categoryVerdict({ plannedMinor: planned, history: [12_000_00n, 13_000_00n, 12_500_00n] })
+        .kind,
+    ).toBe('lower');
+  });
+
+  it('разброс в обе стороны — «нестабильно»: такую статью не поднимают, а разбирают', () => {
+    const v = categoryVerdict({
+      plannedMinor: planned,
+      history: [40_000_00n, 5_000_00n, 35_000_00n, 6_000_00n],
+    });
+    expect(v.kind).toBe('volatile');
+  });
+
+  it('без плана вердикт по факту не выносится, но медиана считается', () => {
+    const v = categoryVerdict({ plannedMinor: 0n, history: [10_000_00n, 11_000_00n, 9_000_00n] });
+    expect(v.kind).toBe('unplanned');
+    expect(v.medianMinor).toBe(10_000_00n);
+    expect(v.deltaPct).toBeNull();
+  });
+
+  it('вердикт согласован с советом: где совет молчит, вердикт не требует правки плана', () => {
+    const input = { plannedMinor: planned, history: [20_400_00n, 19_800_00n, 20_100_00n] };
+    expect(budgetAdvice(input)).toBeNull();
+    expect(['stable', 'volatile']).toContain(categoryVerdict(input).kind);
   });
 });
