@@ -437,11 +437,19 @@ export interface CategoryAnalyticsRow {
   periods: number;
 }
 
-export function useCategoryAnalytics(periods = 6) {
+/**
+ * Аналитика категорий. Без аргумента горизонт берёт сервер из настроек воркспейса (issue #49) —
+ * так вердикт на экране совпадает с советами в плане, которые считаются по тому же горизонту.
+ * Явное число передаётся только когда экран сознательно просит другой отрезок.
+ */
+export function useCategoryAnalytics(periods?: number) {
   return useQuery({
-    queryKey: ['analytics', 'categories', periods],
+    queryKey: ['analytics', 'categories', periods ?? 'settings'],
     retry: false,
-    queryFn: () => api<CategoryAnalyticsRow[]>(`/v1/analytics/categories?periods=${periods}`),
+    queryFn: () =>
+      api<CategoryAnalyticsRow[]>(
+        periods ? `/v1/analytics/categories?periods=${periods}` : '/v1/analytics/categories',
+      ),
   });
 }
 

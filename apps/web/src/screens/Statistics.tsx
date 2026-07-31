@@ -11,6 +11,7 @@ import {
   useExchangeOps,
   useForecast,
   usePlan,
+  useSettings,
   type CategoryAnalyticsRow,
   type ExchangeOp,
   type PlanAllocation,
@@ -179,7 +180,11 @@ function Spark({
  */
 function CategoryAnalyticsPanel({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
-  const { data = [] } = useCategoryAnalytics(6);
+  // Горизонт не передаём: сервер берёт его из настроек воркспейса (issue #49). Иначе экран просил
+  // бы шесть периодов даже при другой настройке, и вердикт здесь расходился бы с советом в плане.
+  const { data = [] } = useCategoryAnalytics();
+  const { data: settings } = useSettings();
+  const horizon = settings?.signals.medianPeriods ?? 6;
   const withHistory = data.filter((r) => r.series.length > 0);
   if (withHistory.length === 0) return null;
   const hasVolatile = withHistory.some((r) => r.verdict === 'volatile');
@@ -195,7 +200,7 @@ function CategoryAnalyticsPanel({ base, locale }: { base: string; locale: string
 
   return (
     <Panel
-      label={t('stats.byPeriods', { periods: 6 })}
+      label={t('stats.byPeriods', { periods: horizon })}
       accent="cyan"
       foot={hasVolatile ? <span className="sub">{t('stats.volatileHint')}</span> : undefined}
     >
