@@ -66,11 +66,23 @@ describe('вход в демо', () => {
   test('размены с разными спредами показывают копилку потерь', async () => {
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));
-    const fx = await expectOk<{ ops: { spreadPct: string | null }[]; totalLost: unknown[] }>(
+    const fx = await expectOk<{ ops: { spreadPct: string | null; note: string | null }[]; totalLost: unknown[] }>(
       await guest.get('/v1/exchange-ops'),
     );
     expect(fx.ops.length).toBeGreaterThanOrEqual(3);
     expect(fx.totalLost.length).toBeGreaterThan(0);
+
+    // Спред обязан быть правдоподобным: меняла берёт своё, а не платит сверху рынка. Пока суммы
+    // разменов стояли константами, демо показывало «+9,4%» и «−30,8%» и средний спред −0,4%.
+    const spreads = fx.ops.map((o) => Number(o.spreadPct));
+    expect(spreads.every((s) => Number.isFinite(s))).toBe(true);
+    for (const s of spreads) {
+      expect(s).toBeGreaterThan(0);
+      expect(s).toBeLessThan(5);
+    }
+    // Разные провайдеры с разной ценой — иначе сравнивать не с чем.
+    expect(new Set(fx.ops.map((o) => o.note)).size).toBeGreaterThan(1);
+    expect(Math.max(...spreads) - Math.min(...spreads)).toBeGreaterThan(0.5);
   });
 
   test('повторный вход не удваивает данные', async () => {
