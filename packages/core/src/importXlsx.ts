@@ -58,10 +58,23 @@ export function parseAmount(value: Cell, currency: string): bigint | null {
   return negative ? -rounded : rounded;
 }
 
+/**
+ * Название позиции или его отсутствие. Число в колонке названия — не позиция: в реальных таблицах
+ * туда попадает цена или количество, когда человек не заполнил товар. Такая «позиция» ломает и
+ * словарь автокатегоризации, и статистику по товарам.
+ */
+function itemName(value: Cell): string | null {
+  const text = String(value ?? '').trim();
+  if (text === '') return null;
+  return /^[\d\s.,]+$/.test(text) ? null : text;
+}
+
 const JOURNAL_HEADERS = {
   date: ['дата', 'date'],
   category: ['категория', 'category'],
   item: ['продукт', 'позиция', 'товар', 'item'],
+  price: ['стоимость', 'цена', 'price'],
+  quantity: ['количество', 'кол-во', 'qty', 'quantity'],
   total: ['сумма', 'итого', 'total', 'amount'],
   note: ['комментарий', 'примечание', 'note', 'comment'],
 } as const;
@@ -76,6 +89,8 @@ interface JournalColumns {
   date: number;
   category: number;
   item: number;
+  price: number;
+  quantity: number;
   total: number;
   note: number;
   headerRow: number;
@@ -95,6 +110,8 @@ function findJournalColumns(rows: SheetRows): JournalColumns {
         total,
         category: find(JOURNAL_HEADERS.category),
         item: find(JOURNAL_HEADERS.item),
+        price: find(JOURNAL_HEADERS.price),
+        quantity: find(JOURNAL_HEADERS.quantity),
         note: find(JOURNAL_HEADERS.note),
         headerRow: r,
       };
@@ -146,7 +163,25 @@ export function parseSpendJournal(
       skipped.push({ sourceRow, reason: 'no_date' });
       continue;
     }
-    const amountMinor = parseAmount(row[cols.total], opts.currency);
+    /*
+     * Итог берём из колонки «Сумма»: человек мог поправить его руками, и правда в нём. Но у части
+     * строк итога просто нет — тогда достраиваем из цены и количества (пустое количество = одна
+     * штука). Терять такую трату нельзя: деньги потрачены, а в файле это видно.
+     *
+     * Явный ноль в «Сумме» — не пропуск, а осознанный ноль («взяли, но не платили»): такую строку
+     * пропускаем, не подменяя её ценой.
+     */
+    let amountMinor = parseAmount(row[cols.total], opts.currency);
+    if (amountMinor === null && cols.price >= 0) {
+      const price = parseAmount(row[cols.price], opts.currency);
+      const quantityRaw = cols.quantity >= 0 ? String(row[cols.quantity] ?? '').trim() : '';
+      const quantity = quantityRaw === '' ? 1 : Number(quantityRaw.replace(',', '.'));
+      if (price !== null && Number.isFinite(quantity) && quantity > 0) {
+        // Количество бывает дробным (0.4 кг): умножаем в целых тысячных, чтобы не втащить float.
+        const milli = BigInt(Math.round(quantity * 1000));
+        amountMinor = (price * milli + 500n) / 1000n;
+      }
+    }
     if (amountMinor === null || amountMinor === 0n) {
       skipped.push({ sourceRow, reason: 'no_amount' });
       continue;
@@ -160,7 +195,7 @@ export function parseSpendJournal(
     parsed.push({
       occurredOn,
       category: text(cols.category),
-      item: text(cols.item),
+      item: cols.item >= 0 ? itemName(row[cols.item]) : null,
       amountMinor,
       note: text(cols.note),
       sourceRow,
@@ -181,8 +216,9 @@ export function parseCategoryDictionary(rows: SheetRows): Map<string, string> {
     const category = String(header[c] ?? '').trim();
     if (category === '') continue;
     for (let r = 1; r < rows.length; r += 1) {
-      const item = String(rows[r]?.[c] ?? '').trim();
-      if (item === '') continue;
+      // Числовые ячейки в словаре — остатки расчётов, а не товары (встречаются в реальном файле).
+      const item = itemName(rows[r]?.[c]);
+      if (item === null) continue;
       // Первое вхождение выигрывает: одна позиция не может принадлежать двум категориям.
       if (!map.has(item.toLowerCase())) map.set(item.toLowerCase(), category);
     }
