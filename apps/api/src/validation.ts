@@ -168,6 +168,24 @@ export const workspaceSettingsPatchSchema = z.object({
 
 export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
 
+/**
+ * Импорт из Excel (issue #76). Файл приходит base64: он маленький (таблица на четыре года — меньше
+ * мегабайта), а multipart ради одного поля усложнил бы и клиент, и тесты. Потолок в 12 МБ — защита
+ * от случайной заливки чего-то не того, а не от злого умысла.
+ */
+const MAX_IMPORT_BASE64 = 12 * 1024 * 1024;
+
+export const importPreviewSchema = z.object({
+  fileBase64: z.string().min(1).max(MAX_IMPORT_BASE64),
+  sheet: z.string().min(1).max(120),
+});
+
+export const importCommitSchema = importPreviewSchema.extend({
+  /** Лист-словарь «позиция → категория»: нужен там, где в строке журнала категории нет. */
+  dictionarySheet: z.string().min(1).max(120).optional(),
+  filename: z.string().min(1).max(200).optional(),
+});
+
 export const analyticsQuerySchema = z.object({
   periods: z.coerce.number().int().min(2).max(24).default(6),
 });

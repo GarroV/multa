@@ -234,20 +234,20 @@ create table recurring_items (     -- расходы и взносы; доход
   active boolean not null default true
 );
 
-create table import_batches (
+create table import_batches (     -- пачка импорта: нужна, чтобы перенос можно было откатить целиком
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces on delete cascade,
-  account_id uuid references accounts,
   filename text not null,
-  bank_template text,                -- 'sber' | 'intesa_rs' | 'custom:...'
-  column_mapping jsonb not null,
+  sheet text not null,             -- лист книги: в одном файле их несколько (журнал, словарь, сводки)
   rows_total int not null default 0,
   rows_imported int not null default 0,
   rows_duplicated int not null default 0,
-  status text not null default 'review' check (status in ('review','committed','rolled_back')),
+  status text not null default 'committed' check (status in ('committed','rolled_back')),
   created_at timestamptz not null default now()
 );
--- transactions: add column import_batch_id uuid references import_batches
+create index import_batches_ws_idx on import_batches (workspace_id, created_at);
+-- transactions: import_batch_id uuid references import_batches on delete set null,
+--               import_key text  -- отпечаток строки исходной таблицы, unique (workspace_id, import_key)
 
 create table fx_rates (
   source text not null,      -- 'cbr' | 'ecb' | 'frankfurter' (только публичные источники)

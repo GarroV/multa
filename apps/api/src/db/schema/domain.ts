@@ -328,6 +328,15 @@ export const transactions = pgTable(
     plannedItemId: uuid('planned_item_id').references(() => plannedItems.id, {
       onDelete: 'set null',
     }),
+    /** Пачка импорта, создавшая строку: по ней импорт откатывается целиком (issue #76). */
+    importBatchId: uuid('import_batch_id').references(() => importBatches.id, {
+      onDelete: 'set null',
+    }),
+    /**
+     * Отпечаток строки исходной таблицы (дата + сумма + позиция). По нему повторная загрузка того
+     * же файла не удваивает историю: совпадения считаются дублями и показываются числом.
+     */
+    importKey: text('import_key'),
   },
   (t) => [
     check(
@@ -342,6 +351,9 @@ export const transactions = pgTable(
       'transactions_target_ck',
       sql`${t.targetKind} is null or ${t.targetKind} in ('category','debt','envelope','goal')`,
     ),
+    // Отпечаток импортированной строки уникален в воркспейсе: защита от удвоения истории стоит в
+    // базе, а не только в коде — повторную загрузку файла не должна спасать только удача.
+    unique('transactions_import_key_uq').on(t.workspaceId, t.importKey),
   ],
 );
 
@@ -430,6 +442,32 @@ export const incomeReceipts = pgTable(
  * табло обменника. Отдельно от `fx_rates` намеренно — там публичные котировки, общие для всех
  * воркспейсов, и запись личного факта туда протекала бы в чужие планы (правило 7).
  */
+/**
+ * Пачка импорта (issue #76): чем именно и когда была залита история. Нужна ровно для одного —
+ * чтобы импорт можно было **откатить целиком**: перенос четырёх лет вслепую человек делать не
+ * станет, если отменить его нельзя.
+ */
+export const importBatches = pgTable(
+  'import_batches',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    filename: text('filename').notNull(),
+    sheet: text('sheet').notNull(),
+    rowsTotal: integer('rows_total').notNull().default(0),
+    rowsImported: integer('rows_imported').notNull().default(0),
+    rowsDuplicated: integer('rows_duplicated').notNull().default(0),
+    status: text('status').notNull().default('committed'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('import_batches_status_ck', sql`${t.status} in ('committed','rolled_back')`),
+    index('import_batches_ws_idx').on(t.workspaceId, t.createdAt),
+  ],
+);
+
 export const fxManualRates = pgTable(
   'fx_manual_rates',
   {
