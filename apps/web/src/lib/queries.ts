@@ -827,9 +827,11 @@ export interface RevisionDto {
   moves: RevisionMoveDto[];
 }
 
-export function useRevisions() {
+/** `enabled` нужен для участника совместного доступа: ручка ему закрыта (issue #46). */
+export function useRevisions(enabled = true) {
   return useQuery({
     queryKey: ['revisions'],
+    enabled,
     retry: false,
     queryFn: () => api<RevisionDto[]>('/v1/plan/current/revisions'),
   });
@@ -892,9 +894,11 @@ export function useAccounts(includeArchived = false) {
   });
 }
 
-export function useBalances() {
+/** `enabled` нужен для участника совместного доступа: ручка ему закрыта (issue #46). */
+export function useBalances(enabled = true) {
   return useQuery({
     queryKey: ['balances'],
+    enabled,
     queryFn: () => api<BalancesDto>('/v1/accounts/balances'),
   });
 }
@@ -1151,9 +1155,11 @@ export interface RecurringDue {
   showOnMap: boolean;
 }
 
-export function useForecast() {
+/** `enabled` нужен для участника совместного доступа: ручка ему закрыта (issue #46). */
+export function useForecast(enabled = true) {
   return useQuery({
     queryKey: ['forecast'],
+    enabled,
     retry: false,
     queryFn: () =>
       api<{ horizonPeriods: number; dueSoon: RecurringDue[]; events: ForecastEvent[] }>(

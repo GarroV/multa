@@ -15,10 +15,12 @@ import { useTheme } from './lib/theme.ts';
  * факта, тема и язык стоят в одной строке: всё управление в 48px высоты.
  */
 
-const NAV: { to: string; key: TranslationKey }[] = [
+const NAV: { to: string; key: TranslationKey; ownerOnly?: true }[] = [
   { to: '/plan', key: 'nav.plan' },
-  { to: '/statistics', key: 'nav.statistics' },
-  { to: '/obligations', key: 'nav.obligations' },
+  // Статистика и обязательства пока не умеют матрицу видимости (issue #46): участнику их ручки
+  // закрыты, и вкладка вела бы на экран из одних сообщений об отказе.
+  { to: '/statistics', key: 'nav.statistics', ownerOnly: true },
+  { to: '/obligations', key: 'nav.obligations', ownerOnly: true },
   { to: '/settings', key: 'nav.settings' },
 ];
 
@@ -44,7 +46,7 @@ export function AppShell() {
       <header className="topbar">
         <span className="topbar-brand">multa</span>
         <nav className="tabs" aria-label={t('nav.plan')}>
-          {NAV.map((n) => (
+          {NAV.filter((n) => !(n.ownerOnly && isMember)).map((n) => (
             <Link
               key={n.to}
               to={n.to}

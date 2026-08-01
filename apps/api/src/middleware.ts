@@ -71,10 +71,55 @@ export const requireWorkspace = createMiddleware<{ Variables: AppVariables }>(as
     return c.json({ error: 'read_only_member' }, 403);
   }
 
+  if (role === 'member' && !isSharingAware(c.req.path)) {
+    /*
+     * Разрешено ровно то, что умеет матрицу видимости. Это список РАЗРЕШЁННОГО, а не запрещённого,
+     * и так и должно остаться: первая версия #46 фильтровала только `/v1/plan/current`, и участник
+     * читал имя скрытой цели через `/v1/signals`, `/v1/forecast`, `/v1/plan/grid` и
+     * `/v1/recurring-items` — каждая новая ручка молча дырявила матрицу. Список запрещённого
+     * забывают пополнять; список разрешённого заставляет автора новой ручки сначала научить её
+     * видимости.
+     */
+    return c.json({ error: 'not_shared', path: c.req.path }, 403);
+  }
+
   c.set('workspace', ws);
   c.set('role', role);
   await next();
 });
+
+/**
+ * Ручки, которые участнику отдавать безопасно: они либо сами применяют матрицу видимости
+ * (`applySharing`), либо проверяют раздел через `requireSection`, либо не содержат сумм вовсе.
+ *
+ * Всё остальное участнику закрыто по умолчанию — см. комментарий в `requireWorkspace`.
+ */
+const SHARING_AWARE = [
+  /** Фильтруется `applySharing`: скрытое сворачивается в «Личное», а не исчезает. */
+  '/v1/plan/current',
+  /** Состав участников и собственная роль; матрицу видимости участник видит как свои ограничения. */
+  '/v1/workspace/members',
+  /** Пороги и предпочтения воркспейса — денег в них нет. */
+  '/v1/workspace/settings',
+] as const;
+
+/** Списки разделов: у них свой сторож `requireSection`, который знает режим раздела. */
+const SECTION_GUARDED = [
+  '/v1/debts',
+  '/v1/envelopes',
+  '/v1/goals',
+  '/v1/buckets',
+  '/v1/categories',
+  '/v1/income-sources',
+] as const;
+
+function isSharingAware(path: string): boolean {
+  return (
+    SHARING_AWARE.some((p) => path === p) ||
+    // Ровно список раздела, без вложенных путей: `/v1/debts/:id/...` сторожем не покрыт.
+    SECTION_GUARDED.some((p) => path === p)
+  );
+}
 
 /** Только владелец: приглашения, состав участников, матрица видимости. */
 export const requireOwner = createMiddleware<{ Variables: AppVariables }>(async (c, next) => {

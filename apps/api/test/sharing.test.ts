@@ -194,6 +194,59 @@ describe('совместный доступ', () => {
     expect((await member.get('/v1/plan/current')).status).toBe(409);
   });
 
+  test('скрытое не протекает через другие ручки — ни одну', async () => {
+    /*
+     * Регрессия на дыру, найденную сразу после выката #46: матрица видимости применялась ТОЛЬКО к
+     * `/v1/plan/current`, и участник читал имя скрытой цели через `/v1/signals`, `/v1/forecast`,
+     * `/v1/plan/grid` и `/v1/recurring-items`. Причина была системная — список запрещённого вместо
+     * списка разрешённого. Тест перечисляет ручки, которые про видимость ничего не знают, и
+     * требует от них отказа: пока ручка не научилась матрице, участнику её отдавать нельзя.
+     */
+    const { owner, member } = await pair();
+    await expectOk(
+      await owner.post('/v1/recurring-items', {
+        name: 'СЕКРЕТНЫЙ ПЛАТЁЖ',
+        amountMinor: '150000',
+        currency: 'RUB',
+        schedule: { kind: 'each-payout' },
+      }),
+      201,
+    );
+    await setMode(owner, 'goals', 'hidden');
+
+    for (const path of [
+      '/v1/signals',
+      '/v1/forecast',
+      '/v1/plan/grid?periods=3',
+      '/v1/recurring-items',
+      '/v1/analytics/categories',
+      '/v1/analytics/spread',
+      '/v1/exchange-ops',
+      '/v1/accounts',
+      '/v1/accounts/balances',
+      '/v1/transactions',
+      '/v1/plan/current/revisions',
+    ]) {
+      const res = await member.get(path);
+      expect({ path, status: res.status }).toEqual({ path, status: 403 });
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('not_shared');
+    }
+
+    // При этом сам план участнику по-прежнему доступен: закрыт не доступ, а необученные ручки.
+    const plan = await planOf(member);
+    expect(JSON.stringify(plan)).not.toContain('Мотоцикл');
+    expect(plan.sharing.hiddenMinor).toBe('500000');
+  });
+
+  test('владельца новый сторож не трогает', async () => {
+    // Список разрешённого — про участника; у владельца всё как было.
+    const { owner } = await pair();
+    for (const path of ['/v1/signals', '/v1/forecast', '/v1/plan/grid?periods=3', '/v1/accounts']) {
+      expect({ path, status: (await owner.get(path)).status }).toEqual({ path, status: 200 });
+    }
+  });
+
   test('свой воркспейс важнее чужого приглашения', async () => {
     /*
      * У человека может быть и свой бюджет, и приглашение в чужой. Подменять его собственный план

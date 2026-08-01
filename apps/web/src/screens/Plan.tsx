@@ -10,6 +10,7 @@ import { CascadeDonut } from '../components/ui/CascadeDonut.tsx';
 import { PeriodMap } from '../components/ui/PeriodMap.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { useIsMember } from '../lib/role.ts';
 import {
   isOnboardingIncomplete,
   useBalances,
@@ -185,7 +186,8 @@ function CategoryRow({ a, base, locale }: { a: PlanAllocation; base: string; loc
  */
 function ForecastPanel({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
-  const { data } = useForecast();
+  // Участнику прогноз закрыт: он назвал бы имена скрытых долгов и целей.
+  const { data } = useForecast(!useIsMember());
   if (!data || (data.dueSoon.length === 0 && data.events.length === 0)) return null;
 
   const label = (e: ForecastEvent): string => {
@@ -236,7 +238,7 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
  */
 function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
-  const { data = [] } = useRevisions();
+  const { data = [] } = useRevisions(!useIsMember());
   const undo = useUndoRevision();
   if (data.length === 0) return null;
 
@@ -305,7 +307,9 @@ function Kpi({ label, tag, children }: { label: string; tag?: ReactNode; childre
 function PlanBody({ plan }: { plan: PlanDto }) {
   const { t, locale } = useI18n();
   const base = plan.baseCurrency;
-  const forecast = useForecast();
+  // Участник совместного доступа: часть ручек ему закрыта, панели на них не строим (issue #46).
+  const isMember = useIsMember();
+  const forecast = useForecast(!isMember);
   // Пересборка живёт в строке категории (там известно, сколько не хватает), поэтому баннер
   // риска не открывает свой модал, а раскрывает редактор категорий — оттуда один шаг до варианта.
   const [editingCats, setEditingCats] = useState(false);
@@ -317,7 +321,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
    */
   const [master, setMaster] = useState(false);
   const cancelReceipt = useCancelIncomeReceipt();
-  const balances = useBalances();
+  const balances = useBalances(!isMember);
 
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
   const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
@@ -344,23 +348,26 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {receiptFor && (
         <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
       )}
-      <div className="mode-row">
-        <span className="seg" role="group" aria-label={t('plan.master.title')}>
-          {([false, true] as const).map((on) => (
-            <button
-              key={String(on)}
-              type="button"
-              className="seg-btn"
-              aria-pressed={master === on}
-              onClick={() => setMaster(on)}
-            >
-              {t(on ? 'plan.master.on' : 'plan.master.off')}
-            </button>
-          ))}
-        </span>
-      </div>
+      {/* Мастер-сетка пока не умеет матрицу видимости — участнику её не предлагаем (issue #46). */}
+      {!isMember && (
+        <div className="mode-row">
+          <span className="seg" role="group" aria-label={t('plan.master.title')}>
+            {([false, true] as const).map((on) => (
+              <button
+                key={String(on)}
+                type="button"
+                className="seg-btn"
+                aria-pressed={master === on}
+                onClick={() => setMaster(on)}
+              >
+                {t(on ? 'plan.master.on' : 'plan.master.off')}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
       {/* Мастер-режим — другой взгляд на тот же план, а не второй экран рядом: панели уступают ему место. */}
-      {master && <MasterGrid />}
+      {master && !isMember && <MasterGrid />}
       {!master && (
         <>
           <div className="kpi-strip">

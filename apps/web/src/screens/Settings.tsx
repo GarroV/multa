@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
 import { ImportExcel } from '../components/ImportExcel.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
+import { useIsMember } from '../lib/role.ts';
 import { Sharing } from '../components/Sharing.tsx';
 import { TwoFactor } from '../components/TwoFactor.tsx';
 import { Panel, Tag } from '../components/ui/Panel.tsx';
@@ -78,6 +79,8 @@ export function Settings() {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const ws = me?.workspace;
+  // Участник совместного доступа: пишущие блоки настроек ему недоступны (issue #46).
+  const isMember = useIsMember();
   const {
     data: sources = [],
     isError: sourcesFailed,
@@ -189,7 +192,8 @@ export function Settings() {
 
           <BehaviourSettings />
 
-          <ImportExcel base={ws.baseCurrency} />
+          {/* Переезд с Excel пишет данные: участнику он вернул бы 403 на первом же шаге. */}
+          {!isMember && <ImportExcel base={ws.baseCurrency} />}
 
           <Panel label={t('settings.account')} accent="vio">
             <div className="prow">
