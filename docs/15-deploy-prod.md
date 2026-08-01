@@ -1,6 +1,6 @@
 # 15. Прод-деплой на MUSPELHEIM (рудбук)
 
-> Ручной документ. Единственное каноническое описание того, как Multa живёт в проде и как её туда доставить. Автоматизация деплоя — issue #14, HTTPS — issue #12.
+> Ручной документ. Единственное каноническое описание того, как Multa живёт в проде и как её туда доставить. Автоматизация деплоя — issue #14.
 
 ## Что и где лежит
 
@@ -14,7 +14,17 @@
 
 Контейнеры (`docker-compose.prod.yml`): `multa-postgres-1` (16-alpine, метка `backup.pgdump=true`), `multa-api-1` (порт 3000 только внутри сети), `multa-web-1` (Caddy, `0.0.0.0:80`).
 
-Точка входа: **http://muspelheim.tail48dfee.ts.net** — по Tailscale, напрямую в порт 80 web-контейнера. `tailscale serve` **не настроен**, поэтому схема именно `http` (и `BETTER_AUTH_URL`/`WEB_ORIGIN` в `.env` тоже `http://...` — они обязаны совпадать с фактической схемой и хостом, иначе better-auth зарежет origin).
+Точка входа: **https://muspelheim.tail48dfee.ts.net** (issue #12). Терминацию TLS делает сам Tailscale: `tailscale serve --bg --https=443 http://localhost:80` кладёт сертификат от tailnet-CA и проксирует в порт 80 web-контейнера. Внешнего домена и платного сертификата нет — только внутри tailnet, что и требовалось профилю нулевой стоимости.
+
+`BETTER_AUTH_URL` и `WEB_ORIGIN` в `.env` обязаны совпадать с фактической схемой и хостом (`https://muspelheim.tail48dfee.ts.net`): иначе better-auth зарежет origin. Именно https включает `Secure`-куку сессии (`__Secure-better-auth.session_token`) — по http браузер её просто не сохранит.
+
+Порт 80 остаётся открытым в tailnet и продолжает отвечать: это запасной вход, если `tailscale serve` слетит. Он же — источник рассинхрона: при заходе по http кука будет с другим именем и логин не переживёт переход на https, поэтому в закладках держим https-адрес.
+
+**Включение HTTPS с нуля** (нужно один раз на тайлнет; повторять при переезде на другую машину):
+
+1. В админке тайлнета включить HTTPS-сертификаты: <https://login.tailscale.com/admin/dns> → «HTTPS Certificates» → Enable. Без этого `tailscale serve` падает с «HTTPS is not enabled in the admin panel».
+2. `ssh muspelheim 'tailscale serve --bg --https=443 http://localhost:80'` — конфиг переживает перезагрузку, проверяется через `tailscale serve status`.
+3. Переписать в `C:\projects\multa\.env` обе переменные на `https://…` и перезапустить api (`docker compose -f docker-compose.prod.yml up -d`). Перезапуск обязателен: origin читается при старте процесса.
 
 Маршрутизация внутри `multa-web-1` (`Caddyfile.prod`): `/v1/*` → `reverse_proxy api:3000`; `/assets/*` → файлы с `immutable` (и 404, если файла нет); остальное → SPA-fallback на `index.html` с `Cache-Control: no-cache`.
 
@@ -52,9 +62,13 @@
 ## Смоук после деплоя (обязательный)
 
 ```bash
-curl -s http://muspelheim.tail48dfee.ts.net/v1/health                    # {"ok":true,...}
-curl -sI http://muspelheim.tail48dfee.ts.net/ | grep -i cache-control     # no-cache
-curl -s http://muspelheim.tail48dfee.ts.net/ | grep -o '/assets/[^"]*js'  # имя бандла = локальной сборке
+curl -s https://muspelheim.tail48dfee.ts.net/v1/health                    # {"ok":true,...}
+curl -sI https://muspelheim.tail48dfee.ts.net/ | grep -i cache-control     # no-cache
+curl -s https://muspelheim.tail48dfee.ts.net/ | grep -o '/assets/[^"]*js'  # имя бандла = локальной сборке
+# origin принят и кука Secure — иначе логин не сохранится:
+curl -s -i -X POST https://muspelheim.tail48dfee.ts.net/v1/demo/enter \
+  -H 'content-type: application/json' -H 'origin: https://muspelheim.tail48dfee.ts.net' \
+  -d '{}' | grep -i 'set-cookie\|allow-origin'
 ```
 
 Затем — **обязательно в браузере**, не только curl: открыть страницу и убедиться, что рендерится экран входа и в консоли нет ошибок. Оба прод-бага, найденных 2026-07-29, curl-ом не ловились: сервер отдавал корректный HTML, а падало исполнение JS в браузере.
