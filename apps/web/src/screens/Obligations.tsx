@@ -1,5 +1,6 @@
 import { fromMajor } from '@multa/core';
 import { useState, type ReactNode } from 'react';
+import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -724,6 +725,9 @@ export function Obligations() {
         <div className="col">
           <EnvelopesSection base={base} />
           <BucketsSection base={base} />
+          {/* Регулярные платежи (issues #21, #55) — не обязательство каскада, но живут рядом с ними:
+              это то же «что с меня спишется», просто вне раздачи. */}
+          <RecurringPayments base={base} />
         </div>
       </div>
     </div>

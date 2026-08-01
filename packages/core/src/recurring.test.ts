@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recurringDueIn } from './recurring.ts';
+import { recurringDueIn, type RecurringItem, type RecurringSchedule } from './recurring.ts';
 
 const period = { startsOn: '2026-07-25', endsOn: '2026-08-10' };
 
@@ -143,5 +143,63 @@ describe('recurringDueIn — регулярные платежи внутри п
     );
 
     expect(due.map((d) => d.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('новые правила повтора (issue #55)', () => {
+  const item = (schedule: RecurringSchedule, over: Partial<RecurringItem> = {}): RecurringItem => ({
+    id: 'x',
+    name: 'Платёж',
+    amountMinor: 100000n,
+    currency: 'RUB',
+    schedule,
+    ...over,
+  });
+
+  it('«второй вторник месяца» попадает в свой период', () => {
+    // Период 2026-07-25 … 2026-08-10; второй вторник августа — 11-е, значит в этот период не входит.
+    expect(
+      recurringDueIn([item({ kind: 'monthly-nth-weekday', nth: 2, weekday: 2 })], period),
+    ).toEqual([]);
+    const august = { startsOn: '2026-08-10', endsOn: '2026-08-25' };
+    expect(
+      recurringDueIn([item({ kind: 'monthly-nth-weekday', nth: 2, weekday: 2 })], august).map(
+        (d) => d.on,
+      ),
+    ).toEqual(['2026-08-11']);
+  });
+
+  it('«ежегодно» срабатывает в своём периоде и молчит в остальных', () => {
+    const schedule = { kind: 'yearly' as const, month: 8, day: 1 };
+    expect(recurringDueIn([item(schedule)], period).map((d) => d.on)).toEqual(['2026-08-01']);
+    expect(
+      recurringDueIn([item(schedule)], { startsOn: '2026-08-10', endsOn: '2026-08-25' }),
+    ).toEqual([]);
+  });
+
+  it('«в каждую выплату» даёт ровно одну дату — начало периода', () => {
+    /*
+     * Ловушка полуинтервала: если отдать заодно endsOn, платёж попадёт и в этот период, и в
+     * следующий, то есть удвоится. Проверяем оба соседних периода.
+     */
+    const first = recurringDueIn([item({ kind: 'each-payout' })], period);
+    expect(first.map((d) => d.on)).toEqual(['2026-07-25']);
+    const next = recurringDueIn([item({ kind: 'each-payout' })], {
+      startsOn: '2026-08-10',
+      endsOn: '2026-08-25',
+    });
+    expect(next.map((d) => d.on)).toEqual(['2026-08-10']);
+  });
+
+  it('до первой даты и после отмены событий нет', () => {
+    const schedule = { kind: 'monthly-days' as const, days: [1] };
+    // Платёж заведён позже даты события.
+    expect(recurringDueIn([item(schedule, { startsOn: '2026-09-01' })], period)).toEqual([]);
+    // Подписка отменена раньше.
+    expect(recurringDueIn([item(schedule, { endsOn: '2026-07-31' })], period)).toEqual([]);
+    // Внутри срока жизни — событие на месте.
+    expect(
+      recurringDueIn([item(schedule, { startsOn: '2026-01-01', endsOn: '2027-01-01' })], period),
+    ).toHaveLength(1);
   });
 });

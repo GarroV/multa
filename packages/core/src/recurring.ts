@@ -11,10 +11,29 @@
  */
 
 import { everyWeeksDatesBetween, monthlyDatesBetween, type PayPeriod } from './periods.ts';
+import {
+  nthWeekdayDatesBetween,
+  yearlyDatesBetween,
+  type NthWeekday,
+  type Weekday,
+} from './repeat.ts';
 
+/**
+ * Расписание платежа. Старые виды не переименовываются никогда: schedule лежит в jsonb, и смена
+ * имени вида сделала бы нечитаемыми уже сохранённые строки.
+ */
 export type RecurringSchedule =
   | { readonly kind: 'monthly-days'; readonly days: readonly number[] }
   | { readonly kind: 'every-weeks'; readonly weeks: number; readonly startsOn: string }
+  /** «Второй вторник месяца» (issue #55). nth = -1 — последний: «пятого» не существует. */
+  | { readonly kind: 'monthly-nth-weekday'; readonly nth: NthWeekday; readonly weekday: Weekday }
+  /** «Раз в год» (issue #55): страховка, домен, пошлина. */
+  | { readonly kind: 'yearly'; readonly month: number; readonly day: number }
+  /**
+   * «В каждую выплату» (issue #55) — ровно одна дата в периоде, его начало. Ритм воркспейса знать
+   * не нужно: период уже пришёл аргументом, и его граница уже сдвинута правилом выходных.
+   */
+  | { readonly kind: 'each-payout' }
   | { readonly kind: 'one-off'; readonly date: string }
   | { readonly kind: 'irregular' };
 
@@ -24,6 +43,10 @@ export interface RecurringItem {
   readonly amountMinor: bigint;
   readonly currency: string;
   readonly schedule: RecurringSchedule;
+  /** С какой даты платёж существует; до неё событий нет. */
+  readonly startsOn?: string | null;
+  /** Отменённая подписка перестаёт быть событием, но остаётся в истории. */
+  readonly endsOn?: string | null;
 }
 
 export interface RecurringDue {
@@ -45,6 +68,14 @@ function datesIn(schedule: RecurringSchedule, period: PayPeriod): string[] {
         period.startsOn,
         period.endsOn,
       );
+    case 'monthly-nth-weekday':
+      return nthWeekdayDatesBetween(schedule.nth, schedule.weekday, period.startsOn, period.endsOn);
+    case 'yearly':
+      return yearlyDatesBetween(schedule.month, schedule.day, period.startsOn, period.endsOn);
+    case 'each-payout':
+      // Ровно одна дата — начало периода. Отдать заодно endsOn значило бы удвоить платёж: конец
+      // одного периода это начало следующего.
+      return [period.startsOn];
     case 'one-off':
       return schedule.date >= period.startsOn && schedule.date < period.endsOn
         ? [schedule.date]
@@ -62,6 +93,9 @@ export function recurringDueIn(items: readonly RecurringItem[], period: PayPerio
     for (const on of datesIn(item.schedule, period)) {
       // Полуинтервал: endsOn — это уже следующий период.
       if (on < period.startsOn || on >= period.endsOn) continue;
+      // Срок жизни платежа — как у источника дохода: до первой даты и после отмены событий нет.
+      if (item.startsOn && on < item.startsOn) continue;
+      if (item.endsOn && on > item.endsOn) continue;
       due.push({
         id: item.id,
         name: item.name,

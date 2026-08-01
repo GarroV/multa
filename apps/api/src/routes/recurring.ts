@@ -24,6 +24,9 @@ function serialize(row: typeof recurringItems.$inferSelect) {
     schedule: row.schedule,
     active: row.active,
     targetId: row.targetId,
+    startsOn: row.startsOn,
+    endsOn: row.endsOn,
+    showOnMap: row.showOnMap,
   };
 }
 
@@ -50,6 +53,9 @@ recurringRoute.post('/recurring-items', async (c) => {
       currency: body.currency,
       schedule: body.schedule,
       ...(body.targetId ? { targetId: body.targetId } : {}),
+      ...(body.startsOn ? { startsOn: body.startsOn } : {}),
+      ...(body.endsOn ? { endsOn: body.endsOn } : {}),
+      ...(body.showOnMap !== undefined ? { showOnMap: body.showOnMap } : {}),
     })
     .returning();
   return c.json(serialize(inserted[0]!), 201);
@@ -67,6 +73,10 @@ recurringRoute.patch('/recurring-items/:id', async (c) => {
       ...(body.currency !== undefined ? { currency: body.currency } : {}),
       ...(body.schedule !== undefined ? { schedule: body.schedule } : {}),
       ...(body.active !== undefined ? { active: body.active } : {}),
+      // null означает «снять ограничение», undefined — «поле не трогали»: разные намерения.
+      ...(body.startsOn !== undefined ? { startsOn: body.startsOn } : {}),
+      ...(body.endsOn !== undefined ? { endsOn: body.endsOn } : {}),
+      ...(body.showOnMap !== undefined ? { showOnMap: body.showOnMap } : {}),
     })
     .where(and(eq(recurringItems.id, c.req.param('id')), eq(recurringItems.workspaceId, ws.id)))
     .returning();

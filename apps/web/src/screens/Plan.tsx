@@ -455,7 +455,12 @@ function PlanBody({ plan }: { plan: PlanDto }) {
             </div>
           )}
 
-          <PeriodMap plan={plan} dueSoon={forecast.data?.dueSoon} events={forecast.data?.events} />
+          {/* Карта показывает только помеченные платежи: тумблер убирает шум, «Что впереди» их знает. */}
+          <PeriodMap
+            plan={plan}
+            dueSoon={forecast.data?.dueSoon.filter((d) => d.showOnMap)}
+            events={forecast.data?.events}
+          />
 
           <div className="panels">
             <div className="col">

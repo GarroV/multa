@@ -400,6 +400,15 @@ export const recurringItems = pgTable(
     amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
     currency: ccy('currency').notNull(),
     schedule: jsonb('schedule').notNull(),
+    /** Первая дата платежа: до неё событий нет (issue #55). */
+    startsOn: date('starts_on'),
+    /** Отменённая подписка перестаёт быть событием, но остаётся в истории. */
+    endsOn: date('ends_on'),
+    /**
+     * Показывать ли платёж на карте периода (issue #55). Default true: сейчас там видны все
+     * платежи, и миграция не имеет права молча обрезать человеку карту.
+     */
+    showOnMap: boolean('show_on_map').notNull().default(true),
     nextOn: date('next_on'),
     escalation: jsonb('escalation'),
     active: boolean('active').notNull().default(true),

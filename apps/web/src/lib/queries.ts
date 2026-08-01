@@ -533,6 +533,76 @@ export function useCategoryAnalytics(periods?: number) {
   });
 }
 
+// --- Регулярные платежи (issues #21, #55) ---
+
+export interface RecurringItemDto {
+  id: string;
+  kind: 'expense' | 'envelope' | 'goal' | 'debt';
+  name: string;
+  amountMinor: string;
+  currency: string;
+  /** Правило повтора; форма зависит от `kind` (см. RepeatRule в ядре). */
+  schedule: { kind: string; [key: string]: unknown };
+  active: boolean;
+  targetId: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+  /** Тумблер прячет метку на карте периода, но не само событие. */
+  showOnMap: boolean;
+}
+
+export interface RecurringInput {
+  name: string;
+  amountMinor: string;
+  currency: string;
+  schedule: unknown;
+  startsOn?: string;
+  showOnMap?: boolean;
+}
+
+export function useRecurringItems(enabled = true) {
+  return useQuery({
+    queryKey: ['recurring-items'],
+    retry: false,
+    enabled,
+    queryFn: () => api<RecurringItemDto[]>('/v1/recurring-items'),
+  });
+}
+
+/** После правки платежа перечитываем и прогноз: «что впереди» и карта периода считаются из него. */
+function useRecurringMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['recurring-items'] });
+      void qc.invalidateQueries({ queryKey: ['forecast'] });
+    },
+  });
+}
+
+export function useCreateRecurring() {
+  return useRecurringMutation<RecurringInput>((body) =>
+    api<RecurringItemDto>('/v1/recurring-items', { method: 'POST', body: JSON.stringify(body) }),
+  );
+}
+
+export function usePatchRecurring() {
+  return useRecurringMutation<{ id: string } & Partial<RecurringInput> & { active?: boolean }>(
+    ({ id, ...body }) =>
+      api<RecurringItemDto>(`/v1/recurring-items/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+  );
+}
+
+export function useDeleteRecurring() {
+  return useRecurringMutation<string>((id) =>
+    api(`/v1/recurring-items/${id}`, { method: 'DELETE' }),
+  );
+}
+
 // --- Мастер-сетка: строки × периоды (issue #47) ---
 
 export interface GridCellDto {
@@ -964,6 +1034,8 @@ export interface RecurringDue {
   amountMinor: string;
   currency: string;
   on: string;
+  /** Тумблер платежа: прячет метку на карте периода, но не сам платёж (issue #55). */
+  showOnMap: boolean;
 }
 
 export function useForecast() {

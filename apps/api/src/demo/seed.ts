@@ -380,6 +380,36 @@ export async function seedDemo(userId: string): Promise<string> {
       currency: 'RSD',
       schedule: { kind: 'monthly-days', days: [15] },
     },
+    /*
+     * Новые правила повтора (issue #55) должны быть видны в демо, иначе фича есть, а показать её
+     * нечем: «второй вторник месяца», «раз в год» и «в каждую выплату».
+     */
+    {
+      workspaceId,
+      kind: 'expense',
+      name: 'Cleaning lady',
+      amountMinor: 350_000n,
+      currency: 'RSD',
+      schedule: { kind: 'monthly-nth-weekday', nth: 2, weekday: 2 },
+    },
+    {
+      workspaceId,
+      kind: 'expense',
+      name: 'Car insurance',
+      amountMinor: 4_200_000n,
+      currency: 'RSD',
+      schedule: { kind: 'yearly', month: 9, day: 12 },
+    },
+    {
+      workspaceId,
+      kind: 'expense',
+      name: 'Kids club',
+      amountMinor: 300_000n,
+      currency: 'RUB',
+      schedule: { kind: 'each-payout' },
+      // Тумблер карты в демо тоже показан: событие есть, метки нет — карта не должна зарастать.
+      showOnMap: false,
+    },
   ]);
 
   const ws = (

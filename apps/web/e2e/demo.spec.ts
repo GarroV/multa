@@ -122,3 +122,27 @@ test('мастер-режим показывает полгода вперёд �
   const scrolls = await grid.evaluate((el) => el.scrollWidth > el.clientWidth);
   expect(scrolls).toBe(true);
 });
+
+test('регулярные платежи управляются из интерфейса и знают новые правила', async ({ page }) => {
+  /*
+   * До issue #55 регулярные платежи существовали только в API: в продукте их было не завести и не
+   * удалить. Проверяем ровно это — панель есть, новые правила читаются словами, а вариант повтора
+   * выводится из выбранной даты (29 сентября 2026 — пятый вторник, значит «последний»).
+   */
+  await page.goto('/demo');
+  await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
+  await page.locator('.tab', { hasText: 'Obligations' }).click();
+
+  const panel = page.locator('.panel', { hasText: 'RECURRING PAYMENTS' });
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.tag', { hasText: 'SECOND TUESDAY OF THE MONTH' })).toHaveCount(1);
+  await expect(panel.locator('.tag', { hasText: 'EVERY PAYDAY' })).toHaveCount(1);
+
+  await panel.getByLabel('First time').fill('2026-09-29');
+  const repeat = panel.getByLabel('Repeat');
+  // «Пятого вторника» как правила не существует: пятая неделя предлагается как «последняя».
+  await expect(repeat.locator('option')).toContainText([
+    'day 29 of the month',
+    'last Tuesday of the month',
+  ]);
+});

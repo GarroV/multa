@@ -229,9 +229,20 @@ create table recurring_items (     -- расходы и взносы; доход
   name text not null,
   amount_minor bigint not null,
   currency char(3) not null,
-  schedule jsonb not null,   -- {anchors:[10,25]} | {rrule:'FREQ=MONTHLY;BYMONTHDAY=1'}
-  next_on date,
-  escalation jsonb,          -- {percent: 10, from: '2026-06-01'} — аренда растет
+  -- Правило повтора (RecurringSchedule в packages/core/src/recurring.ts). Виды никогда не
+  -- переименовываются: jsonb хранит их как есть, и смена имени сделала бы старые строки нечитаемыми.
+  --   {kind:'monthly-days', days:[10,25]}
+  --   {kind:'every-weeks', weeks:2, startsOn:'2026-07-01'}
+  --   {kind:'monthly-nth-weekday', nth:2, weekday:2}   -- nth = -1 «последний»; «пятого» не бывает
+  --   {kind:'yearly', month:9, day:12}                 -- 29 февраля клампится к концу месяца
+  --   {kind:'each-payout'}                             -- ровно одна дата: начало периода
+  --   {kind:'one-off', date:'2026-08-01'} | {kind:'irregular'}
+  schedule jsonb not null,
+  starts_on date,            -- первая дата платежа: до неё событий нет
+  ends_on date,              -- отменённая подписка перестаёт быть событием, но остаётся в истории
+  show_on_map boolean not null default true,  -- метка на карте периода; событие в прогнозе остаётся
+  next_on date,              -- НЕ ЧИТАЕТСЯ ни одним хендлером (техдолг, не оживлять вслепую)
+  escalation jsonb,          -- {percent: 10, from: '2026-06-01'} — аренда растет; тоже не читается
   active boolean not null default true
 );
 

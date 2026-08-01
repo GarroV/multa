@@ -54,9 +54,13 @@ forecastRoute.get('/forecast', async (c) => {
       amountMinor: r.amountMinor,
       currency: r.currency,
       schedule: r.schedule as RecurringSchedule,
+      startsOn: r.startsOn,
+      endsOn: r.endsOn,
     })),
     current,
   );
+  // Скрытые с карты платежи остаются в списке «что впереди»: тумблер прячет метку, а не событие.
+  const showOnMap = new Map(recurringRows.map((r) => [r.id, r.showOnMap]));
 
   const events = forecastTimeline({
     asOf,
@@ -85,6 +89,7 @@ forecastRoute.get('/forecast', async (c) => {
       amountMinor: d.amountMinor.toString(),
       currency: d.currency,
       on: d.on,
+      showOnMap: showOnMap.get(d.id) ?? true,
     })),
     events: events.map((e) => ({
       kind: e.kind,

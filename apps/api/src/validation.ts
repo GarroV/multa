@@ -381,6 +381,22 @@ export const recurringScheduleSchema = z.discriminatedUnion('kind', [
     weeks: z.number().int().min(1).max(12),
     startsOn: isoDate,
   }),
+  /*
+   * «N-й <день недели> месяца» (issue #55). nth = -1 означает «последний»; пятёрки здесь нет
+   * намеренно: пятый вторник бывает не каждый месяц, и такое правило молча пропускало бы платёж.
+   */
+  z.object({
+    kind: z.literal('monthly-nth-weekday'),
+    nth: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(-1)]),
+    weekday: z.number().int().min(0).max(6),
+  }),
+  z.object({
+    kind: z.literal('yearly'),
+    month: z.number().int().min(1).max(12),
+    day: z.number().int().min(1).max(31),
+  }),
+  /** «В каждую выплату»: дата берётся из периода, поэтому у правила нет параметров. */
+  z.object({ kind: z.literal('each-payout') }),
   z.object({ kind: z.literal('one-off'), date: isoDate }),
   z.object({ kind: z.literal('irregular') }),
 ]);
@@ -392,6 +408,10 @@ export const recurringCreateSchema = z.object({
   currency: ccy,
   schedule: recurringScheduleSchema,
   targetId: z.string().uuid().optional(),
+  /** Срок жизни платежа (issue #55): «первая дата» из редактора и дата отмены. */
+  startsOn: isoDate.optional(),
+  endsOn: isoDate.optional(),
+  showOnMap: z.boolean().optional(),
 });
 
 export const recurringPatchSchema = z.object({
@@ -400,6 +420,10 @@ export const recurringPatchSchema = z.object({
   currency: ccy.optional(),
   schedule: recurringScheduleSchema.optional(),
   active: z.boolean().optional(),
+  // null — снять ограничение срока; отличать от «поле не прислали» обязательно.
+  startsOn: isoDate.nullable().optional(),
+  endsOn: isoDate.nullable().optional(),
+  showOnMap: z.boolean().optional(),
 });
 
 // --- Чеки (Спринт 5). QR пробуется первым, он бесплатный. ---

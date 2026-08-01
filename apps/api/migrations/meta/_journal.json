@@ -92,6 +92,13 @@
       "when": 1785571292047,
       "tag": "0012_exchange_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785573978433,
+      "tag": "0013_recurring_rules",
+      "breakpoints": true
     }
   ]
 }
