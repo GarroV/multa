@@ -79,3 +79,19 @@ test('статистика считает метрики и историю ра�
   const history = page.locator('.panel', { hasText: 'HISTORY' });
   await expect(history.locator('.prow')).not.toHaveCount(0);
 });
+
+test('демо доводит размен до вывода: у кого дешевле и сколько дал бы переход', async ({ page }) => {
+  /*
+   * Вторая заявленная ценность продукта (issue #53) в её показательном виде. Проверяется именно
+   * вывод, а не наличие панели: если сид скатится к одной сделке на обменник, сравнение перестанет
+   * советовать переход, и демо будет показывать таблицу без главной строки.
+   */
+  await page.goto('/demo');
+  await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
+  await page.locator('.tab', { hasText: 'Statistics' }).click();
+
+  const panel = page.locator('.panel', { hasText: 'WHERE YOU EXCHANGE' });
+  await expect(panel.locator('.tag', { hasText: 'CHEAPEST' })).toHaveCount(1);
+  await expect(panel.locator('.tag', { hasText: 'PRICIEST' })).toHaveCount(1);
+  await expect(panel.locator('.panel-foot')).toContainText(/would have cost .* less/);
+});

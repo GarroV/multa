@@ -85,6 +85,13 @@
       "when": 1785568177228,
       "tag": "0011_import_batches",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785571292047,
+      "tag": "0012_exchange_provider",
+      "breakpoints": true
     }
   ]
 }

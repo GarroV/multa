@@ -179,6 +179,7 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 | `POST /v1/plan/current/revisions/:id/undo`                           | откат правки; сам откат тоже ревизия                                                          | 6      |
 | `GET /v1/forecast`                                                   | таймлайн: закрытие долгов, цели, риски                                                        | 4      |
 | `GET /v1/analytics/categories?periods=N`                             | план против медианы факта, ряд для спарклайна, вердикт (в т.ч. «нестабильно»)                 | 6      |
+| `GET /v1/analytics/spread?months=N`                                  | сравнение провайдеров размена: средний спред, объёмы, у кого дешевле и сколько дал бы переход | 6      |
 | `GET/POST/PATCH/DELETE /v1/accounts`                                 | счета: наличные, карты, накопительные; архивация вместо удаления                              | 6      |
 | `GET /v1/accounts/balances`                                          | «сколько всего денег»: суммы по валютам + итог в базовой                                      | 6      |
 | `GET/POST/DELETE /v1/debts`, `/envelopes`, `/goals`, `/buckets`      | обязательства                                                                                 | 2      |
@@ -190,7 +191,7 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 | `POST /v1/transactions/parse`                                        | разбор фразы: regex ядра, за ним LLM-фоллбэк                                                  | 5      |
 | `POST /v1/transactions/voice`                                        | голосовая заметка → Whisper → тот же разбор фразы                                             | 5      |
 | `GET/POST/PATCH/DELETE /v1/recurring-items`                          | регулярные платежи вне обязательств                                                           | 5      |
-| `GET/POST/DELETE /v1/exchange-ops`                                   | размены, фактический курс и спред                                                             | 3      |
+| `GET/POST/DELETE /v1/exchange-ops`                                   | размены, фактический курс, спред и провайдер                                                  | 3      |
 | `GET /v1/receipts`, `POST /v1/receipts/qr`, `/photo`, `/:id/confirm` | чеки: QR-путь, vision-фоллбэк, подтверждение раскладки                                        | 5      |
 | `GET /v1/fx/rate`                                                    | курс пары на дату                                                                             | 1      |
 | `POST /v1/demo/enter`                                                | вход в демо без регистрации: сессия + наполненный воркспейс                                   | 6      |

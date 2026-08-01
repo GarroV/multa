@@ -217,7 +217,8 @@ create table exchange_ops (
   spread_pct numeric(8,4),                 -- (actual/official - 1) * 100; null без официального курса
   spread_minor bigint,                     -- потеря в валюте получения; отрицательная = выиграл
   occurred_on date not null,
-  note text                                -- где меняли: по нему считается спред по провайдерам
+  provider text,                           -- где меняли: по этому полю считается сравнение провайдеров (#53)
+  note text                                -- комментарий к сделке, в сравнении не участвует
 );
 
 create table recurring_items (     -- расходы и взносы; доходы живут в income_sources (одна правда о доходах)

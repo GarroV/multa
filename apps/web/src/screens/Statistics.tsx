@@ -12,10 +12,12 @@ import {
   useForecast,
   usePlan,
   useSettings,
+  useSpread,
   type CategoryAnalyticsRow,
   type ExchangeOp,
   type PlanAllocation,
   type PlanDto,
+  type ProviderStatsDto,
 } from '../lib/queries.ts';
 import { currencyMix, lockedSplit, planVsFact, spreadAverage } from '../lib/statsView.ts';
 
@@ -25,9 +27,9 @@ import { currencyMix, lockedSplit, planVsFact, spreadAverage } from '../lib/stat
  * связано обязательствами, в каких валютах живёт риск), советы по категориям от ядра и размен —
  * ввод, копилка потерь и история.
  *
- * Считается всё из уже существующих ручек: план, прогноз, размены. Чего в бэке пока нет —
- * медиана по шести периодам, история ревизий, спред по провайдерам — здесь не выдумывается
- * (issues #50–#53).
+ * Считается всё из уже существующих ручек: план, прогноз, размены, медиана по периодам (#51),
+ * сравнение провайдеров (#53). Чего в бэке пока нет — сигналы как сущность (#50) — здесь не
+ * выдумывается.
  */
 
 function Centered({ children }: { children: ReactNode }) {
@@ -98,7 +100,8 @@ function ExchangeRow({ op, locale }: { op: ExchangeOp; locale: string }) {
           <span className="dim"> → </span>
           {formatMinor(op.toMinor, op.toCurrency, locale)} {op.toCurrency}
         </span>
-        {op.note && <Tag>{op.note}</Tag>}
+        {/* Провайдер — метка сделки, заметка — комментарий к ней: разные поля, разные места. */}
+        {op.provider && <Tag tone="vio">{op.provider}</Tag>}
       </span>
       <span className="prow-num">
         {lost === null ? (
@@ -125,6 +128,7 @@ function ExchangeRow({ op, locale }: { op: ExchangeOp; locale: string }) {
       >
         ✕
       </button>
+      {op.note && <span className="prow-note">{op.note}</span>}
     </div>
   );
 }
@@ -172,6 +176,85 @@ function Spark({
         />
       ))}
     </span>
+  );
+}
+
+/**
+ * Где меняешь (issue #53) — вторая заявленная ценность продукта в её практическом виде: не «ты
+ * потерял столько-то», а «у кого дешевле».
+ *
+ * Порог совета держит сервер (`confident`): при единичных сделках разница показывается, но фраза
+ * про экономию не появляется — иначе интерфейс уговаривал бы сменить обменник по одному случаю.
+ */
+function ProviderPanel({ locale }: { locale: string }) {
+  const { t } = useI18n();
+  const { data, isError, refetch } = useSpread();
+
+  if (isError) {
+    return (
+      <Panel label={t('fx.byProvider')} accent="vio">
+        <div className="prow">
+          <span className="prow-day" aria-hidden />
+          <span className="prow-name">
+            <span className="danger">{t('obl.loadFailed')}</span>
+          </span>
+          <span className="prow-num" />
+          <button type="button" className="act" onClick={() => void refetch()}>
+            {t('common.retry')}
+          </button>
+        </div>
+      </Panel>
+    );
+  }
+  if (!data || data.providers.length === 0) return null;
+
+  const volume = (stats: ProviderStatsDto) =>
+    Object.entries(stats.volumeMinor)
+      .map(([ccy, minor]) => `${formatMinor(minor, ccy, locale)} ${ccy}`)
+      .join(' · ');
+
+  const saving =
+    data.confident && data.best && data.savingCurrency && BigInt(data.savingMinor) > 0n
+      ? t('fx.saving', {
+          provider: data.best.provider ?? '',
+          amount: `${formatMinor(data.savingMinor, data.savingCurrency, locale)} ${data.savingCurrency}`,
+        })
+      : data.best && !data.confident
+        ? t('fx.notEnoughDeals')
+        : data.providers.length === 1
+          ? t('fx.onlyOneProvider')
+          : t('fx.markProvider');
+
+  return (
+    <Panel
+      label={t('fx.byProvider')}
+      sum={t('fx.byProvider.sub', { months: data.months })}
+      accent="vio"
+      foot={<span className="sub">{saving}</span>}
+    >
+      {data.providers.map((stats) => {
+        const isBest = data.best !== null && stats.provider === data.best.provider;
+        const isWorst = data.worst !== null && stats.provider === data.worst.provider && !isBest;
+        return (
+          <div className="prow" key={stats.provider ?? '—'}>
+            <span className="prow-day" aria-hidden />
+            <span className="prow-name">
+              {/* Безымянная группа названа прямо: «пусто» читалось бы как сбой. */}
+              <span className={stats.provider ? undefined : 'dim'}>
+                {stats.provider ?? t('fx.noProvider')}
+              </span>
+              {isBest && <Tag tone="lime">{t('fx.cheapest')}</Tag>}
+              {isWorst && <Tag tone="amber">{t('fx.priciest')}</Tag>}
+            </span>
+            <span className="prow-num">
+              <b>{stats.avgSpreadPct.toFixed(2)}%</b>
+              <i>{t('fx.deals', { count: stats.deals })}</i>
+            </span>
+            <span className="prow-note">{volume(stats)}</span>
+          </div>
+        );
+      })}
+    </Panel>
   );
 }
 
@@ -391,6 +474,8 @@ function StatsBody({ plan }: { plan: PlanDto }) {
           </Panel>
 
           <CategoryAnalyticsPanel base={base} locale={locale} />
+
+          <ProviderPanel locale={locale} />
 
           {advices.length > 0 && (
             <Panel

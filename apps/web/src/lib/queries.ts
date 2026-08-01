@@ -533,6 +533,39 @@ export function useCategoryAnalytics(periods?: number) {
   });
 }
 
+// --- Сравнение провайдеров размена (issue #53) ---
+
+export interface ProviderStatsDto {
+  /** null — метка не проставлена: такие сделки видны, но «перейти на без метки» нельзя. */
+  provider: string | null;
+  deals: number;
+  avgSpreadPct: number;
+  /** Отданные объёмы по валютам отдачи. */
+  volumeMinor: Record<string, string>;
+  /** Потери по валютам получения. */
+  lostMinor: Record<string, string>;
+}
+
+export interface SpreadDto {
+  months: number;
+  providers: ProviderStatsDto[];
+  best: ProviderStatsDto | null;
+  worst: ProviderStatsDto | null;
+  /** Есть ли у лучшего повторяемость: без неё показываем разницу, но не советуем переходить. */
+  confident: boolean;
+  savingMinor: string;
+  savingCurrency: string | null;
+}
+
+export function useSpread(months?: number) {
+  return useQuery({
+    queryKey: ['analytics', 'spread', months ?? 'default'],
+    retry: false,
+    queryFn: () =>
+      api<SpreadDto>(months ? `/v1/analytics/spread?months=${months}` : '/v1/analytics/spread'),
+  });
+}
+
 // --- История ревизий (issue #52) ---
 
 export interface RevisionMoveDto {
@@ -769,6 +802,8 @@ export interface ExchangeOp {
   spreadPct: string | null;
   spreadMinor: string | null;
   occurredOn: string;
+  /** Где меняли (issue #53): по этому полю считается сравнение провайдеров. */
+  provider: string | null;
   note: string | null;
 }
 
@@ -792,6 +827,8 @@ export interface ExchangeInput {
   fromMinor: string;
   toMinor: string;
   occurredOn?: string;
+  /** Пусто — сервер подставит привычного провайдера из настроек. */
+  provider?: string;
   note?: string;
 }
 
@@ -802,6 +839,8 @@ function useExchangeMutation<TVars>(mutationFn: (vars: TVars) => Promise<unknown
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['exchange-ops'] });
       void qc.invalidateQueries({ queryKey: ['plan'] });
+      // Сравнение провайдеров считается по этим же сделкам: иначе новая строка есть, а вывод старый.
+      void qc.invalidateQueries({ queryKey: ['analytics', 'spread'] });
     },
   });
 }

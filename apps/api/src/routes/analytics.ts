@@ -1,13 +1,19 @@
-import { categoryVerdict, type CategoryVerdictKind } from '@multa/core';
-import { and, desc, eq, lt, sql } from 'drizzle-orm';
+import { categoryVerdict, compareProviders, type CategoryVerdictKind } from '@multa/core';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
-import { categories, payPeriods, plannedItems, transactions } from '../db/schema/domain.ts';
+import {
+  categories,
+  exchangeOps,
+  payPeriods,
+  plannedItems,
+  transactions,
+} from '../db/schema/domain.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import { currentPeriodFor } from '../plan/assemble.ts';
 import { settingsOf } from '../settings/store.ts';
-import { analyticsQuerySchema } from '../validation.ts';
+import { analyticsQuerySchema, spreadQuerySchema } from '../validation.ts';
 
 /**
  * Категорийная аналитика (issue #51): план текущего периода против медианы факта за прошлые
@@ -121,3 +127,70 @@ function rank(kind: CategoryVerdictKind): number {
   const idx = VERDICT_ORDER.indexOf(kind);
   return idx === -1 ? VERDICT_ORDER.length : idx;
 }
+
+/**
+ * Дата на N месяцев раньше, YYYY-MM-DD. Считаем по календарю, а не «месяц = 31 день»: горизонт
+ * «полгода» должен означать полгода, а не 186 дней, иначе граница выборки съезжает от месяца к
+ * месяцу. Переполнение дня (31 марта − 1 месяц) UTC-конструктор сам сносит на конец февраля.
+ */
+function monthsBefore(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1 - months, d)).toISOString().slice(0, 10);
+}
+
+/**
+ * Сравнение провайдеров размена (issue #53). Считает ядро (`compareProviders`) — это доменное
+ * правило: там же решается, когда совет молчит (один провайдер, единичная сделка, разные валюты).
+ */
+analyticsRoute.get('/analytics/spread', async (c) => {
+  const ws = c.get('workspace')!;
+  const { months } = spreadQuerySchema.parse(c.req.query());
+  const since = monthsBefore(today(ws.timezone), months);
+
+  const rows = await db
+    .select({
+      provider: exchangeOps.provider,
+      fromCurrency: exchangeOps.fromCurrency,
+      toCurrency: exchangeOps.toCurrency,
+      fromMinor: exchangeOps.fromMinor,
+      spreadPct: exchangeOps.spreadPct,
+      spreadMinor: exchangeOps.spreadMinor,
+      occurredOn: exchangeOps.occurredOn,
+    })
+    .from(exchangeOps)
+    .where(and(eq(exchangeOps.workspaceId, ws.id), gte(exchangeOps.occurredOn, since)));
+
+  const comparison = compareProviders(
+    rows.map((r) => ({
+      provider: r.provider,
+      pair: `${r.fromCurrency}→${r.toCurrency}`,
+      fromMinor: r.fromMinor,
+      spreadPct: r.spreadPct,
+      lostMinor: r.spreadMinor,
+      occurredOn: r.occurredOn,
+    })),
+  );
+
+  const serializeStats = (stats: (typeof comparison.providers)[number]) => ({
+    provider: stats.provider,
+    deals: stats.deals,
+    avgSpreadPct: Number(stats.avgSpreadPct.toFixed(4)),
+    volumeMinor: Object.fromEntries(
+      [...stats.volumeMinorByCurrency].map(([ccy, v]) => [ccy, v.toString()]),
+    ),
+    lostMinor: Object.fromEntries(
+      [...stats.lostMinorByCurrency].map(([ccy, v]) => [ccy, v.toString()]),
+    ),
+  });
+
+  return c.json({
+    months,
+    providers: comparison.providers.map(serializeStats),
+    best: comparison.best ? serializeStats(comparison.best) : null,
+    worst: comparison.worst ? serializeStats(comparison.worst) : null,
+    // Совет показывается только при повторяемости: единичная сделка — не привычка.
+    confident: comparison.confident,
+    savingMinor: comparison.savingMinor.toString(),
+    savingCurrency: comparison.savingCurrency,
+  });
+});

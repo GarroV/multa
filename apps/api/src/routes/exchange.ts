@@ -6,6 +6,7 @@ import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import { currencyBuckets, exchangeOps } from '../db/schema/domain.ts';
 import { getRate } from '../fx/service.ts';
+import { settingsOf } from '../settings/store.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import { exchangeCreateSchema } from '../validation.ts';
 
@@ -30,6 +31,7 @@ function serialize(row: typeof exchangeOps.$inferSelect) {
     spreadPct: row.spreadPct,
     spreadMinor: row.spreadMinor != null ? row.spreadMinor.toString() : null,
     occurredOn: row.occurredOn,
+    provider: row.provider,
     note: row.note,
   };
 }
@@ -84,6 +86,10 @@ exchangeRoute.post('/exchange-ops', async (c) => {
     bucketId = owned[0].id;
   }
 
+  const settings = settingsOf(ws);
+  // Провайдер: из запроса, иначе привычный из настроек — его набирают каждый раз одинаково.
+  const provider = body.provider?.trim() || settings.currency.defaultProvider || null;
+
   /*
    * Здесь курс намеренно публичный, без личных курсов воркспейса: спред считается как отклонение
    * от рыночной котировки. Сравнивать свой курс со своим же — значит всегда получать нулевой спред.
@@ -111,6 +117,9 @@ exchangeRoute.post('/exchange-ops', async (c) => {
       ...(result.spreadPct !== null ? { spreadPct: result.spreadPct } : {}),
       ...(result.lostMinor !== null ? { spreadMinor: result.lostMinor } : {}),
       occurredOn,
+      // Провайдер: из запроса, иначе — привычный из настроек (issue #49). Пустая метка означает,
+      // что человек не сказал, где менял: такие сделки видны, но в советах не участвуют.
+      ...(provider ? { provider } : {}),
       ...(body.note ? { note: body.note } : {}),
       ...(bucketId ? { bucketId } : {}),
     })

@@ -542,12 +542,31 @@ export async function seedDemo(userId: string): Promise<string> {
     fromMinor: bigint;
     spreadBp: bigint;
     back: number;
-    note: string;
+    provider: string;
   }[] = [
-    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 180n, back: 20, note: 'Menjačnica' },
-    { from: 'RUB', to: 'RSD', fromMinor: 4_000_000n, spreadBp: 90n, back: 35, note: 'Menjačnica' },
-    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 260n, back: 50, note: 'Bank' },
-    { from: 'RUB', to: 'EUR', fromMinor: 5_500_000n, spreadBp: 120n, back: 65, note: 'Wise' },
+    /*
+     * Разные обменники с повторяемостью: сравнение провайдеров (issue #53) молчит, пока у лучшего
+     * одна сделка, поэтому у Wise их две — иначе демо показывает панель без главного вывода.
+     */
+    {
+      from: 'RUB',
+      to: 'EUR',
+      fromMinor: 6_000_000n,
+      spreadBp: 180n,
+      back: 20,
+      provider: 'Menjačnica',
+    },
+    {
+      from: 'RUB',
+      to: 'RSD',
+      fromMinor: 4_000_000n,
+      spreadBp: 90n,
+      back: 35,
+      provider: 'Menjačnica',
+    },
+    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 260n, back: 50, provider: 'Bank' },
+    { from: 'RUB', to: 'EUR', fromMinor: 5_500_000n, spreadBp: 120n, back: 65, provider: 'Wise' },
+    { from: 'RUB', to: 'EUR', fromMinor: 4_500_000n, spreadBp: 110n, back: 12, provider: 'Wise' },
   ];
   for (const op of fxHistory) {
     const day = shift(asOf, -op.back);
@@ -578,7 +597,7 @@ export async function seedDemo(userId: string): Promise<string> {
       ...(result.spreadPct !== null ? { spreadPct: result.spreadPct } : {}),
       ...(result.lostMinor !== null ? { spreadMinor: result.lostMinor } : {}),
       occurredOn: day,
-      note: op.note,
+      provider: op.provider,
     });
   }
 

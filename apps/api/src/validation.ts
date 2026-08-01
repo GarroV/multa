@@ -192,6 +192,11 @@ export const importCommitSchema = z.object({
   filename: z.string().min(1).max(200).optional(),
 });
 
+/** Горизонт сравнения провайдеров (issue #53): меньше месяца — не выборка, больше двух лет — не про сейчас. */
+export const spreadQuerySchema = z.object({
+  months: z.coerce.number().int().min(1).max(24).default(6),
+});
+
 export const analyticsQuerySchema = z.object({
   periods: z.coerce.number().int().min(2).max(24).default(6),
 });
@@ -319,6 +324,8 @@ export const executionSchema = z.object({
  * суммы — положительные: «отдал 0» это не размен.
  */
 export const exchangeCreateSchema = z.object({
+  /** Где меняли (issue #53): по нему считается сравнение провайдеров, поэтому это поле, а не заметка. */
+  provider: z.string().min(1).max(40).optional(),
   fromCurrency: ccy,
   toCurrency: ccy,
   fromMinor: positiveMinor,

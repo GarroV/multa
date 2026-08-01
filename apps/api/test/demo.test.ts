@@ -105,7 +105,7 @@ describe('вход в демо', () => {
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));
     const fx = await expectOk<{
-      ops: { spreadPct: string | null; note: string | null }[];
+      ops: { spreadPct: string | null; provider: string | null }[];
       totalLost: unknown[];
     }>(await guest.get('/v1/exchange-ops'));
     expect(fx.ops.length).toBeGreaterThanOrEqual(3);
@@ -120,8 +120,24 @@ describe('вход в демо', () => {
       expect(s).toBeLessThan(5);
     }
     // Разные провайдеры с разной ценой — иначе сравнивать не с чем.
-    expect(new Set(fx.ops.map((o) => o.note)).size).toBeGreaterThan(1);
+    expect(new Set(fx.ops.map((o) => o.provider)).size).toBeGreaterThan(1);
     expect(Math.max(...spreads) - Math.min(...spreads)).toBeGreaterThan(0.5);
+
+    /*
+     * Демо показывает не только копилку потерь, но и вывод из неё: у кого дешевле (issue #53).
+     * Совет требует повторяемости у лучшего провайдера — если сид скатится к одной сделке на
+     * обменник, панель в демо останется без главной строки, и это надо ловить здесь.
+     */
+    const spread = await expectOk<{
+      best: { provider: string | null } | null;
+      confident: boolean;
+      savingMinor: string;
+      savingCurrency: string | null;
+    }>(await guest.get('/v1/analytics/spread?months=6'));
+    expect(spread.best?.provider).toBeTruthy();
+    expect(spread.confident).toBe(true);
+    expect(spread.savingCurrency).toBe('RUB');
+    expect(BigInt(spread.savingMinor)).toBeGreaterThan(0n);
   });
 
   test('повторный вход не удваивает данные', async () => {

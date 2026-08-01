@@ -377,6 +377,12 @@ export const exchangeOps = pgTable('exchange_ops', {
   officialSource: text('official_source'),
   spreadPct: numeric('spread_pct', { precision: 8, scale: 4 }),
   spreadMinor: bigint('spread_minor', { mode: 'bigint' }),
+  /**
+   * Где меняли (issue #53). Отдельная колонка, а не заметка: по ней считается сравнение
+   * провайдеров — одна из двух заявленных ценностей продукта. В заметке это была строка «для
+   * человека», по которой нельзя ни сгруппировать, ни сравнить.
+   */
+  provider: text('provider'),
   occurredOn: date('occurred_on').notNull(),
   note: text('note'),
 });

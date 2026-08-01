@@ -36,7 +36,7 @@ export function ExchangeEntry() {
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
   const [occurredOn, setOccurredOn] = useState(todayISO());
-  const [note, setNote] = useState('');
+  const [provider, setProvider] = useState('');
   const providerHint = settings?.currency.defaultProvider ?? '';
   const [invalid, setInvalid] = useState(false);
 
@@ -57,14 +57,14 @@ export function ExchangeEntry() {
         fromMinor,
         toMinor,
         occurredOn,
-        // Пустое поле означает «как обычно»: подставляем провайдера из настроек.
-        ...(note.trim() || providerHint ? { note: note.trim() || providerHint } : {}),
+        // Пустое поле означает «как обычно»: провайдера из настроек подставит сервер (issue #53).
+        ...(provider.trim() ? { provider: provider.trim() } : {}),
       },
       {
         onSuccess: () => {
           setFromValue('');
           setToValue('');
-          setNote('');
+          setProvider('');
         },
       },
     );
@@ -120,8 +120,8 @@ export function ExchangeEntry() {
           className="field grow"
           placeholder={providerHint || '—'}
           aria-label={t('fx.provider')}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          value={provider}
+          onChange={(e) => setProvider(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
         <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
