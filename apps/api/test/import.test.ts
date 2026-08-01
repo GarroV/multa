@@ -62,6 +62,16 @@ describe('импорт журнала из Excel', () => {
     expect(txs.transactions).toHaveLength(0);
   });
 
+  test('без названия листа предпросмотр отвечает составом книги', async () => {
+    // Интерфейс не знает имён листов, пока не прочитает файл: первый запрос отвечает именно на это.
+    const client = await onboarded();
+    const preview = await expectOk<PreviewDto & { journal: null }>(
+      await client.post('/v1/import/preview', { fileBase64: fixture.toString('base64') }),
+    );
+    expect(preview.sheets.map((s) => s.name)).toEqual(['Журнал', 'Словарь']);
+    expect(preview.journal).toBeNull();
+  });
+
   test('запись создаёт траты, недостающие категории и пачку импорта', async () => {
     const client = await onboarded();
     const result = await expectOk<CommitDto>(

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
+import { ImportExcel } from '../components/ImportExcel.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { Panel, Tag } from '../components/ui/Panel.tsx';
 import { api } from '../lib/api.ts';
@@ -185,6 +186,8 @@ export function Settings() {
           </Panel>
 
           <BehaviourSettings />
+
+          <ImportExcel base={ws.baseCurrency} />
 
           <Panel label={t('settings.account')} accent="vio">
             <div className="prow">

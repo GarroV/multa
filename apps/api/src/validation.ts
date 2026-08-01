@@ -177,10 +177,16 @@ const MAX_IMPORT_BASE64 = 12 * 1024 * 1024;
 
 export const importPreviewSchema = z.object({
   fileBase64: z.string().min(1).max(MAX_IMPORT_BASE64),
-  sheet: z.string().min(1).max(120),
+  /**
+   * Лист необязателен: первый запрос отвечает на вопрос «что вообще в файле» и возвращает список
+   * листов. Без этого интерфейс не может предложить выбор — он не знает имён.
+   */
+  sheet: z.string().min(1).max(120).optional(),
 });
 
-export const importCommitSchema = importPreviewSchema.extend({
+export const importCommitSchema = z.object({
+  fileBase64: z.string().min(1).max(MAX_IMPORT_BASE64),
+  sheet: z.string().min(1).max(120),
   /** Лист-словарь «позиция → категория»: нужен там, где в строке журнала категории нет. */
   dictionarySheet: z.string().min(1).max(120).optional(),
   filename: z.string().min(1).max(200).optional(),
