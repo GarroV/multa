@@ -10,7 +10,7 @@ import {
   plannedItems,
   transactions,
 } from '../db/schema/domain.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
 import { currentPeriodFor } from '../plan/assemble.ts';
 import { settingsOf } from '../settings/store.ts';
 import { analyticsQuerySchema, spreadQuerySchema } from '../validation.ts';
@@ -38,6 +38,14 @@ analyticsRoute.get('/analytics/categories', async (c) => {
   // значение по умолчанию для этого воркспейса (issue #49).
   const requested = analyticsQuerySchema.parse(c.req.query());
   const periods = c.req.query('periods') ? requested.periods : settingsOf(ws).signals.medianPeriods;
+  return c.json(await categoryAnalytics(ws, periods));
+});
+
+/**
+ * Категорийная аналитика как функция: её читает и ручка, и движок сигналов (issue #50). Считать
+ * медиану во второй раз своим кодом было бы прямым путём к двум разным цифрам на одном экране.
+ */
+export async function categoryAnalytics(ws: Workspace, periods: number) {
   const period = currentPeriodFor(ws, today(ws.timezone));
 
   const [catRows, factRows, plannedRows] = await Promise.all([
@@ -111,8 +119,8 @@ analyticsRoute.get('/analytics/categories', async (c) => {
     // Сначала то, что требует решения: нестабильные и требующие правки плана.
     .sort((a, b) => rank(a.verdict) - rank(b.verdict));
 
-  return c.json(rows);
-});
+  return rows;
+}
 
 const VERDICT_ORDER: CategoryVerdictKind[] = [
   'volatile',

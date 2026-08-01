@@ -147,6 +147,12 @@ const signalsSettings = z.object({
   burnThresholdDays: z.number().int().min(1).max(14).default(3),
   /** Сколько прошлых периодов берём в медиану: меньше двух — не история. */
   medianPeriods: z.number().int().min(2).max(24).default(6),
+  /** Запас хода ниже этого числа дней — сигнал (issue #50). */
+  runwayWarnDays: z.number().int().min(1).max(90).default(14),
+  /** Доля дохода, связанная обязательствами, выше этой — сигнал. */
+  lockedWarnPct: z.number().int().min(10).max(95).default(60),
+  /** Сколько сигналов показывать: длинный список перестают читать. */
+  maxSignals: z.number().int().min(3).max(12).default(6),
 });
 
 export const workspaceSettingsSchema = z

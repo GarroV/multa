@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ExchangeEntry } from '../components/ExchangeEntry.tsx';
+import { SignalsPanel } from '../components/SignalsPanel.tsx';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { formatMinor } from '../lib/format.ts';
@@ -9,7 +10,6 @@ import {
   useCategoryAnalytics,
   useDeleteExchange,
   useExchangeOps,
-  useForecast,
   usePlan,
   useSettings,
   useSpread,
@@ -27,9 +27,8 @@ import { currencyMix, lockedSplit, planVsFact, spreadAverage } from '../lib/stat
  * связано обязательствами, в каких валютах живёт риск), советы по категориям от ядра и размен —
  * ввод, копилка потерь и история.
  *
- * Считается всё из уже существующих ручек: план, прогноз, размены, медиана по периодам (#51),
- * сравнение провайдеров (#53). Чего в бэке пока нет — сигналы как сущность (#50) — здесь не
- * выдумывается.
+ * Ни одной цифры экран не досчитывает: сигналы (#50), медиана по периодам (#51) и сравнение
+ * провайдеров (#53) приходят готовыми сущностями, здесь только раскладка и подписи.
  */
 
 function Centered({ children }: { children: ReactNode }) {
@@ -52,35 +51,6 @@ function Metric({
       <span className="kpi-label">{label}</span>
       <span className={tone ? `kpi-value ${tone}` : 'kpi-value'}>{value}</span>
       {sub && <span className="kpi-sub">{sub}</span>}
-    </div>
-  );
-}
-
-/** Сигнал: строка с причиной и суммой. Тон — риск или возможность, никогда «вина». */
-function Signal({
-  tone,
-  title,
-  detail,
-  amount,
-}: {
-  tone: 'risk' | 'attention' | 'opportunity';
-  title: string;
-  detail?: string;
-  amount?: string;
-}) {
-  const { t } = useI18n();
-  const tag = tone === 'risk' ? 'mag' : tone === 'attention' ? 'amber' : 'lime';
-  return (
-    <div className="prow">
-      <span className="prow-day" aria-hidden />
-      <span className="prow-name">
-        <span>{title}</span>
-        {/* Через словарь: сырой литерал 'risk' был единственным хардкодом строки в вебе. */}
-        <Tag tone={tag}>{t(`stats.tone.${tone}`)}</Tag>
-      </span>
-      <span className="prow-num">{amount && <b>{amount}</b>}</span>
-      <span />
-      {detail && <span className="prow-note">{detail}</span>}
     </div>
   );
 }
@@ -332,7 +302,6 @@ function StatsBody({ plan }: { plan: PlanDto }) {
   const { t, locale } = useI18n();
   const base = plan.baseCurrency;
   const fx = useExchangeOps();
-  const forecast = useForecast();
 
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
   const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
@@ -376,58 +345,7 @@ function StatsBody({ plan }: { plan: PlanDto }) {
 
       <div className="panels">
         <div className="col">
-          <Panel label={t('stats.signals')} accent={plan.burn.willLast ? 'cyan' : 'mag'}>
-            {!plan.burn.willLast && plan.burn.runsOutOn && (
-              <Signal
-                tone="risk"
-                title={t('signal.burn.title', { date: plan.burn.runsOutOn.slice(5) })}
-                detail={t('signal.burn.body', {
-                  perDay: withCcy(plan.burn.perDayMinor),
-                  perDayPlan: withCcy(plan.canSpendPerDayMinor),
-                })}
-                amount={withCcy(plan.burn.perDayMinor)}
-              />
-            )}
-            {BigInt(plan.compressedMinor) > 0n && (
-              <Signal
-                tone="attention"
-                title={t('stats.signal.compressed')}
-                detail={t('plan.compressed.note', { amount: fmt(plan.compressedMinor), ccy: base })}
-                amount={withCcy(plan.compressedMinor)}
-              />
-            )}
-            {BigInt(plan.overspentMinor) > 0n && (
-              <Signal
-                tone="risk"
-                title={t('stats.signal.overspent')}
-                amount={withCcy(plan.overspentMinor)}
-              />
-            )}
-            {(forecast.data?.events ?? [])
-              .filter((e) => e.kind === 'freed_money' || e.kind === 'goal_at_risk')
-              .slice(0, 4)
-              .map((e) => (
-                <Signal
-                  key={`${e.kind}:${e.targetId}`}
-                  tone={e.kind === 'freed_money' ? 'opportunity' : 'attention'}
-                  title={
-                    e.kind === 'freed_money'
-                      ? t('forecast.freed', { amount: e.amountMinor ? withCcy(e.amountMinor) : '' })
-                      : t('forecast.goalRisk', {
-                          name: e.name,
-                          amount: e.amountMinor ? withCcy(e.amountMinor) : '',
-                        })
-                  }
-                  detail={e.on}
-                />
-              ))}
-            {plan.burn.willLast &&
-              BigInt(plan.compressedMinor) === 0n &&
-              BigInt(plan.overspentMinor) === 0n &&
-              (forecast.data?.events ?? []).length === 0 && (
-                <Signal tone="opportunity" title={t('signal.ok')} />
-              )}
-          </Panel>
+          <SignalsPanel base={base} locale={locale} />
 
           <Panel label={t('stats.structure')} accent="vio">
             <div className="prow">

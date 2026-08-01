@@ -8,6 +8,7 @@ export * from './income.ts';
 export * from './parseEntry.ts';
 export * from './exchange.ts';
 export * from './signals.ts';
+export * from './signalEngine.ts';
 export * from './rebalance.ts';
 export * from './learning.ts';
 export * from './forecast.ts';

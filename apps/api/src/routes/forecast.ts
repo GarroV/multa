@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import { debts, goals, recurringItems } from '../db/schema/domain.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
 
 /**
  * Прогноз-таймлайн (Спринт 4): когда закроются долги, когда соберутся цели и где риск.
@@ -25,10 +25,19 @@ const HORIZON_PERIODS = 12;
 forecastRoute.get('/forecast', async (c) => {
   const ws = c.get('workspace')!;
   if (!ws.periodAnchors) return c.json({ error: 'onboarding_incomplete' }, 409);
+  return c.json(await forecastOf(ws));
+});
+
+/**
+ * Прогноз как функция: его читает и ручка, и движок сигналов (issue #50). «Долг закроется» должно
+ * считаться одним кодом, иначе лента «Что впереди» и сигнал разойдутся в датах.
+ */
+export async function forecastOf(ws: Workspace) {
   const asOf = today(ws.timezone);
 
   const [current] = generatePeriods(ws.periodAnchors as PeriodConfig, asOf, 2);
-  if (!current) return c.json({ error: 'period_undeterminable' }, 409);
+  // Период не определяется — это сбой ритма, а не пустой прогноз: молчать здесь нельзя.
+  if (!current) throw new Error('period_undeterminable');
 
   const [debtRows, goalRows, recurringRows] = await Promise.all([
     db
@@ -81,7 +90,7 @@ forecastRoute.get('/forecast', async (c) => {
     })),
   });
 
-  return c.json({
+  return {
     horizonPeriods: HORIZON_PERIODS,
     dueSoon: dueSoon.map((d) => ({
       id: d.id,
@@ -99,5 +108,5 @@ forecastRoute.get('/forecast', async (c) => {
       periodsAway: e.periodsAway,
       amountMinor: e.amountMinor != null ? e.amountMinor.toString() : null,
     })),
-  });
-});
+  };
+}

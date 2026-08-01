@@ -6,7 +6,7 @@ import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import { accounts } from '../db/schema/domain.ts';
 import { getRate } from '../fx/service.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
 import { accountPatchSchema, accountSchema } from '../validation.ts';
 
 /**
@@ -67,7 +67,14 @@ accountsRoute.get('/accounts', async (c) => {
  * запроса; история остатков не ведётся, поэтому пересчитывать назад нечего (правило 2 не нарушается).
  */
 accountsRoute.get('/accounts/balances', async (c) => {
-  const ws = c.get('workspace')!;
+  return c.json(await balancesOf(c.get('workspace')!));
+});
+
+/**
+ * «Сколько всего денег» как функция: её читает и ручка, и движок сигналов (issue #50) — запас хода
+ * считается от этой же цифры, и вторая её реализация неизбежно разошлась бы с первой.
+ */
+export async function balancesOf(ws: Workspace) {
   const rows = await db
     .select({ currency: accounts.currency, minor: sql<string>`sum(${accounts.balanceMinor})` })
     .from(accounts)
@@ -107,13 +114,13 @@ accountsRoute.get('/accounts/balances', async (c) => {
     if (totalMinor !== null) totalMinor += baseMinor;
   }
 
-  return c.json({
+  return {
     baseCurrency: ws.baseCurrency,
     totalMinor: totalMinor === null ? null : totalMinor.toString(),
     byCurrency,
     unresolved,
-  });
-});
+  };
+}
 
 accountsRoute.post('/accounts', async (c) => {
   const ws = c.get('workspace')!;

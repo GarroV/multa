@@ -146,3 +146,25 @@ test('регулярные платежи управляются из интер
     'last Tuesday of the month',
   ]);
 });
+
+test('сигналы приходят сущностями и у каждого есть действие', async ({ page }) => {
+  /*
+   * Суть issue #50: раньше панель сигналов была разметкой без единой кнопки — она сообщала о
+   * проблеме и оставляла человека с ней один на один. Проверяем именно это: у каждой строки есть
+   * тон, метрика и хотя бы одно действие.
+   */
+  await page.goto('/demo');
+  await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
+  await page.locator('.tab', { hasText: 'Statistics' }).click();
+
+  const panel = page.locator('.panel', { hasText: 'SIGNALS' });
+  const rows = panel.locator('.prow');
+  await expect(rows.first()).toBeVisible();
+
+  const count = await rows.count();
+  for (let i = 0; i < count; i += 1) {
+    const row = rows.nth(i);
+    await expect(row.locator('.tag')).toHaveCount(1);
+    await expect(row.locator('button.act').first()).toBeVisible();
+  }
+});

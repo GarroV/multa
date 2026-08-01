@@ -533,6 +533,47 @@ export function useCategoryAnalytics(periods?: number) {
   });
 }
 
+// --- Сигналы как сущность (issue #50) ---
+
+export type SignalSeverity = 'risk' | 'attention' | 'opportunity';
+
+export type SignalMetricDto =
+  | { kind: 'money'; minor: string; currency: string }
+  | { kind: 'percent'; bp: number }
+  | { kind: 'days'; days: number }
+  | { kind: 'date'; on: string };
+
+export type SignalActionDto =
+  | { kind: 'rebalance'; targetId: string }
+  | { kind: 'set_budget'; targetId: string; amountMinor: string }
+  | { kind: 'freeze_goal'; targetId: string }
+  | { kind: 'open'; screen: 'plan' | 'statistics' | 'obligations' };
+
+export interface SignalDto {
+  id: string;
+  rule: string;
+  severity: SignalSeverity;
+  metric: SignalMetricDto;
+  /** Значения для подстановки в строку словаря: текст сервер не собирает (правило 5). */
+  params: Record<string, string | number>;
+  targetId: string | null;
+  targetName: string | null;
+  actions: SignalActionDto[];
+}
+
+/**
+ * Сигналы текущего периода. Ключ включает `plan`: любое действие по сигналу меняет план, и список
+ * обязан пересчитаться — иначе кнопка «поднять бюджет» остаётся на экране после нажатия.
+ */
+export function useSignals(enabled = true) {
+  return useQuery({
+    queryKey: ['plan', 'signals'],
+    retry: false,
+    enabled,
+    queryFn: () => api<{ baseCurrency: string; signals: SignalDto[] }>('/v1/signals'),
+  });
+}
+
 // --- Регулярные платежи (issues #21, #55) ---
 
 export interface RecurringItemDto {

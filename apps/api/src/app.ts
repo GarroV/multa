@@ -57,6 +57,7 @@ import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
 import { forecastRoute } from './routes/forecast.ts';
+import { signalsRoute } from './routes/signals.ts';
 import { receiptsRoute } from './routes/receipts.ts';
 import { recurringRoute } from './routes/recurring.ts';
 import { transactionsRoute } from './routes/transactions.ts';
@@ -431,6 +432,9 @@ app.route('/v1', exchangeRoute);
 
 // Прогноз-таймлайн (Спринт 4): /v1/forecast
 app.route('/v1', forecastRoute);
+
+// Сигналы как сущность (issue #50): /v1/signals
+app.route('/v1', signalsRoute);
 
 // Чеки: QR-путь и подтверждение раскладки (Спринт 5): /v1/receipts
 app.route('/v1', receiptsRoute);
