@@ -49,6 +49,7 @@ import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { patchSettings, settingsOf } from './settings/store.ts';
 import { accountsRoute } from './routes/accounts.ts';
 import { analyticsRoute } from './routes/analytics.ts';
+import { importRoute } from './routes/importRoute.ts';
 import { demoRoute } from './routes/demo.ts';
 import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
@@ -391,6 +392,8 @@ app.route('/v1', demoRoute);
 app.route('/v1', accountsRoute);
 // Категорийная аналитика (#51): план против медианы факта, спарклайн, вердикт.
 app.route('/v1', analyticsRoute);
+// Импорт истории из Excel (#76): предпросмотр, запись пачкой, откат.
+app.route('/v1', importRoute);
 
 // CRUD обязательств (Спринт 2): /v1/debts, /v1/envelopes, /v1/goals, /v1/buckets
 app.route('/v1', obligations);
