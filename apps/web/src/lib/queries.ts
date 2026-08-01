@@ -533,6 +533,62 @@ export function useCategoryAnalytics(periods?: number) {
   });
 }
 
+// --- Мастер-сетка: строки × периоды (issue #47) ---
+
+export interface GridCellDto {
+  minor: string;
+  /** `planned` — сумма периода, `none` — строки в нём нет, `ended` — строка кончилась. */
+  state: 'planned' | 'none' | 'ended';
+}
+
+export interface GridRowDto {
+  targetKind: PlanTargetKind;
+  targetId: string;
+  name: string;
+  sourceCurrency: string;
+  cells: GridCellDto[];
+  totalMinor: string;
+  endsAfterIndex: number | null;
+}
+
+export interface GridGroupDto {
+  kind: PlanTargetKind | 'income';
+  rows: GridRowDto[];
+  totals: string[];
+  totalMinor: string;
+}
+
+export interface PlanGridDto {
+  baseCurrency: string;
+  periods: { startsOn: string; endsOn: string; daysInPeriod: number; materialized: boolean }[];
+  groups: GridGroupDto[];
+  footer: {
+    freeMinor: string[];
+    perDayMinor: string[];
+    toExchangeMinor: string[];
+    toExchangeByCurrency: { currency: string; cells: string[] }[];
+  };
+  unresolved: {
+    targetKind: PlanTargetKind;
+    targetId: string;
+    name: string;
+    sourceCurrency: string;
+  }[];
+}
+
+/**
+ * Матрица «строки × периоды». Ключ включает `plan`, чтобы правка бюджета или обязательства
+ * обновляла и её: иначе мастер-режим показывал бы состояние до правки.
+ */
+export function usePlanGrid(periods: number, enabled = true) {
+  return useQuery({
+    queryKey: ['plan', 'grid', periods],
+    retry: false,
+    enabled,
+    queryFn: () => api<PlanGridDto>(`/v1/plan/grid?periods=${periods}`),
+  });
+}
+
 // --- Сравнение провайдеров размена (issue #53) ---
 
 export interface ProviderStatsDto {

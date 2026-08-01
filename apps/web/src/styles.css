@@ -1398,3 +1398,112 @@ a {
   background: var(--mag);
   opacity: 1;
 }
+
+/* --- Мастер-режим: строки × периоды (issue #47) --------------------------------------------- */
+
+/* Переключатель взгляда живёт над содержимым плана и не спорит с ним за внимание. */
+.mode-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+/*
+ * Таблица шире экрана по определению: полгода колонок не помещаются в телефон. Скроллим её саму,
+ * а не страницу — горизонтальный скролл документа ломает всё остальное.
+ */
+.mgrid-wrap {
+  border-bottom: 1px solid var(--line);
+  /* min-width: 0 обязателен: без него grid-родитель растягивается по содержимому таблицы и вбок
+     уезжает вся страница, а не она сама. */
+  min-width: 0;
+}
+.mgrid {
+  overflow-x: auto;
+  min-width: 0;
+}
+.mgrid-row {
+  display: grid;
+  /* Первая колонка держит название, остальные равны между собой: числа сравниваются взглядом. */
+  grid-template-columns: 200px repeat(var(--cols), minmax(92px, 1fr));
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  min-width: max-content;
+}
+.mgrid-row:last-child {
+  border-bottom: 0;
+}
+.mgrid-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 7px 12px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mgrid-cell {
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+/* Прочерк вместо суммы: строка кончилась или её в этом периоде нет. Тише, чем настоящий ноль. */
+.mgrid-cell-off {
+  color: var(--text-dim);
+}
+.mgrid-cell.over {
+  color: var(--mag);
+}
+.mgrid-row-head {
+  background: var(--bg-raised);
+  font-weight: 500;
+}
+.mgrid-row-head .mgrid-name {
+  background: var(--bg-raised);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+.mgrid-row-periods {
+  border-bottom: 1px solid var(--line-strong);
+}
+.mgrid-row-periods .mgrid-cell,
+.mgrid-row-periods .mgrid-name {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.mgrid-now {
+  color: var(--accent);
+  font-style: normal;
+  margin-left: 6px;
+}
+.mgrid-row-sub .mgrid-name {
+  padding-left: 26px;
+  color: var(--text-dim);
+}
+/* Подвал — расчётные строки: их отделяет линия, а не отдельная панель. */
+.mgrid-foot {
+  border-top: 1px solid var(--line-strong);
+  background: var(--bg-raised);
+}
+.mgrid-foot .mgrid-name {
+  background: var(--bg-raised);
+}
+.mgrid-note {
+  padding: 8px 12px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .mgrid-row {
+    grid-template-columns: 132px repeat(var(--cols), minmax(84px, 1fr));
+  }
+}

@@ -10,6 +10,7 @@ import {
   createWorkspaceSchema,
   patchWorkspaceSchema,
   executionSchema,
+  planGridQuerySchema,
   rateQuerySchema,
   rebalanceApplySchema,
   rebalanceQuerySchema,
@@ -45,6 +46,7 @@ import {
   setCategoryBudget,
   setExecution,
 } from './plan/assemble.ts';
+import { getPlanGrid } from './plan/grid.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { patchSettings, settingsOf } from './settings/store.ts';
 import { accountsRoute } from './routes/accounts.ts';
@@ -171,6 +173,23 @@ app.get('/v1/plan/current', requireWorkspace, async (c) => {
   try {
     const plan = await getCurrentPlan(ws, today(ws.timezone));
     return c.json(plan);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'onboarding_incomplete') {
+      return c.json({ error: 'onboarding_incomplete' }, 409);
+    }
+    throw err;
+  }
+});
+
+/**
+ * Мастер-сетка: строки × периоды выплат (issue #47). Read-only взгляд вперёд — правка идёт через
+ * редакторы разделов, чтобы не заводить вторую правду о планах.
+ */
+app.get('/v1/plan/grid', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const { periods } = planGridQuerySchema.parse(c.req.query());
+  try {
+    return c.json(await getPlanGrid(ws, today(ws.timezone), periods));
   } catch (err) {
     if (err instanceof Error && err.message === 'onboarding_incomplete') {
       return c.json({ error: 'onboarding_incomplete' }, 409);

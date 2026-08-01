@@ -197,6 +197,14 @@ export const spreadQuerySchema = z.object({
   months: z.coerce.number().int().min(1).max(24).default(6),
 });
 
+/**
+ * Горизонт мастер-сетки (issue #47). Кламп обязателен: параметр множит объём расчёта — каждая
+ * колонка это отдельный прогон каскада.
+ */
+export const planGridQuerySchema = z.object({
+  periods: z.coerce.number().int().min(1).max(12).default(6),
+});
+
 export const analyticsQuerySchema = z.object({
   periods: z.coerce.number().int().min(2).max(24).default(6),
 });

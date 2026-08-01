@@ -95,3 +95,30 @@ test('демо доводит размен до вывода: у кого деш
   await expect(panel.locator('.tag', { hasText: 'PRICIEST' })).toHaveCount(1);
   await expect(panel.locator('.panel-foot')).toContainText(/would have cost .* less/);
 });
+
+test('мастер-режим показывает полгода вперёд и не уезжает вбок', async ({ page }) => {
+  /*
+   * Таблица «строки × периоды» (issue #47) — то, ради чего человек уходит из Excel. Проверяем не
+   * вёрстку, а два её обещания: закрывшийся долг перестаёт быть строкой (прочерк, а не ноль) и
+   * широкая таблица скроллит себя, а не всю страницу.
+   */
+  await page.goto('/demo');
+  await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
+  await page.getByRole('button', { name: 'Table', exact: true }).click();
+
+  const grid = page.locator('.mgrid');
+  await expect(grid).toBeVisible();
+  // Шесть колонок периодов + колонка названий.
+  await expect(grid.locator('.mgrid-row-periods .mgrid-cell')).toHaveCount(6);
+  // Закрывшийся долг: прочерк вместо суммы.
+  await expect(grid.locator('.mgrid-cell-off').first()).toHaveText('—');
+
+  // На телефоне шесть колонок заведомо не помещаются — и это должна разруливать сама таблица.
+  await page.setViewportSize({ width: 375, height: 800 });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  const scrolls = await grid.evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(scrolls).toBe(true);
+});

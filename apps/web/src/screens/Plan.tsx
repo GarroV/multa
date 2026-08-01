@@ -2,6 +2,7 @@ import type { TranslationKey } from '@multa/i18n';
 import { Link } from '@tanstack/react-router';
 import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
+import { MasterGrid } from '../components/MasterGrid.tsx';
 import { IncomeReceipt } from '../components/IncomeReceipt.tsx';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag, type Accent } from '../components/ui/Panel.tsx';
@@ -296,6 +297,11 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   const [editingCats, setEditingCats] = useState(false);
   // Подтверждение поступления (issue #48): открывается чипом «ждём» у конкретной выплаты.
   const [receiptFor, setReceiptFor] = useState<IncomeEventDto | null>(null);
+  /*
+   * Мастер-режим (issue #47) — не отдельный экран, а другой взгляд на тот же план: полгода вперёд
+   * таблицей. Переключатель здесь, потому что уходить с «Плана» ради этого незачем.
+   */
+  const [master, setMaster] = useState(false);
   const cancelReceipt = useCancelIncomeReceipt();
   const balances = useBalances();
 
@@ -319,284 +325,308 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {receiptFor && (
         <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
       )}
-      <div className="kpi-strip">
-        {balances.data && balances.data.byCurrency.length > 0 && (
-          <Kpi label={t('acc.total')}>
-            <span className="kpi-value">
-              {balances.data.totalMinor === null
-                ? '—'
-                : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
-            </span>
-            <div className="kpi-rows">
-              {balances.data.byCurrency.map((b) => (
-                <div key={b.currency}>
-                  <span>
-                    {formatMinor(b.minor, b.currency, locale)} {b.currency}
-                  </span>
-                  {b.baseMinor === null ? (
-                    <span className="st-warn">—</span>
-                  ) : (
-                    b.currency !== base && (
-                      <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
-                    )
-                  )}
-                </div>
-              ))}
-            </div>
-            {balances.data.unresolved.length > 0 && (
-              <span className="kpi-sub st-warn">
-                {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
-              </span>
-            )}
-          </Kpi>
-        )}
-        <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })}>
-          <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
-            {withCcy(plan.remainingLivingMinor)}
-          </span>
-          <Bar share={spentShare} tone={BigInt(plan.overspentMinor) > 0n ? 'mag' : 'cyan'} />
-          <span className="kpi-sub">
-            {t('spend.spentOfPlan', {
-              spent: fmt(plan.spentLivingMinor),
-              plan: fmt(plan.livingMinor),
-            })}
-          </span>
-        </Kpi>
-
-        <Kpi label={t('plan.kpi.canSpend')}>
-          <span className="kpi-value accent">
-            {fmt(plan.canSpendPerDayMinor)} <span className="kpi-sub">{t('plan.kpi.perDay')}</span>
-          </span>
-          <span className="kpi-sub">
-            {t('plan.today.until', { date: plan.period.endsOn.slice(5), days: plan.daysLeft })}
-            {BigInt(plan.bufferMinor) > 0n &&
-              ` · ${t('plan.kpi.buffer', { amount: withCcy(plan.bufferMinor) })}`}
-          </span>
-        </Kpi>
-
-        <Kpi
-          label={t('plan.summary.toExchange')}
-          tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}
-        >
-          {buckets.length === 0 && <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>}
-          <div className="kpi-rows">
-            {buckets.map((b) => (
-              <div key={b.targetId}>
-                <span>
-                  {withCcy(b.allocatedMinor)} → {b.toCurrency ?? b.sourceCurrency}
-                </span>
-                <span className="dim">{b.name}</span>
-              </div>
-            ))}
-          </div>
-        </Kpi>
-
-        <Kpi label={t('plan.kpi.cascade', { amount: withCcy(plan.incomeMinor) })}>
-          <CascadeDonut plan={plan} />
-          <span className="kpi-sub">
-            {t('plan.kpi.leftToLive')} <b className="mono">{withCcy(plan.livingMinor)}</b>
-          </span>
-        </Kpi>
+      <div className="mode-row">
+        <span className="seg" role="group" aria-label={t('plan.master.title')}>
+          {([false, true] as const).map((on) => (
+            <button
+              key={String(on)}
+              type="button"
+              className="seg-btn"
+              aria-pressed={master === on}
+              onClick={() => setMaster(on)}
+            >
+              {t(on ? 'plan.master.on' : 'plan.master.off')}
+            </button>
+          ))}
+        </span>
       </div>
-
-      {risky && (
-        <div className="risk-band">
-          <span className="risk-text">
-            {t('signal.burn.title', { date: plan.burn.runsOutOn!.slice(5) })} ·{' '}
-            {t('signal.burn.body', {
-              perDay: withCcy(plan.burn.perDayMinor),
-              perDayPlan: withCcy(plan.canSpendPerDayMinor),
-            })}
-          </span>
-          <button type="button" className="act" onClick={() => setEditingCats(true)}>
-            {t('signal.burn.action')}
-          </button>
-        </div>
-      )}
-
-      {compressed && !risky && (
-        <div className="risk-band info">
-          <span className="risk-text">
-            {t('plan.compressed.note', { amount: fmt(plan.compressedMinor), ccy: base })}
-          </span>
-        </div>
-      )}
-
-      {plan.unresolved.length > 0 && (
-        <div className="risk-band info">
-          <span className="risk-text">{t('plan.unresolved.affectsHero')}</span>
-          <span className="panel-sum">{plan.unresolved.map((u) => u.name).join(' · ')}</span>
-        </div>
-      )}
-
-      <PeriodMap plan={plan} dueSoon={forecast.data?.dueSoon} events={forecast.data?.events} />
-
-      <div className="panels">
-        <div className="col">
-          <Panel
-            label={t('plan.panel.income')}
-            sum={withCcy(plan.incomeMinor)}
-            accent="lime"
-            tools={
-              <Link className="act" to="/settings">
-                {t('plan.act.edit')}
-              </Link>
-            }
-          >
-            {plan.income.events.length === 0 && (
-              <div className="prow">
-                <span />
-                <span className="dim">{t('common.empty')}</span>
-              </div>
+      {/* Мастер-режим — другой взгляд на тот же план, а не второй экран рядом: панели уступают ему место. */}
+      {master && <MasterGrid />}
+      {!master && (
+        <>
+          <div className="kpi-strip">
+            {balances.data && balances.data.byCurrency.length > 0 && (
+              <Kpi label={t('acc.total')}>
+                <span className="kpi-value">
+                  {balances.data.totalMinor === null
+                    ? '—'
+                    : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
+                </span>
+                <div className="kpi-rows">
+                  {balances.data.byCurrency.map((b) => (
+                    <div key={b.currency}>
+                      <span>
+                        {formatMinor(b.minor, b.currency, locale)} {b.currency}
+                      </span>
+                      {b.baseMinor === null ? (
+                        <span className="st-warn">—</span>
+                      ) : (
+                        b.currency !== base && (
+                          <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {balances.data.unresolved.length > 0 && (
+                  <span className="kpi-sub st-warn">
+                    {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
+                  </span>
+                )}
+              </Kpi>
             )}
-            {plan.income.events.map((e) => (
-              <div className="prow" key={`${e.sourceId}:${e.date}`}>
-                <span className="prow-day">{e.date.slice(8, 10)}</span>
-                <span className="prow-name">
-                  <span>{e.label}</span>
-                  {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
-                  {e.status === 'received' && <Tag tone="lime">{t('income.chip.received')}</Tag>}
-                </span>
-                <span className="prow-num">
-                  <b>
-                    {formatMinor(e.amountMinor, e.currency, locale)} {e.currency}
-                  </b>
-                  {e.baseAmountMinor && e.currency !== base && (
-                    <i>
-                      ≈ {formatMinor(e.baseAmountMinor, base, locale)} {base}
-                    </i>
-                  )}
-                </span>
-                {/* Пока «ждём» — чип открывает подтверждение факта; после — даёт его отменить. */}
-                {e.status === 'expected' ? (
-                  <button type="button" className="act" onClick={() => setReceiptFor(e)}>
-                    {t('income.chip.expected')}
-                  </button>
-                ) : (
+            <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })}>
+              <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
+                {withCcy(plan.remainingLivingMinor)}
+              </span>
+              <Bar share={spentShare} tone={BigInt(plan.overspentMinor) > 0n ? 'mag' : 'cyan'} />
+              <span className="kpi-sub">
+                {t('spend.spentOfPlan', {
+                  spent: fmt(plan.spentLivingMinor),
+                  plan: fmt(plan.livingMinor),
+                })}
+              </span>
+            </Kpi>
+
+            <Kpi label={t('plan.kpi.canSpend')}>
+              <span className="kpi-value accent">
+                {fmt(plan.canSpendPerDayMinor)}{' '}
+                <span className="kpi-sub">{t('plan.kpi.perDay')}</span>
+              </span>
+              <span className="kpi-sub">
+                {t('plan.today.until', { date: plan.period.endsOn.slice(5), days: plan.daysLeft })}
+                {BigInt(plan.bufferMinor) > 0n &&
+                  ` · ${t('plan.kpi.buffer', { amount: withCcy(plan.bufferMinor) })}`}
+              </span>
+            </Kpi>
+
+            <Kpi
+              label={t('plan.summary.toExchange')}
+              tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}
+            >
+              {buckets.length === 0 && <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>}
+              <div className="kpi-rows">
+                {buckets.map((b) => (
+                  <div key={b.targetId}>
+                    <span>
+                      {withCcy(b.allocatedMinor)} → {b.toCurrency ?? b.sourceCurrency}
+                    </span>
+                    <span className="dim">{b.name}</span>
+                  </div>
+                ))}
+              </div>
+            </Kpi>
+
+            <Kpi label={t('plan.kpi.cascade', { amount: withCcy(plan.incomeMinor) })}>
+              <CascadeDonut plan={plan} />
+              <span className="kpi-sub">
+                {t('plan.kpi.leftToLive')} <b className="mono">{withCcy(plan.livingMinor)}</b>
+              </span>
+            </Kpi>
+          </div>
+
+          {risky && (
+            <div className="risk-band">
+              <span className="risk-text">
+                {t('signal.burn.title', { date: plan.burn.runsOutOn!.slice(5) })} ·{' '}
+                {t('signal.burn.body', {
+                  perDay: withCcy(plan.burn.perDayMinor),
+                  perDayPlan: withCcy(plan.canSpendPerDayMinor),
+                })}
+              </span>
+              <button type="button" className="act" onClick={() => setEditingCats(true)}>
+                {t('signal.burn.action')}
+              </button>
+            </div>
+          )}
+
+          {compressed && !risky && (
+            <div className="risk-band info">
+              <span className="risk-text">
+                {t('plan.compressed.note', { amount: fmt(plan.compressedMinor), ccy: base })}
+              </span>
+            </div>
+          )}
+
+          {plan.unresolved.length > 0 && (
+            <div className="risk-band info">
+              <span className="risk-text">{t('plan.unresolved.affectsHero')}</span>
+              <span className="panel-sum">{plan.unresolved.map((u) => u.name).join(' · ')}</span>
+            </div>
+          )}
+
+          <PeriodMap plan={plan} dueSoon={forecast.data?.dueSoon} events={forecast.data?.events} />
+
+          <div className="panels">
+            <div className="col">
+              <Panel
+                label={t('plan.panel.income')}
+                sum={withCcy(plan.incomeMinor)}
+                accent="lime"
+                tools={
+                  <Link className="act" to="/settings">
+                    {t('plan.act.edit')}
+                  </Link>
+                }
+              >
+                {plan.income.events.length === 0 && (
+                  <div className="prow">
+                    <span />
+                    <span className="dim">{t('common.empty')}</span>
+                  </div>
+                )}
+                {plan.income.events.map((e) => (
+                  <div className="prow" key={`${e.sourceId}:${e.date}`}>
+                    <span className="prow-day">{e.date.slice(8, 10)}</span>
+                    <span className="prow-name">
+                      <span>{e.label}</span>
+                      {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
+                      {e.status === 'received' && (
+                        <Tag tone="lime">{t('income.chip.received')}</Tag>
+                      )}
+                    </span>
+                    <span className="prow-num">
+                      <b>
+                        {formatMinor(e.amountMinor, e.currency, locale)} {e.currency}
+                      </b>
+                      {e.baseAmountMinor && e.currency !== base && (
+                        <i>
+                          ≈ {formatMinor(e.baseAmountMinor, base, locale)} {base}
+                        </i>
+                      )}
+                    </span>
+                    {/* Пока «ждём» — чип открывает подтверждение факта; после — даёт его отменить. */}
+                    {e.status === 'expected' ? (
+                      <button type="button" className="act" onClick={() => setReceiptFor(e)}>
+                        {t('income.chip.expected')}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="act"
+                        disabled={cancelReceipt.isPending}
+                        onClick={() => e.receiptId && cancelReceipt.mutate(e.receiptId)}
+                      >
+                        {t('income.cancelReceipt')}
+                      </button>
+                    )}
+                    {cancelReceipt.isError && (
+                      <span className="prow-note danger">⚠ {t('common.error')}</span>
+                    )}
+                  </div>
+                ))}
+                {BigInt(plan.extraIncomeMinor) > 0n && (
+                  <div className="prow">
+                    <span className="prow-day" aria-hidden />
+                    <span className="prow-name">
+                      <span>{t('plan.summary.extraIncome')}</span>
+                    </span>
+                    <span className="prow-num">
+                      <b className="st-ok">{withCcy(plan.extraIncomeMinor)}</b>
+                    </span>
+                    <span />
+                  </div>
+                )}
+              </Panel>
+
+              <Panel
+                label={t('plan.groups.category')}
+                sum={t('plan.panel.perPeriod', {
+                  amount: withCcy(categories.reduce((s, c) => s + BigInt(c.allocatedMinor), 0n)),
+                })}
+                tools={
                   <button
                     type="button"
                     className="act"
-                    disabled={cancelReceipt.isPending}
-                    onClick={() => e.receiptId && cancelReceipt.mutate(e.receiptId)}
+                    aria-pressed={editingCats}
+                    onClick={() => setEditingCats((v) => !v)}
                   >
-                    {t('income.cancelReceipt')}
+                    {t('plan.act.edit')}
                   </button>
-                )}
-                {cancelReceipt.isError && (
-                  <span className="prow-note danger">⚠ {t('common.error')}</span>
-                )}
-              </div>
-            ))}
-            {BigInt(plan.extraIncomeMinor) > 0n && (
-              <div className="prow">
-                <span className="prow-day" aria-hidden />
-                <span className="prow-name">
-                  <span>{t('plan.summary.extraIncome')}</span>
-                </span>
-                <span className="prow-num">
-                  <b className="st-ok">{withCcy(plan.extraIncomeMinor)}</b>
-                </span>
-                <span />
-              </div>
-            )}
-          </Panel>
-
-          <Panel
-            label={t('plan.groups.category')}
-            sum={t('plan.panel.perPeriod', {
-              amount: withCcy(categories.reduce((s, c) => s + BigInt(c.allocatedMinor), 0n)),
-            })}
-            tools={
-              <button
-                type="button"
-                className="act"
-                aria-pressed={editingCats}
-                onClick={() => setEditingCats((v) => !v)}
+                }
               >
-                {t('plan.act.edit')}
-              </button>
-            }
-          >
-            {categories.length === 0 && !editingCats && (
-              <div className="prow">
-                <span />
-                <span className="dim">{t('common.empty')}</span>
-              </div>
-            )}
-            {!editingCats &&
-              categories.map((a) => (
-                <CategoryRow key={a.targetId} a={a} base={base} locale={locale} />
+                {categories.length === 0 && !editingCats && (
+                  <div className="prow">
+                    <span />
+                    <span className="dim">{t('common.empty')}</span>
+                  </div>
+                )}
+                {!editingCats &&
+                  categories.map((a) => (
+                    <CategoryRow key={a.targetId} a={a} base={base} locale={locale} />
+                  ))}
+                {editingCats && (
+                  <div style={{ padding: '10px 14px' }}>
+                    <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
+                  </div>
+                )}
+              </Panel>
+            </div>
+
+            <div className="col">
+              {obligationGroups.map((g) => (
+                <Panel
+                  key={g.kind}
+                  label={t(GROUP_LABEL[g.kind])}
+                  accent={GROUP_ACCENT[g.kind]}
+                  sum={t('plan.panel.perPeriod', {
+                    amount: withCcy(g.rows.reduce((s, r) => s + BigInt(r.allocatedMinor), 0n)),
+                  })}
+                  tools={
+                    <Link className="act" to="/obligations">
+                      {t('plan.act.edit')}
+                    </Link>
+                  }
+                >
+                  {g.rows.map((a) => (
+                    <AllocationRow key={a.targetId} a={a} base={base} locale={locale} />
+                  ))}
+                </Panel>
               ))}
-            {editingCats && (
-              <div style={{ padding: '10px 14px' }}>
-                <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
-              </div>
-            )}
-          </Panel>
-        </div>
 
-        <div className="col">
-          {obligationGroups.map((g) => (
-            <Panel
-              key={g.kind}
-              label={t(GROUP_LABEL[g.kind])}
-              accent={GROUP_ACCENT[g.kind]}
-              sum={t('plan.panel.perPeriod', {
-                amount: withCcy(g.rows.reduce((s, r) => s + BigInt(r.allocatedMinor), 0n)),
-              })}
-              tools={
-                <Link className="act" to="/obligations">
-                  {t('plan.act.edit')}
-                </Link>
-              }
-            >
-              {g.rows.map((a) => (
-                <AllocationRow key={a.targetId} a={a} base={base} locale={locale} />
-              ))}
-            </Panel>
-          ))}
+              {obligationGroups.length === 0 && (
+                <Panel label={t('plan.empty.title')} accent="amber">
+                  <div className="prow">
+                    <span />
+                    <span className="dim">{t('plan.empty.noPlan')}</span>
+                    <Link className="act" to="/obligations">
+                      {t('nav.obligations')}
+                    </Link>
+                    <span />
+                  </div>
+                </Panel>
+              )}
 
-          {obligationGroups.length === 0 && (
-            <Panel label={t('plan.empty.title')} accent="amber">
-              <div className="prow">
-                <span />
-                <span className="dim">{t('plan.empty.noPlan')}</span>
-                <Link className="act" to="/obligations">
-                  {t('nav.obligations')}
-                </Link>
-                <span />
-              </div>
-            </Panel>
-          )}
+              <RevisionsPanel base={base} locale={locale} />
 
-          <RevisionsPanel base={base} locale={locale} />
+              <ForecastPanel base={base} locale={locale} />
 
-          <ForecastPanel base={base} locale={locale} />
-
-          {plan.unresolved.length > 0 && (
-            <Panel
-              label={t('plan.unresolved.title')}
-              accent="amber"
-              foot={<span className="sub">{t('plan.unresolved.hint')}</span>}
-            >
-              {plan.unresolved.map((u) => (
-                <div className="prow" key={`${u.targetKind}:${u.targetId}`}>
-                  <span className="prow-day" aria-hidden />
-                  <span className="prow-name">
-                    <span>{u.name}</span>
-                  </span>
-                  <span className="prow-num">
-                    <b>
-                      {formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}
-                    </b>
-                  </span>
-                  <span />
-                </div>
-              ))}
-            </Panel>
-          )}
-        </div>
-      </div>
+              {plan.unresolved.length > 0 && (
+                <Panel
+                  label={t('plan.unresolved.title')}
+                  accent="amber"
+                  foot={<span className="sub">{t('plan.unresolved.hint')}</span>}
+                >
+                  {plan.unresolved.map((u) => (
+                    <div className="prow" key={`${u.targetKind}:${u.targetId}`}>
+                      <span className="prow-day" aria-hidden />
+                      <span className="prow-name">
+                        <span>{u.name}</span>
+                      </span>
+                      <span className="prow-num">
+                        <b>
+                          {formatMinor(u.sourceMinor, u.sourceCurrency, locale)} {u.sourceCurrency}
+                        </b>
+                      </span>
+                      <span />
+                    </div>
+                  ))}
+                </Panel>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
