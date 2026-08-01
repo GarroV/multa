@@ -12,7 +12,7 @@ export interface WorkspaceDto {
 }
 
 export interface MeDto {
-  user: { id: string; email: string; name: string } | null;
+  user: { id: string; email: string; name: string; twoFactorEnabled: boolean } | null;
   workspace: WorkspaceDto | null;
   /** Есть ритм и хотя бы один активный источник дохода. */
   onboardingComplete: boolean;

@@ -105,6 +105,9 @@ importers:
       better-auth:
         specifier: 1.4.21
         version: 1.4.21(@prisma/client@5.22.0)(better-sqlite3@12.11.1)(drizzle-orm@0.41.0(@prisma/client@5.22.0)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(gel@2.2.0)(kysely@0.28.17)(pg@8.22.0))(pg@8.22.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.1))
+      qrcode-generator:
+        specifier: ^2.0.4
+        version: 2.0.4
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -2318,6 +2321,9 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
+
   rc9@3.0.1:
     resolution: {integrity: sha512-gMDyleLWVE+i6Sgtc0QbbY6pEKqYs97NGi6isHQPqYlLemPoO8dxQ3uGi0f4NiP98c+jMW6cG1Kx9dDwfvqARQ==}
 
@@ -4521,6 +4527,8 @@ snapshots:
       once: 1.4.0
 
   punycode@2.3.1: {}
+
+  qrcode-generator@2.0.4: {}
 
   rc9@3.0.1:
     dependencies:

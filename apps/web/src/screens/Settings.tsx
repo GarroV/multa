@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
 import { ImportExcel } from '../components/ImportExcel.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
+import { TwoFactor } from '../components/TwoFactor.tsx';
 import { Panel, Tag } from '../components/ui/Panel.tsx';
 import { api } from '../lib/api.ts';
 import { formatMinor } from '../lib/format.ts';
@@ -200,7 +201,7 @@ export function Settings() {
               </span>
               <span />
             </div>
-            {/* TOTP-переключатель ещё не сделан (issue #19) — обещать его строкой в настройках нельзя. */}
+            <TwoFactor enabled={me?.user?.twoFactorEnabled === true} />
           </Panel>
         </div>
 

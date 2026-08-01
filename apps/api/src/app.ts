@@ -108,7 +108,14 @@ app.get('/v1/me', requireAuth, async (c) => {
     ? ws.periodAnchors != null && (await hasActiveIncome(ws.id))
     : false;
   return c.json({
-    user: { id: user.id, email: user.email, name: user.name },
+    // twoFactorEnabled нужен экрану настроек (issue #19): без него он не знает, что показать —
+    // «включить» или «выключить», и предлагал бы включить уже включённое.
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      twoFactorEnabled: (user as { twoFactorEnabled?: boolean | null }).twoFactorEnabled === true,
+    },
     workspace: ws ? serializeWorkspace(ws) : null,
     onboardingComplete,
     // Пропустил обучение — пускаем в приложение, план останется пустым до ввода дохода.
