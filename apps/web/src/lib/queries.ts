@@ -18,6 +18,8 @@ export interface MeDto {
   onboardingComplete: boolean;
   /** Обучение пропущено осознанно — пускаем в приложение с пустым планом. */
   onboardingSkipped: boolean;
+  /** Роль в воркспейсе (issue #46): участник смотрит и не правит. null — воркспейса нет. */
+  role: 'owner' | 'member' | null;
 }
 
 /** Онбординг не пройден: план собрать нельзя, но это не ошибка — нужен пустой экран с CTA. */
@@ -105,6 +107,14 @@ export interface PlanDto {
   allocations: PlanAllocation[];
   unresolved: PlanUnresolved[];
   burn: { perDayMinor: string; willLast: boolean; runsOutOn: string | null };
+  /** Матрица видимости в действии (issue #46): что свернуто и во что. */
+  sharing?: {
+    role: 'owner' | 'member';
+    previewAsMember: boolean;
+    sums: { section: string; minor: string }[];
+    hiddenMinor: string;
+    incomeVisible: boolean;
+  };
   /** Разбивка дохода периода по источникам. */
   income: {
     events: IncomeEventDto[];
@@ -126,6 +136,7 @@ export function useMe() {
             workspace: null,
             onboardingComplete: false,
             onboardingSkipped: false,
+            role: null,
           };
         }
         throw err;
@@ -134,12 +145,16 @@ export function useMe() {
   });
 }
 
-export function usePlan(enabled: boolean) {
+/**
+ * План текущего периода. `asMember` — предпросмотр владельца «глазами участника» (issue #46):
+ * параметр только сужает видимое, поэтому его можно передавать с клиента.
+ */
+export function usePlan(enabled: boolean, asMember = false) {
   return useQuery({
-    queryKey: ['plan'],
+    queryKey: ['plan', asMember ? 'as-member' : 'own'],
     enabled,
     retry: false,
-    queryFn: () => api<PlanDto>('/v1/plan/current'),
+    queryFn: () => api<PlanDto>(`/v1/plan/current${asMember ? '?as=member' : ''}`),
   });
 }
 
@@ -465,6 +480,9 @@ export function useRollbackImport() {
 
 // --- Настройки воркспейса (issue #49) ---
 
+export type ShareMode = 'open' | 'sum' | 'hidden';
+export type ShareSection = 'income' | 'debts' | 'buckets' | 'envelopes' | 'categories' | 'goals';
+
 export interface WorkspaceSettingsDto {
   periods: { suggestRaises: boolean };
   currency: {
@@ -473,7 +491,15 @@ export interface WorkspaceSettingsDto {
     defaultProvider: string | null;
   };
   cascade: { bufferPct: number; compressOrder: ('goal' | 'envelope' | 'category')[] };
-  signals: { burnThresholdDays: number; medianPeriods: number };
+  signals: {
+    burnThresholdDays: number;
+    medianPeriods: number;
+    runwayWarnDays: number;
+    lockedWarnPct: number;
+    maxSignals: number;
+  };
+  /** Матрица видимости для участников (issue #46). */
+  sharing: Record<ShareSection, ShareMode>;
 }
 
 export function useSettings() {
@@ -530,6 +556,52 @@ export function useCategoryAnalytics(periods?: number) {
       api<CategoryAnalyticsRow[]>(
         periods ? `/v1/analytics/categories?periods=${periods}` : '/v1/analytics/categories',
       ),
+  });
+}
+
+// --- Совместный доступ (issue #46) ---
+
+export interface MembersDto {
+  role: 'owner' | 'member';
+  members: { id: string; userId: string; role: 'owner' | 'member'; name: string; email: string }[];
+  sharing: Record<ShareSection, ShareMode>;
+}
+
+export function useMembers(enabled = true) {
+  return useQuery({
+    queryKey: ['members'],
+    retry: false,
+    enabled,
+    queryFn: () => api<MembersDto>('/v1/workspace/members'),
+  });
+}
+
+export function useCreateInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ code: string }>('/v1/workspace/invites', { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['members'] }),
+  });
+}
+
+export function useRemoveMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api(`/v1/workspace/members/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['members'] }),
+  });
+}
+
+/** Принятие приглашения: меняет всё сразу — воркспейс, план, роль. Чистим кэш целиком. */
+export function useAcceptInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) =>
+      api<{ ok: true; workspaceId: string }>(
+        `/v1/workspace/invites/${encodeURIComponent(code)}/accept`,
+        { method: 'POST' },
+      ),
+    onSuccess: () => qc.invalidateQueries(),
   });
 }
 

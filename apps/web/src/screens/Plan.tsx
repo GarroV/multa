@@ -17,6 +17,7 @@ import {
   useConfirmExecution,
   useForecast,
   useGoalFreeze,
+  useMe,
   useRevisions,
   usePlan,
   useSkipExecution,
@@ -51,6 +52,19 @@ const GROUP_ACCENT: Record<PlanTargetKind, Accent> = {
   category: 'cyan',
   goal: 'lime',
 };
+
+/** Подпись раздела для свёрнутых сумм: те же слова, что и в панелях плана. */
+function sectionLabel(t: (key: TranslationKey) => string, section: string): string {
+  const keys: Record<string, TranslationKey> = {
+    income: 'share.sec.income',
+    debts: 'plan.groups.debt',
+    buckets: 'obl.buckets',
+    envelopes: 'plan.groups.envelope',
+    categories: 'plan.groups.category',
+    goals: 'plan.groups.goal',
+  };
+  return t(keys[section] ?? 'share.private');
+}
 
 function Centered({ children }: { children: ReactNode }) {
   return <div className="center-screen">{children}</div>;
@@ -315,6 +329,11 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   const spentShare =
     living > 0n ? Number((BigInt(plan.spentLivingMinor) * 1000n) / living) / 10 : 0;
   const risky = !plan.burn.willLast && plan.burn.runsOutOn;
+
+  // Что-то скрыто матрицей видимости (issue #46): пустота на экране объясняется этим, а не планом.
+  const collapsedForViewer =
+    plan.sharing !== undefined &&
+    (plan.sharing.sums.length > 0 || BigInt(plan.sharing.hiddenMinor) > 0n);
 
   const obligationGroups = (['debt', 'envelope', 'goal', 'bucket'] as const)
     .map((kind) => ({ kind, rows: plan.allocations.filter((a) => a.targetKind === kind) }))
@@ -589,7 +608,46 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 </Panel>
               ))}
 
-              {obligationGroups.length === 0 && (
+              {/*
+                Свёрнутое матрицей видимости (issue #46). Показывать обязательно: деньги, ушедшие
+                из общего котла, не имеют права исчезнуть из плана — иначе у партнёра доход
+                сходится, а раскладка нет, и виноватым выглядит продукт.
+              */}
+              {plan.sharing &&
+                (plan.sharing.sums.length > 0 || BigInt(plan.sharing.hiddenMinor) > 0n) && (
+                  <Panel label={t('share.collapsed')} accent="vio">
+                    {plan.sharing.sums.map((s) => (
+                      <div className="prow" key={s.section}>
+                        <span className="prow-day" aria-hidden />
+                        <span className="prow-name">
+                          <span>{t('share.sumOf', { section: sectionLabel(t, s.section) })}</span>
+                        </span>
+                        <span className="prow-num">
+                          <b>{withCcy(s.minor)}</b>
+                        </span>
+                        <span />
+                      </div>
+                    ))}
+                    {BigInt(plan.sharing.hiddenMinor) > 0n && (
+                      <div className="prow">
+                        <span className="prow-day" aria-hidden />
+                        <span className="prow-name">
+                          <span>{t('share.private')}</span>
+                        </span>
+                        <span className="prow-num">
+                          <b>{withCcy(plan.sharing.hiddenMinor)}</b>
+                        </span>
+                        <span />
+                      </div>
+                    )}
+                  </Panel>
+                )}
+
+              {/*
+                «Чистый лист» участнику не показываем: у него план не пустой, а свёрнутый, и
+                ссылка «завести обязательство» ведёт туда, где он ничего не может.
+              */}
+              {obligationGroups.length === 0 && !collapsedForViewer && (
                 <Panel label={t('plan.empty.title')} accent="amber">
                   <div className="prow">
                     <span />
@@ -638,7 +696,13 @@ function PlanBody({ plan }: { plan: PlanDto }) {
 
 export function Plan() {
   const { t } = useI18n();
-  const { data: plan, isLoading, error, refetch } = usePlan(true);
+  /*
+   * «Глазами участника» (issue #46): владелец проверяет, что именно увидит партнёр при выбранной
+   * матрице видимости. Права при этом не меняются — сужается только показанное.
+   */
+  const [asMember, setAsMember] = useState(false);
+  const { data: me } = useMe();
+  const { data: plan, isLoading, error, refetch } = usePlan(true, asMember);
   if (isLoading) return <Centered>{t('common.loading')}</Centered>;
   // Дохода ещё нет (обучение пропущено) — не ошибка, а пустой лист с дорогой в настройки.
   if (isOnboardingIncomplete(error)) return <NoIncomeYet />;
@@ -660,5 +724,29 @@ export function Plan() {
         <span className="dim">—</span>
       </Centered>
     );
-  return <PlanBody plan={plan} />;
+  return (
+    <>
+      {me?.role === 'owner' && (
+        <div className="mode-row">
+          <span className="seg" role="group" aria-label={t('share.viewAs')}>
+            {([false, true] as const).map((on) => (
+              <button
+                key={String(on)}
+                type="button"
+                className="seg-btn"
+                aria-pressed={asMember === on}
+                onClick={() => setAsMember(on)}
+              >
+                {t(on ? 'share.viewAs' : 'share.viewAsOff')}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
+      {plan.sharing?.previewAsMember && (
+        <div className="risk-band info">{t('share.banner.preview')}</div>
+      )}
+      <PlanBody plan={plan} />
+    </>
+  );
 }

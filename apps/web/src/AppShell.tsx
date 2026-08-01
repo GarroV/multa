@@ -6,7 +6,7 @@ import { ReceiptEntry } from './components/ReceiptEntry.tsx';
 import { SpendEntry } from './components/SpendEntry.tsx';
 import { authClient } from './lib/authClient.ts';
 import { useI18n } from './lib/i18n.tsx';
-import { useMe } from './lib/queries.ts';
+import { useMe, useMembers } from './lib/queries.ts';
 import { useTheme } from './lib/theme.ts';
 
 /**
@@ -30,6 +30,14 @@ export function AppShell() {
   const [spendOpen, setSpendOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const base = me?.workspace?.baseCurrency;
+  /*
+   * Участник совместного доступа смотрит и не правит (issue #46). Кнопки ввода ему не показываем:
+   * сервер их всё равно отклонит, а кнопка, которая всегда падает, — обман, а не ограничение.
+   */
+  const isMember = me?.role === 'member';
+  // Имя владельца в баннере: «чужой кабинет» без имени звучит тревожнее, чем есть на самом деле.
+  const { data: members } = useMembers(isMember);
+  const ownerName = members?.members.find((m) => m.role === 'owner')?.name ?? '';
 
   return (
     <div className="app-frame">
@@ -49,7 +57,7 @@ export function AppShell() {
         </nav>
         <div className="topbar-right">
           {/* Ввод факта доступен с любого экрана: трату записывают на ходу (04-web-ux §Ввод). */}
-          {base && (
+          {base && !isMember && (
             <>
               <button type="button" className="act" onClick={() => setSpendOpen(true)}>
                 {t('spend.open')}
@@ -98,6 +106,9 @@ export function AppShell() {
           </button>
         </div>
       </header>
+      {isMember && (
+        <div className="risk-band info">{t('share.banner.member', { owner: ownerName })}</div>
+      )}
       <main className="app-main">
         <Outlet />
       </main>

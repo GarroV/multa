@@ -221,6 +221,24 @@ create table exchange_ops (
   note text                                -- комментарий к сделке, в сравнении не участвует
 );
 
+create table workspace_members (   -- совместный доступ (#46): владелец правит, участник смотрит
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  user_id text not null references "user" on delete cascade,
+  role text not null default 'member' check (role in ('owner','member')),
+  created_at timestamptz not null default now(),
+  unique (workspace_id, user_id)        -- один человек не состоит в воркспейсе дважды
+);
+
+create table workspace_invites (  -- приглашение кодом: почтового провайдера в профиле $0 нет
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  code text not null unique,
+  created_at timestamptz not null default now(),
+  accepted_by text references "user" on delete set null,
+  accepted_at timestamptz          -- заполнено = код сгорел, повторно не впускает
+);
+
 create table recurring_items (     -- расходы и взносы; доходы живут в income_sources (одна правда о доходах)
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces on delete cascade,

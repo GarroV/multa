@@ -387,6 +387,49 @@ export const exchangeOps = pgTable('exchange_ops', {
   note: text('note'),
 });
 
+/**
+ * Участники воркспейса (issue #46). Владелец — строка с ролью `owner`, он же `workspaces.owner_id`;
+ * дубль намеренный: список участников должен читаться одним запросом, без объединения с другой
+ * таблицей.
+ *
+ * Правило продукта: правит строку только её владелец. Участник видит воркспейс по матрице
+ * видимости, но ничего в нём не меняет — это держит middleware, а не доверие к клиенту (правило 7).
+ */
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('member'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('workspace_members_role_ck', sql`${t.role} in ('owner','member')`),
+    // Один и тот же человек не может состоять в воркспейсе дважды.
+    unique('workspace_members_uq').on(t.workspaceId, t.userId),
+  ],
+);
+
+/**
+ * Приглашение по коду (issue #46). Почты в профиле $0 нет, поэтому ссылку владелец передаёт сам —
+ * код одноразовый и сгорает после принятия.
+ */
+export const workspaceInvites = pgTable('workspace_invites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  code: text('code').notNull().unique(),
+  createdAt: createdAt(),
+  acceptedBy: text('accepted_by').references(() => user.id, { onDelete: 'set null' }),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+});
+
 export const recurringItems = pgTable(
   'recurring_items',
   {

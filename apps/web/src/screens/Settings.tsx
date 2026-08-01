@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
 import { ImportExcel } from '../components/ImportExcel.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
+import { Sharing } from '../components/Sharing.tsx';
 import { TwoFactor } from '../components/TwoFactor.tsx';
 import { Panel, Tag } from '../components/ui/Panel.tsx';
 import { api } from '../lib/api.ts';
@@ -203,6 +204,8 @@ export function Settings() {
             </div>
             <TwoFactor enabled={me?.user?.twoFactorEnabled === true} />
           </Panel>
+
+          <Sharing />
         </div>
 
         <Panel

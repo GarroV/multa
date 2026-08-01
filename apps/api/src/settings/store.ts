@@ -40,6 +40,7 @@ export async function patchSettings(
     currency: { ...current.currency, ...(patch.currency ?? {}) },
     cascade: { ...current.cascade, ...(patch.cascade ?? {}) },
     signals: { ...current.signals, ...(patch.signals ?? {}) },
+    sharing: { ...current.sharing, ...(patch.sharing ?? {}) },
   };
   // Прогоняем результат через схему целиком: слияние не должно уметь собрать невалидный объект.
   const validated = workspaceSettingsSchema.parse(next);

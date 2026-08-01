@@ -155,12 +155,38 @@ const signalsSettings = z.object({
   maxSignals: z.number().int().min(3).max(12).default(6),
 });
 
+/**
+ * Матрица видимости по разделам (issue #46).
+ *
+ * `open` — участник видит строки; `sum` — только итог раздела; `hidden` — не видит ничего, но
+ * сумма всё равно попадает в каскад отдельной строкой «Личное». Правило продукта: **скрыть можно
+ * содержимое, но не факт траты** — иначе совместный план врёт, и деньги «исчезают» из общего
+ * котла.
+ *
+ * По умолчанию всё открыто: приглашают ради совместного планирования, а не ради слежки; сузить
+ * владелец может в любой момент.
+ */
+const shareMode = z.enum(['open', 'sum', 'hidden']);
+
+const sharingSettings = z.object({
+  income: shareMode.default('open'),
+  debts: shareMode.default('open'),
+  buckets: shareMode.default('open'),
+  envelopes: shareMode.default('open'),
+  categories: shareMode.default('open'),
+  goals: shareMode.default('open'),
+});
+
+export type ShareMode = z.infer<typeof shareMode>;
+export type SharingSettings = z.infer<typeof sharingSettings>;
+
 export const workspaceSettingsSchema = z
   .object({
     periods: periodsSettings.default({}),
     currency: currencySettings.default({}),
     cascade: cascadeSettings.default({}),
     signals: signalsSettings.default({}),
+    sharing: sharingSettings.default({}),
   })
   .default({});
 
@@ -170,6 +196,7 @@ export const workspaceSettingsPatchSchema = z.object({
   currency: currencySettings.partial().optional(),
   cascade: cascadeSettings.partial().optional(),
   signals: signalsSettings.partial().optional(),
+  sharing: sharingSettings.partial().optional(),
 });
 
 export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;

@@ -3,7 +3,7 @@ import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { currencyBuckets, debts, envelopes, goals } from '../db/schema/domain.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireSection, requireWorkspace, type AppVariables } from '../middleware.ts';
 import {
   bucketCreateSchema,
   debtCreateSchema,
@@ -29,7 +29,8 @@ const ENTITIES = [
 ] as const;
 
 for (const { path, table, schema } of ENTITIES) {
-  obligations.get(`/${path}`, async (c) => {
+  // Список раздела закрыт для участника, если владелец сузил видимость (issue #46).
+  obligations.get(`/${path}`, requireSection(path), async (c) => {
     const ws = c.get('workspace')!;
     const rows = await db.select().from(table).where(eq(table.workspaceId, ws.id));
     return c.json(rows.map(serialize));

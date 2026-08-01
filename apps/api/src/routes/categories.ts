@@ -3,7 +3,7 @@ import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { categories } from '../db/schema/domain.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireSection, requireWorkspace, type AppVariables } from '../middleware.ts';
 import { categoryCreateSchema, categoryPatchSchema } from '../validation.ts';
 
 /**
@@ -39,7 +39,7 @@ export async function seedPresetCategories(workspaceId: string, locale: string):
 export const categoriesRoute = new Hono<{ Variables: AppVariables }>();
 categoriesRoute.use('*', requireWorkspace);
 
-categoriesRoute.get('/categories', async (c) => {
+categoriesRoute.get('/categories', requireSection('categories'), async (c) => {
   const ws = c.get('workspace')!;
   const rows = await db
     .select()

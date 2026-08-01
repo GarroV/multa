@@ -17,7 +17,7 @@ import {
   ReceiptRateUnavailable,
   serializeReceipt,
 } from '../income/receipts.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireSection, requireWorkspace, type AppVariables } from '../middleware.ts';
 import {
   incomeReceiptSchema,
   incomeSourcePatchSchema,
@@ -32,7 +32,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const incomeRoute = new Hono<{ Variables: AppVariables }>();
 incomeRoute.use('*', requireWorkspace);
 
-incomeRoute.get('/income-sources', async (c) => {
+incomeRoute.get('/income-sources', requireSection('income'), async (c) => {
   const ws = c.get('workspace')!;
   return c.json((await listSourceRows(ws.id)).map(serializeSource));
 });

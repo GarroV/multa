@@ -18,7 +18,7 @@ import {
 } from './validation.ts';
 import { auth } from './auth.ts';
 import { db } from './db/client.ts';
-import { workspaces } from './db/schema/domain.ts';
+import { workspaceMembers, workspaces } from './db/schema/domain.ts';
 import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
@@ -47,6 +47,7 @@ import {
   setExecution,
 } from './plan/assemble.ts';
 import { getPlanGrid } from './plan/grid.ts';
+import { applySharing } from './plan/sharing.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { patchSettings, settingsOf } from './settings/store.ts';
 import { accountsRoute } from './routes/accounts.ts';
@@ -57,6 +58,7 @@ import { incomeRoute } from './routes/income.ts';
 import { obligations } from './routes/obligations.ts';
 import { exchangeRoute } from './routes/exchange.ts';
 import { forecastRoute } from './routes/forecast.ts';
+import { sharingRoute } from './routes/sharing.ts';
 import { signalsRoute } from './routes/signals.ts';
 import { receiptsRoute } from './routes/receipts.ts';
 import { recurringRoute } from './routes/recurring.ts';
@@ -101,7 +103,21 @@ app.get('/v1/health', async (c) =>
 app.get('/v1/me', requireAuth, async (c) => {
   const user = c.get('user')!;
   const rows = await db.select().from(workspaces).where(eq(workspaces.ownerId, user.id)).limit(1);
-  const ws = rows[0];
+  let ws = rows[0];
+  // Совместный доступ (issue #46): своего воркспейса может не быть, но быть приглашение в чужой.
+  let role: 'owner' | 'member' = 'owner';
+  if (!ws) {
+    const shared = await db
+      .select({ workspace: workspaces })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .where(eq(workspaceMembers.userId, user.id))
+      .limit(1);
+    if (shared[0]) {
+      ws = shared[0].workspace;
+      role = 'member';
+    }
+  }
   // Онбординг завершён, когда есть ритм И хотя бы один активный источник дохода:
   // без ритма нет границ периода, без источника план собрался бы на нуле.
   const onboardingComplete = ws
@@ -120,6 +136,8 @@ app.get('/v1/me', requireAuth, async (c) => {
     onboardingComplete,
     // Пропустил обучение — пускаем в приложение, план останется пустым до ввода дохода.
     onboardingSkipped: ws?.onboardingSkipped ?? false,
+    // Роль решает, что вообще показывать: участник смотрит и не правит.
+    role: ws ? role : null,
   });
 });
 
@@ -180,7 +198,15 @@ app.get('/v1/plan/current', requireWorkspace, async (c) => {
   const ws = c.get('workspace')!;
   try {
     const plan = await getCurrentPlan(ws, today(ws.timezone));
-    return c.json(plan);
+    /*
+     * Матрица видимости (issue #46). `as=member` — предпросмотр владельца «глазами участника»:
+     * параметр только СУЖАЕТ видимое, поэтому принимать его от клиента безопасно (правило 7 про
+     * скоуп он не нарушает — воркспейс по-прежнему из токена).
+     */
+    const previewAsMember = c.req.query('as') === 'member';
+    return c.json(
+      applySharing(plan, settingsOf(ws).sharing, c.get('role') ?? 'owner', previewAsMember),
+    );
   } catch (err) {
     if (err instanceof Error && err.message === 'onboarding_incomplete') {
       return c.json({ error: 'onboarding_incomplete' }, 409);
@@ -415,6 +441,12 @@ app.get('/v1/fx/rate', requireAuth, async (c) => {
 // а в Hono такой middleware из подключённого роутера действует на все пути /v1/*, смонтированные
 // после него, — публичный роут ниже получал бы 401 ещё до своего хендлера.
 app.route('/v1', demoRoute);
+/*
+ * Совместный доступ (issue #46) — по той же причине рядом с демо: принятие приглашения обязано
+ * работать у человека, у которого своего воркспейса ещё нет, а `use('*', requireWorkspace)` из
+ * суброутеров ниже вернуло бы ему 409 до захода в хендлер.
+ */
+app.route('/v1', sharingRoute);
 // Счета и мультивалютные остатки (#45): «сколько всего денег есть».
 app.route('/v1', accountsRoute);
 // Категорийная аналитика (#51): план против медианы факта, спарклайн, вердикт.
