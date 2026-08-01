@@ -383,6 +383,86 @@ export function useCancelIncomeReceipt() {
   });
 }
 
+// --- Импорт из Excel (issue #76) ---
+
+export interface ImportPreviewDto {
+  sheets: { name: string; rows: number }[];
+  /** null — спрашивали только состав книги (лист ещё не выбран). */
+  journal: null | {
+    rowsTotal: number;
+    rowsReady: number;
+    rowsSkipped: { sourceRow: number; reason: string }[];
+    firstDate: string | null;
+    lastDate: string | null;
+    totalMinor: string;
+    categories: { name: string; rows: number; existingId: string | null }[];
+  };
+}
+
+export interface ImportCommitDto {
+  batchId: string;
+  rowsImported: number;
+  rowsDuplicated: number;
+  rowsSkipped: number;
+  categoriesCreated: string[];
+}
+
+export interface ImportBatchDto {
+  id: string;
+  filename: string;
+  sheet: string;
+  rowsTotal: number;
+  rowsImported: number;
+  rowsDuplicated: number;
+  status: 'committed' | 'rolled_back';
+  createdAt: string;
+}
+
+export function useImportPreview() {
+  return useMutation({
+    mutationFn: (input: { fileBase64: string; sheet?: string }) =>
+      api<ImportPreviewDto>('/v1/import/preview', { method: 'POST', body: JSON.stringify(input) }),
+  });
+}
+
+export function useImportCommit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      fileBase64: string;
+      sheet: string;
+      dictionarySheet?: string;
+      filename?: string;
+    }) =>
+      api<ImportCommitDto>('/v1/import/commit', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      // Перенос меняет всё сразу: факт, категории, аналитику и советы по медиане.
+      void qc.invalidateQueries();
+    },
+  });
+}
+
+export function useImportBatches() {
+  return useQuery({
+    queryKey: ['import-batches'],
+    retry: false,
+    queryFn: () => api<ImportBatchDto[]>('/v1/import/batches'),
+  });
+}
+
+export function useRollbackImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) =>
+      api<{ ok: boolean; rowsRemoved: number }>(`/v1/import/batches/${batchId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries();
+    },
+  });
+}
+
 // --- Настройки воркспейса (issue #49) ---
 
 export interface WorkspaceSettingsDto {

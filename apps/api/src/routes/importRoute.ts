@@ -82,8 +82,16 @@ function importKeysOf(rows: readonly JournalRow[]): string[] {
 importRoute.post('/import/preview', async (c) => {
   const ws = c.get('workspace')!;
   const body = importPreviewSchema.parse(await c.req.json());
-  const found = bookAndSheet(body.fileBase64, body.sheet);
+  const found = bookAndSheet(body.fileBase64, body.sheet ?? '');
   if ('error' in found && found.error === 'not_xlsx') return c.json({ error: 'not_xlsx' }, 400);
+
+  // Лист не назвали — значит спрашивают состав книги: отдаём листы, разбирать пока нечего.
+  if (!body.sheet) {
+    return c.json({
+      sheets: found.book!.sheets.map((s) => ({ name: s.name, rows: s.rows.length })),
+      journal: null,
+    });
+  }
   if (!found.sheet) {
     return c.json(
       { error: 'sheet_not_found', sheets: found.book?.sheets.map((s) => s.name) ?? [] },
