@@ -148,13 +148,17 @@ export function BehaviourSettings() {
           <span>{t('tour.restart')}</span>
         </span>
         <span className="prow-num" />
+        {/*
+          Кнопка всегда живая и всегда с одним словом. Первая версия гасила её, пока тур не пройден,
+          и подписывала «идёт» — человек видел мёртвую кнопку с непонятным словом вместо действия.
+        */}
         <button
           type="button"
           className="act"
-          disabled={patch.isPending || !data.tour.planDone}
+          disabled={patch.isPending}
           onClick={() => patch.mutate({ tour: { planDone: false } })}
         >
-          {data.tour.planDone ? t('tour.restartAction') : t('tour.restartDone')}
+          {t('tour.restartAction')}
         </button>
       </div>
     </Panel>

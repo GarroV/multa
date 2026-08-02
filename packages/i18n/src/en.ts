@@ -96,7 +96,6 @@ export const en = {
   'tour.skip': 'Skip',
   'tour.restart': 'Show the walkthrough again',
   'tour.restartAction': 'Show',
-  'tour.restartDone': 'running',
   'tour.hero.title': 'The number that matters',
   'tour.hero.body':
     'How much you can spend per day until the next payday. It comes from what is left, not from the plan: spend more today and the number drops today, not at the end of the month.',

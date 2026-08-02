@@ -145,11 +145,11 @@ export function Sharing() {
       {isOwner && (
         <div className="prow">
           <span className="prow-day" aria-hidden />
-          <span className="prow-name">
-            <span className="sub">{t('share.matrixHint')}</span>
-          </span>
+          <span className="prow-name" />
           <span className="prow-num" />
           <span />
+          {/* Именно `prow-note`: это объяснение всей фичи, и обрезать его многоточием нельзя. */}
+          <span className="prow-note">{t('share.matrixHint')}</span>
         </div>
       )}
     </Panel>

@@ -96,7 +96,6 @@ export const ru: Record<TranslationKey, string> = {
   'tour.skip': 'Пропустить',
   'tour.restart': 'Показать обучение заново',
   'tour.restartAction': 'Показать',
-  'tour.restartDone': 'идёт',
   'tour.hero.title': 'Главная цифра',
   'tour.hero.body':
     'Сколько можно тратить в день до следующей выплаты. Считается от остатка, а не от плана: потратил больше — цифра уменьшилась сегодня, а не в конце месяца.',
