@@ -102,3 +102,36 @@ describe('categoryVerdict', () => {
     expect(['stable', 'volatile']).toContain(categoryVerdict(input).kind);
   });
 });
+
+describe('нестабильность — свойство ряда, а не его положения относительно плана (#82)', () => {
+  /*
+   * Симптом, с которого начался issue: у категории план 2 500, медиана факта 7 750 → вердикт
+   * «поднять план». Человек поднимает — и тот же экран отвечает «статья скачет, поднимать рано».
+   * Совет противоречил сам себе, потому что разброс мерился от плана: при заниженном плане все
+   * точки лежали выше него, и разброса «не было».
+   */
+  const jumpy = [12_000_00n, 2_000_00n, 11_000_00n, 1_500_00n];
+
+  it('один и тот же ряд нестабилен при любом плане', () => {
+    for (const plannedMinor of [1_000_00n, 6_500_00n, 20_000_00n]) {
+      expect(categoryVerdict({ plannedMinor, history: jumpy }).kind).toBe('volatile');
+    }
+  });
+
+  it('поднятие плана до медианы не превращает совет в свою противоположность', () => {
+    // Ровный ряд: при заниженном плане советуем поднять, после поднятия — «стабильно», и точка.
+    const steady = [10_000_00n, 10_500_00n, 9_800_00n, 10_200_00n];
+    const before = categoryVerdict({ plannedMinor: 5_000_00n, history: steady });
+    expect(before.kind).toBe('raise');
+
+    const after = categoryVerdict({ plannedMinor: before.medianMinor, history: steady });
+    expect(after.kind).toBe('stable');
+  });
+
+  it('совет по нестабильной статье молчит независимо от плана', () => {
+    // Иначе сигнал предложил бы «поднять план» по медиане ряда, в котором никакой привычки нет.
+    for (const plannedMinor of [1_000_00n, 6_500_00n, 20_000_00n]) {
+      expect(budgetAdvice({ plannedMinor, history: jumpy })).toBeNull();
+    }
+  });
+});
