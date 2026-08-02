@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { setCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { logger } from '../logger.ts';
 
@@ -27,8 +29,13 @@ interface Bucket {
 export interface RateRule {
   /** Длина окна в секундах. */
   readonly windowSec: number;
-  /** Сколько запросов разрешено за окно. */
+  /** Сколько запросов разрешено одному клиенту за окно. */
   readonly max: number;
+  /**
+   * Потолок на всех разом за то же окно. Нужен потому, что клиента мы отличаем по метке, а метку
+   * злоупотребляющий сбрасывает в один клик — значит персональный лимит его не держит. Держит этот.
+   */
+  readonly globalMax: number;
 }
 
 /**
@@ -40,19 +47,19 @@ export interface RateRule {
  * счёт за наш счёт.
  */
 const RULES: readonly (readonly [string, RateRule])[] = [
-  ['/v1/auth/sign-up', { windowSec: 3600, max: 10 }],
-  ['/v1/auth/sign-in', { windowSec: 300, max: 20 }],
-  ['/v1/auth/two-factor', { windowSec: 300, max: 20 }],
-  ['/v1/demo/reset', { windowSec: 3600, max: 5 }],
-  ['/v1/demo/enter', { windowSec: 600, max: 20 }],
-  ['/v1/receipts/photo', { windowSec: 3600, max: 30 }],
-  ['/v1/transactions/voice', { windowSec: 3600, max: 30 }],
-  ['/v1/transactions/parse', { windowSec: 3600, max: 200 }],
-  ['/v1/import/', { windowSec: 3600, max: 30 }],
+  ['/v1/auth/sign-up', { windowSec: 3600, max: 10, globalMax: 60 }],
+  ['/v1/auth/sign-in', { windowSec: 300, max: 20, globalMax: 200 }],
+  ['/v1/auth/two-factor', { windowSec: 300, max: 20, globalMax: 200 }],
+  ['/v1/demo/reset', { windowSec: 3600, max: 5, globalMax: 20 }],
+  ['/v1/demo/enter', { windowSec: 600, max: 20, globalMax: 200 }],
+  ['/v1/receipts/photo', { windowSec: 3600, max: 30, globalMax: 120 }],
+  ['/v1/transactions/voice', { windowSec: 3600, max: 30, globalMax: 120 }],
+  ['/v1/transactions/parse', { windowSec: 3600, max: 200, globalMax: 2000 }],
+  ['/v1/import/', { windowSec: 3600, max: 30, globalMax: 120 }],
 ];
 
 /** Общий потолок на всё остальное: обычная работа в интерфейсе в него не упирается. */
-const DEFAULT_RULE: RateRule = { windowSec: 60, max: 240 };
+const DEFAULT_RULE: RateRule = { windowSec: 60, max: 240, globalMax: 3000 };
 
 const buckets = new Map<string, Bucket>();
 
@@ -71,15 +78,48 @@ function ruleFor(path: string): readonly [string, RateRule] {
   return ['*', DEFAULT_RULE];
 }
 
+/** Имя метки клиента. httpOnly: она служебная, интерфейсу знать о ней незачем. */
+const CLIENT_COOKIE = 'multa_c';
+
 /**
- * Клиент запроса. За Caddy и Tailscale реальный адрес приходит в `x-forwarded-for`; берём первый
- * элемент — он от ближайшего к клиенту прокси. Без заголовка все запросы попадут в один ключ:
- * это грубее, но безопаснее, чем не ограничивать вовсе.
+ * Кто именно к нам пришёл.
+ *
+ * Порядок продиктован тем, что реально доступно. За Tailscale Serve и Funnel адрес клиента до
+ * приложения **не доходит**: туннель проксирует на localhost, и Caddy видит docker-шлюз — то есть
+ * один и тот же адрес у всех. Пойман фактически: первая версия лимитера писала в лог ключ
+ * `172.21.0.1`, и один человек, упершийся в лимит регистрации, запер бы всех остальных.
+ *
+ * Поэтому:
+ * 1. `x-forwarded-for` — если однажды появится настоящий обратный прокси, ключ станет точным;
+ * 2. личность tailnet (`tailscale-user-login`) — для своих устройств она есть всегда;
+ * 3. собственная метка в cookie — отличает обычных людей друг от друга, чтобы они не делили
+ *    квоту. От злоупотребления она не защищает: метка сбрасывается в один клик. Для этого есть
+ *    общий потолок правила (`globalMax`), и держит именно он.
  */
-function clientOf(headers: Headers): string {
+function clientOf(c: { req: { raw: Request } }): string {
+  const headers = c.req.raw.headers;
   const forwarded = headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0]!.trim();
-  return headers.get('x-real-ip')?.trim() || 'unknown';
+  // Docker-шлюз и локалхост в роли «клиента» — признак того, что настоящего адреса нам не дали.
+  const first = forwarded?.split(',')[0]?.trim();
+  if (first && !isProxyHop(first)) return `ip:${first}`;
+
+  const tailnetUser = headers.get('tailscale-user-login');
+  if (tailnetUser) return `ts:${tailnetUser}`;
+
+  const cookie = headers.get('cookie') ?? '';
+  const marked = new RegExp(`(?:^|; )${CLIENT_COOKIE}=([A-Za-z0-9_-]{8,64})`).exec(cookie);
+  return marked ? `c:${marked[1]}` : '';
+}
+
+/** Адреса, за которыми стоит наш же прокси, а не человек. */
+function isProxyHop(ip: string): boolean {
+  return (
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip.startsWith('172.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('192.168.')
+  );
 }
 
 export const rateLimit = createMiddleware(async (c, next) => {
@@ -91,26 +131,46 @@ export const rateLimit = createMiddleware(async (c, next) => {
   const now = Date.now();
   sweep(now);
 
-  const key = `${clientOf(c.req.raw.headers)} ${ruleKey}`;
-  const bucket = buckets.get(key);
-
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + rule.windowSec * 1000 });
-    return next();
+  let client = clientOf(c);
+  if (!client) {
+    // Метки нет — выдаём. Первый запрос при этом считается за новым клиентом, а не за «всеми».
+    client = `c:${randomUUID().replaceAll('-', '')}`;
+    setCookie(c, CLIENT_COOKIE, client.slice(2), {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 365 * 24 * 3600,
+      secure: c.req.url.startsWith('https://'),
+    });
   }
 
-  if (bucket.count >= rule.max) {
-    const retryAfter = Math.ceil((bucket.resetAt - now) / 1000);
-    // Логируем один раз на превышение, а не на каждый запрос сверх лимита.
-    if (bucket.count === rule.max) logger.warn(`rate limit: ${key}`);
-    bucket.count += 1;
-    c.header('Retry-After', String(retryAfter));
-    return c.json({ error: 'rate_limited', retryAfter }, 429);
+  const denied =
+    hit(`${client} ${ruleKey}`, rule.max, rule.windowSec, now) ??
+    hit(`* ${ruleKey}`, rule.globalMax, rule.windowSec, now);
+
+  if (denied !== null) {
+    c.header('Retry-After', String(denied));
+    return c.json({ error: 'rate_limited', retryAfter: denied }, 429);
   }
 
-  bucket.count += 1;
   await next();
 });
+
+/**
+ * Отмечает запрос в корзине. Возвращает `null`, если запрос разрешён, иначе — через сколько секунд
+ * повторять. Лог пишется ровно на переходе через порог: иначе шквал запросов даёт шквал строк.
+ */
+function hit(key: string, max: number, windowSec: number, now: number): number | null {
+  const bucket = buckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    buckets.set(key, { count: 1, resetAt: now + windowSec * 1000 });
+    return null;
+  }
+  bucket.count += 1;
+  if (bucket.count <= max) return null;
+  if (bucket.count === max + 1) logger.warn(`rate limit: ${key}`);
+  return Math.ceil((bucket.resetAt - now) / 1000);
+}
 
 /** Сброс счётчиков — только для тестов: между сценариями лимит не должен протекать. */
 export function resetRateLimits(): void {
