@@ -15,6 +15,17 @@ export const auth = betterAuth({
   trustedOrigins: [env.WEB_ORIGIN],
   database: drizzleAdapter(db, { provider: 'pg' }),
   emailAndPassword: { enabled: true },
+  /*
+   * Встроенное ограничение частоты выключено намеренно (публичный доступ, 2026-08-02). Оно
+   * ключуется по IP, а за Tailscale адрес клиента до приложения не доходит: туннель проксирует на
+   * localhost, и все посетители выглядят как docker-шлюз. В таком виде правило better-auth «три
+   * входа за десять секунд» становится общим на весь интернет — два человека, входящие
+   * одновременно, мешают друг другу.
+   *
+   * Частоту держит наш `apps/api/src/http/rateLimit.ts`: он умеет отличать клиентов не только по
+   * адресу и, кроме персонального лимита, имеет общий потолок правила.
+   */
+  rateLimit: { enabled: false },
   plugins: [twoFactor()],
   // $0/приватность: не отправляем телеметрию.
   telemetry: { enabled: false },
