@@ -1,5 +1,6 @@
 import type { TargetKind } from '@multa/core';
 import { isUuid } from './http/ids.ts';
+import { rateLimit } from './http/rateLimit.ts';
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -90,6 +91,13 @@ export const app = new Hono<{ Variables: AppVariables }>();
 // Access-лог не нужен в тестах: он топит вывод vitest и прячет причину падения.
 if (process.env.NODE_ENV !== 'test') app.use('*', honoLogger());
 app.use('/v1/*', cors(corsOptions));
+
+/*
+ * Ограничение частоты — до всего остального, включая auth: смысл в том, чтобы дорогой запрос не
+ * доехал до обработчика, а не в том, чтобы посчитать его после. В тестах выключено: сценарии
+ * гоняют десятки запросов подряд от одного «адреса» и упирались бы в лимит, проверяя не то.
+ */
+if (process.env.NODE_ENV !== 'test') app.use('/v1/*', rateLimit);
 
 // better-auth (email+password + TOTP) — на /v1/auth/*
 app.on(['POST', 'GET'], '/v1/auth/*', (c) => auth.handler(c.req.raw));

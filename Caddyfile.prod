@@ -26,9 +26,30 @@
 		file_server
 	}
 
+	# Заголовки безопасности. Появились, когда приложение стало доступно из интернета
+	# (решение владельца 2026-08-02): до этого адрес жил внутри tailnet, и всё, что ниже,
+	# защищало бы только от своих же устройств.
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
+
+		# Год HSTS без preload: preload — билет в один конец (снятие занимает месяцы), а адрес
+		# на ts.net может смениться вместе с площадкой.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+		# Кликджекинг: приложение про деньги никогда не должно оказаться в чужом фрейме.
+		X-Frame-Options DENY
+
+		# Камеру, микрофон и геолокацию продукт не использует: чек фотографируют файлом,
+		# голос пишет отдельная ручка по явному действию.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+		# CSP под фактическую сборку, а не по шаблону: скрипты и стили — только свои файлы,
+		# шрифты вшиты в бандл (@fontsource), сеть — только собственный origin.
+		# 'unsafe-inline' в style-src обязателен: экраны задают сеточные отступы инлайновым
+		# style, а SVG-графики — толщину дуг. Скрипты инлайном не исполняются нигде.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+
 		-Server
 	}
 }

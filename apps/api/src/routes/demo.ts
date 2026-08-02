@@ -64,8 +64,16 @@ demoRoute.post('/demo/enter', async (c) => {
   return c.json({ ok: true, demo: true });
 });
 
-/** Ручной сброс: тот же путь, что у планового, — удобно на показе, если демо «испачкали». */
+/**
+ * Ручной сброс: тот же путь, что у планового, — удобно на показе, если демо «испачкали».
+ *
+ * Доступен только тому, кто уже сидит в демо. Раньше ручка не требовала ничего, и на публичном
+ * адресе (решение владельца 2026-08-02) это был бесплатный генератор нагрузки: один POST
+ * переписывает всю демо-базу, а звать его мог кто угодно и сколько угодно.
+ */
 demoRoute.post('/demo/reset', async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (session?.user.email !== DEMO_EMAIL) return c.json({ error: 'demo_only' }, 403);
   const userId = await ensureDemoUser();
   const workspaceId = await seedDemo(userId);
   return c.json({ ok: true, workspaceId });

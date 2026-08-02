@@ -213,4 +213,24 @@ describe('вход в демо', () => {
     expect(list.transactions.map((t) => t.id)).not.toContain(created.id);
     expect((await guest.del(`/v1/transactions/${created.id}`)).status).toBe(404);
   });
+
+  test('сброс демо доступен только тому, кто уже в демо', async () => {
+    /*
+     * На публичном адресе (решение владельца 2026-08-02) ручка без проверки была бесплатным
+     * генератором нагрузки: один POST переписывает всю демо-базу, а звать его мог кто угодно.
+     */
+    const stranger = anonymous();
+    const denied = await stranger.post('/v1/demo/reset');
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ error: 'demo_only' });
+
+    // Обычный зарегистрированный пользователь — тоже не демо, и тоже не сбрасывает.
+    const outsider = await onboarded();
+    expect((await outsider.post('/v1/demo/reset')).status).toBe(403);
+
+    // А тот, кто вошёл в демо, сбросить его может: это его же кабинет.
+    const guest = anonymous();
+    await expectOk(await guest.post('/v1/demo/enter'));
+    await expectOk(await guest.post('/v1/demo/reset'));
+  });
 });
