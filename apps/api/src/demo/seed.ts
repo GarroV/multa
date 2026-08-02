@@ -83,6 +83,7 @@ async function ensureWorkspace(userId: string): Promise<string> {
         periodAnchors: { kind: 'monthly-days', days: [10, 25], weekendRule: 'before' },
         paydayWeekendRule: 'before',
         onboardingSkipped: false,
+        settings: DEMO_SETTINGS,
       })
       .where(eq(workspaces.id, existing[0].id));
     return existing[0].id;
@@ -96,10 +97,17 @@ async function ensureWorkspace(userId: string): Promise<string> {
       timezone: DEMO_TZ,
       periodAnchors: { kind: 'monthly-days', days: [10, 25], weekendRule: 'before' },
       paydayWeekendRule: 'before',
+      settings: DEMO_SETTINGS,
     })
     .returning({ id: workspaces.id });
   return inserted[0]!.id;
 }
+
+/**
+ * Демо приходят смотреть на наполненный продукт, а не учиться им пользоваться: обучающий тур
+ * (issue #28) здесь выключен, иначе первый экран показа — затемнение с подсказкой, а не план.
+ */
+const DEMO_SETTINGS = { tour: { planDone: true } } as const;
 
 /** Сдвиг даты на N дней в ISO. */
 function shift(iso: string, days: number): string {

@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { useSkipOnboarding } from '../lib/queries.ts';
 
-const TOTAL_STEPS = 4;
+/** Шагов ровно два (issue #28): валюта и доход. Долги и корзины заводятся уже внутри продукта. */
+const TOTAL_STEPS = 2;
 
 export function OnboardingShell({ step, children }: { step: number; children: ReactNode }) {
   const { t } = useI18n();

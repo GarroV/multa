@@ -500,6 +500,8 @@ export interface WorkspaceSettingsDto {
   };
   /** Матрица видимости для участников (issue #46). */
   sharing: Record<ShareSection, ShareMode>;
+  /** Пройденное обучение (issue #28): флаг на сервере, а не в localStorage. */
+  tour: { planDone: boolean };
 }
 
 export function useSettings() {

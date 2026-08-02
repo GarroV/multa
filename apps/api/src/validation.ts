@@ -142,6 +142,14 @@ const cascadeSettings = z.object({
   compressOrder: z.array(compressibleKind).min(1).max(3).default(['goal', 'envelope', 'category']),
 });
 
+/**
+ * Обучение (issue #28). Флаг на сервере, а не в localStorage: человек заходит с телефона после
+ * ноутбука, и тур не должен начинаться заново.
+ */
+const tourSettings = z.object({
+  planDone: z.boolean().default(false),
+});
+
 const signalsSettings = z.object({
   /** За сколько дней до конца периода считать «деньги кончатся раньше» тревогой. */
   burnThresholdDays: z.number().int().min(1).max(14).default(3),
@@ -187,6 +195,7 @@ export const workspaceSettingsSchema = z
     cascade: cascadeSettings.default({}),
     signals: signalsSettings.default({}),
     sharing: sharingSettings.default({}),
+    tour: tourSettings.default({}),
   })
   .default({});
 
@@ -197,6 +206,7 @@ export const workspaceSettingsPatchSchema = z.object({
   cascade: cascadeSettings.partial().optional(),
   signals: signalsSettings.partial().optional(),
   sharing: sharingSettings.partial().optional(),
+  tour: tourSettings.partial().optional(),
 });
 
 export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;

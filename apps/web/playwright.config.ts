@@ -47,6 +47,8 @@ export default defineConfig({
         BETTER_AUTH_SECRET: 'e2e_secret_at_least_32_characters_long',
         BETTER_AUTH_URL: `http://localhost:${API_PORT}`,
         MIGRATIONS_DIR: 'migrations',
+        // Лимит частоты в браузерном прогоне только мешает: 24 сценария бьют в одни и те же ручки.
+        RATE_LIMIT_DISABLED: '1',
       },
     },
     {

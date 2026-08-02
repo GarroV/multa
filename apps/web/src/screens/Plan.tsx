@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
 import { MasterGrid } from '../components/MasterGrid.tsx';
+import { Tour } from '../components/tour/Tour.tsx';
+import { PLAN_TOUR } from '../components/tour/steps.ts';
 import { IncomeReceipt } from '../components/IncomeReceipt.tsx';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag, type Accent } from '../components/ui/Panel.tsx';
@@ -19,8 +21,10 @@ import {
   useForecast,
   useGoalFreeze,
   useMe,
+  usePatchSettings,
   useRevisions,
   usePlan,
+  useSettings,
   useSkipExecution,
   useUndoRevision,
   type ForecastEvent,
@@ -728,6 +732,14 @@ export function Plan() {
    */
   const [asMember, setAsMember] = useState(false);
   const { data: me } = useMe();
+  /*
+   * Обучение (issue #28). Показывается один раз владельцу и только когда план уже собран: тур по
+   * пустому экрану бессмыслен — подсвечивать нечего. Флаг живёт в настройках воркспейса, чтобы с
+   * телефона после ноутбука не начинался заново.
+   */
+  const { data: settings } = useSettings();
+  const patchSettings = usePatchSettings();
+  const [tourClosed, setTourClosed] = useState(false);
   const { data: plan, isLoading, error, refetch } = usePlan(true, asMember);
   if (isLoading) return <Centered>{t('common.loading')}</Centered>;
   // Дохода ещё нет (обучение пропущено) — не ошибка, а пустой лист с дорогой в настройки.
@@ -750,8 +762,24 @@ export function Plan() {
         <span className="dim">—</span>
       </Centered>
     );
+  const tourReady =
+    !tourClosed &&
+    me?.role === 'owner' &&
+    settings !== undefined &&
+    settings.tour.planDone === false;
+
   return (
     <>
+      {tourReady && (
+        <Tour
+          steps={PLAN_TOUR}
+          onFinish={() => {
+            // Закрываем сразу, не дожидаясь сети: повторно показать тур поверх ответа — хамство.
+            setTourClosed(true);
+            patchSettings.mutate({ tour: { planDone: true } });
+          }}
+        />
+      )}
       {me?.role === 'owner' && (
         <div className="mode-row">
           <span className="seg" role="group" aria-label={t('share.viewAs')}>

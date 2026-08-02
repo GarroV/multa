@@ -41,6 +41,7 @@ export async function patchSettings(
     cascade: { ...current.cascade, ...(patch.cascade ?? {}) },
     signals: { ...current.signals, ...(patch.signals ?? {}) },
     sharing: { ...current.sharing, ...(patch.sharing ?? {}) },
+    tour: { ...current.tour, ...(patch.tour ?? {}) },
   };
   // Прогоняем результат через схему целиком: слияние не должно уметь собрать невалидный объект.
   const validated = workspaceSettingsSchema.parse(next);

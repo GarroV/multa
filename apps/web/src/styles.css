@@ -1653,3 +1653,75 @@ a {
     order: 4;
   }
 }
+
+/* --- Обучающий тур по главному экрану (issue #28) ---------------------------------------------
+   Затемнение собрано из четырёх полос вокруг дырки, а не из clip-path: подсвечиваемый блок при
+   этом ничем не накрыт и остаётся кликабельным, а вёрстка не сдвигается ни на пиксель — иначе
+   блок «прыгал» бы на каждом переходе между шагами. */
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.tour-mask {
+  position: fixed;
+  background: color-mix(in oklab, var(--bg-void) 78%, transparent);
+  pointer-events: auto;
+}
+.tour-ring {
+  position: fixed;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--accent-quiet);
+  pointer-events: none;
+}
+.tour-tip {
+  position: fixed;
+  pointer-events: auto;
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 28%);
+}
+.tour-step {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.tour-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.tour-body {
+  font-size: 13px;
+  color: var(--mid);
+  line-height: 1.45;
+}
+.tour-acts {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* Телефон: подсказка на всю ширину — 300px на 375px экране оставляли бы поля в пару пикселей. */
+@media (max-width: 640px) {
+  .tour-tip {
+    left: 12px !important;
+    right: 12px;
+    width: auto !important;
+  }
+}
+
+/* Уважение к «поменьше движения»: подсветка появляется, но не ездит. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring,
+  .tour-tip {
+    transition: none;
+  }
+}

@@ -140,6 +140,23 @@ export function BehaviourSettings() {
         </span>
         <span />
       </div>
+
+      {/* Явная дорога назад к обучению (issue #28): пропустить тур легко, найти его снова — нет. */}
+      <div className="prow">
+        <span className="prow-day" aria-hidden />
+        <span className="prow-name">
+          <span>{t('tour.restart')}</span>
+        </span>
+        <span className="prow-num" />
+        <button
+          type="button"
+          className="act"
+          disabled={patch.isPending || !data.tour.planDone}
+          onClick={() => patch.mutate({ tour: { planDone: false } })}
+        >
+          {data.tour.planDone ? t('tour.restartAction') : t('tour.restartDone')}
+        </button>
+      </div>
     </Panel>
   );
 }

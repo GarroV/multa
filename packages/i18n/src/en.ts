@@ -91,6 +91,29 @@ export const en = {
   'plan.groups.category': 'Categories',
   'plan.groups.goal': 'Goals',
   'plan.groups.income': 'Income',
+  'tour.next': 'Next',
+  'tour.done': 'Got it',
+  'tour.skip': 'Skip',
+  'tour.restart': 'Show the walkthrough again',
+  'tour.restartAction': 'Show',
+  'tour.restartDone': 'running',
+  'tour.hero.title': 'The number that matters',
+  'tour.hero.body':
+    'How much you can spend per day until the next payday. It comes from what is left, not from the plan: spend more today and the number drops today, not at the end of the month.',
+  'tour.cascade.title': 'Where the payout went',
+  'tour.cascade.body':
+    'Money goes in order: debts, exchange, envelopes, categories, goals. When it falls short, goals give way first, then envelopes, then categories. Debts and currency baskets are never trimmed.',
+  'tour.map.title': 'What happens before payday',
+  'tour.map.body': 'The axis from payday to payday: income, large payments and where today sits.',
+  'tour.categories.title': 'Categories',
+  'tour.categories.body':
+    'Plan against fact. Budgets are edited right here, and when a line runs out early the app offers where to take the rest from.',
+  'tour.obligations.title': 'Debts, goals, baskets',
+  'tour.obligations.body':
+    'Nobody asks about them upfront: look at the plan first, then add what you actually have. Empty is fine — the plan works without them.',
+  'tour.entry.title': 'Log a spend',
+  'tour.entry.body':
+    'By phrase (“250 groceries”), by receipt or by voice. The daily number updates immediately — that is the whole point.',
   'share.title': 'SHARED ACCESS',
   'share.collapsed': 'COLLAPSED FOR YOU',
   'share.invite': 'Create an invite code',

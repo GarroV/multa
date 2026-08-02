@@ -97,7 +97,13 @@ app.use('/v1/*', cors(corsOptions));
  * доехал до обработчика, а не в том, чтобы посчитать его после. В тестах выключено: сценарии
  * гоняют десятки запросов подряд от одного «адреса» и упирались бы в лимит, проверяя не то.
  */
-if (process.env.NODE_ENV !== 'test') app.use('/v1/*', rateLimit);
+/*
+ * Выключается и в тестах, и в E2E (`RATE_LIMIT_DISABLED=1` из playwright.config): браузерный
+ * прогон делает десятки запросов подряд от одного клиента и упирался бы в лимит, проверяя не то.
+ * В проде переменная не выставлена — там лимит работает всегда.
+ */
+if (process.env.NODE_ENV !== 'test' && process.env.RATE_LIMIT_DISABLED !== '1')
+  app.use('/v1/*', rateLimit);
 
 // better-auth (email+password + TOTP) — на /v1/auth/*
 app.on(['POST', 'GET'], '/v1/auth/*', (c) => auth.handler(c.req.raw));
