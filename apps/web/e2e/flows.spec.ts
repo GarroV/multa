@@ -136,3 +136,53 @@ test('выбранный вариант в группе виден глазом,
   ]);
   expect(selectedBg).not.toBe(plainBg);
 });
+
+test('на телефоне сначала цифра дня и диаграмма, а не ведомости', async ({ page }) => {
+  /*
+   * Решение владельца 2026-08-01: мобильная раскладка должна отдавать смысл быстро, поэтому
+   * картинки идут раньше списков. Порядок задан только в CSS (`order`), а такие вещи молча
+   * возвращаются при первом же рефакторе разметки — тест держит их на месте.
+   */
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/plan');
+
+  const topOf = async (selector: string) => (await page.locator(selector).first().boundingBox())!.y;
+
+  const hero = await topOf('.kpi-hero');
+  const donut = await topOf('.kpi-cascade');
+  const map = await topOf('.pmap');
+  const secondary = await topOf('.kpi-money');
+  const panels = await topOf('.panels .panel');
+
+  expect(hero).toBeLessThan(donut);
+  expect(donut).toBeLessThan(map);
+  // Второстепенные суммы и ведомости — после обоих графиков.
+  expect(map).toBeLessThan(secondary);
+  expect(secondary).toBeLessThan(panels);
+  // Оба графика помещаются в два экрана: ради этого перекладка и делалась.
+  expect(map).toBeLessThan(812 * 2);
+});
+
+test('на телефоне статистика открывается графиками, а не списком сигналов', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/statistics');
+
+  const structure = (await page.locator('.panel-structure').boundingBox())!.y;
+  const periods = (await page.locator('.panel-periods').boundingBox())!.y;
+  const signals = (await page.locator('.panel-signals').boundingBox())!.y;
+
+  expect(structure).toBeLessThan(periods);
+  expect(periods).toBeLessThan(signals);
+});
+
+test('на широком экране порядок прежний: полоса метрик, потом панели', async ({ page }) => {
+  // Перекладка касается только телефона; ломать привычный десктоп ради неё нельзя.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/plan');
+
+  const money = (await page.locator('.kpi-money').boundingBox())!;
+  const hero = (await page.locator('.kpi-hero').boundingBox())!;
+  // Клетки стоят в одну строку: разница по вертикали нулевая, порядок — слева направо.
+  expect(Math.abs(money.y - hero.y)).toBeLessThan(2);
+  expect(money.x).toBeLessThan(hero.x);
+});

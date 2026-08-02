@@ -11,6 +11,11 @@ export type Accent = 'cyan' | 'mag' | 'vio' | 'lime' | 'amber';
 
 interface PanelProps {
   label: string;
+  /**
+   * Имя роли панели. Нужно телефону: там панели выстраиваются по важности (сначала картинки,
+   * потом ведомости), и порядок задаётся в CSS по этим именам, а не второй разметкой под мобильный.
+   */
+  slot?: string;
   /** Сумма раздела за период — вторая строка заголовка, всегда в колонке моно. */
   sum?: string;
   accent?: Accent;
@@ -20,9 +25,9 @@ interface PanelProps {
   foot?: ReactNode;
 }
 
-export function Panel({ label, sum, accent = 'cyan', tools, children, foot }: PanelProps) {
+export function Panel({ label, sum, accent = 'cyan', tools, children, foot, slot }: PanelProps) {
   return (
-    <section className="panel" aria-label={label}>
+    <section className={slot ? `panel panel-${slot}` : 'panel'} aria-label={label}>
       <header className="panel-head">
         <span className={`panel-mark ${accent}`} aria-hidden />
         <span className="panel-name">{label}</span>

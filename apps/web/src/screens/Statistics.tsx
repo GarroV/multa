@@ -198,6 +198,7 @@ function ProviderPanel({ locale }: { locale: string }) {
   return (
     <Panel
       label={t('fx.byProvider')}
+      slot="providers"
       sum={t('fx.byProvider.sub', { months: data.months })}
       accent="vio"
       foot={<span className="sub">{saving}</span>}
@@ -273,6 +274,7 @@ function CategoryAnalyticsPanel({ base, locale }: { base: string; locale: string
   return (
     <Panel
       label={t('stats.byPeriods', { periods: horizon })}
+      slot="periods"
       accent="cyan"
       foot={hasVolatile ? <span className="sub">{t('stats.volatileHint')}</span> : undefined}
     >
@@ -314,7 +316,7 @@ function StatsBody({ plan }: { plan: PlanDto }) {
   const advices = plan.allocations.filter((a) => a.advice);
 
   return (
-    <div className="dense">
+    <div className="dense dense-stats">
       <div className="kpi-strip">
         <Metric
           label={t('stats.locked')}
@@ -347,7 +349,7 @@ function StatsBody({ plan }: { plan: PlanDto }) {
         <div className="col">
           <SignalsPanel base={base} locale={locale} />
 
-          <Panel label={t('stats.structure')} accent="vio">
+          <Panel label={t('stats.structure')} accent="vio" slot="structure">
             <div className="prow">
               <span className="prow-day" aria-hidden />
               <span className="prow-name">

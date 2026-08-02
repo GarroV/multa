@@ -121,6 +121,7 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
       )}
       <Panel
         label={t('stats.signals')}
+        slot="signals"
         accent={worst === 'risk' ? 'mag' : worst === 'attention' ? 'amber' : 'cyan'}
       >
         {signals.length === 0 && (

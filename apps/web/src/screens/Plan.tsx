@@ -292,9 +292,24 @@ function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
   );
 }
 
-function Kpi({ label, tag, children }: { label: string; tag?: ReactNode; children: ReactNode }) {
+/**
+ * Клетка верхней полосы. `slot` — не украшение, а имя роли: на телефоне полоса перестаёт быть
+ * полосой и выстраивается по важности (цифра дня → диаграмма раздачи → остальное), и порядок
+ * задаётся в CSS по этим именам, а не переставлением разметки под каждый экран.
+ */
+function Kpi({
+  label,
+  tag,
+  slot,
+  children,
+}: {
+  label: string;
+  tag?: ReactNode;
+  slot?: 'hero' | 'cascade' | 'left' | 'money' | 'exchange';
+  children: ReactNode;
+}) {
   return (
-    <div className="kpi">
+    <div className={slot ? `kpi kpi-${slot}` : 'kpi'}>
       <span className="kpi-label">
         {label}
         {tag}
@@ -344,7 +359,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
     .filter((g) => g.rows.length > 0);
 
   return (
-    <div className="dense">
+    <div className="dense dense-plan">
       {receiptFor && (
         <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
       )}
@@ -372,7 +387,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
         <>
           <div className="kpi-strip">
             {balances.data && balances.data.byCurrency.length > 0 && (
-              <Kpi label={t('acc.total')}>
+              <Kpi label={t('acc.total')} slot="money">
                 <span className="kpi-value">
                   {balances.data.totalMinor === null
                     ? '—'
@@ -401,7 +416,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 )}
               </Kpi>
             )}
-            <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })}>
+            <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })} slot="left">
               <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
                 {withCcy(plan.remainingLivingMinor)}
               </span>
@@ -414,7 +429,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               </span>
             </Kpi>
 
-            <Kpi label={t('plan.kpi.canSpend')}>
+            <Kpi label={t('plan.kpi.canSpend')} slot="hero">
               <span className="kpi-value accent">
                 {fmt(plan.canSpendPerDayMinor)}{' '}
                 <span className="kpi-sub">{t('plan.kpi.perDay')}</span>
@@ -428,6 +443,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
 
             <Kpi
               label={t('plan.summary.toExchange')}
+              slot="exchange"
               tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}
             >
               {buckets.length === 0 && <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>}
@@ -443,7 +459,10 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               </div>
             </Kpi>
 
-            <Kpi label={t('plan.kpi.cascade', { amount: withCcy(plan.incomeMinor) })}>
+            <Kpi
+              label={t('plan.kpi.cascade', { amount: withCcy(plan.incomeMinor) })}
+              slot="cascade"
+            >
               <CascadeDonut plan={plan} />
               <span className="kpi-sub">
                 {t('plan.kpi.leftToLive')} <b className="mono">{withCcy(plan.livingMinor)}</b>

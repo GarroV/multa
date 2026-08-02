@@ -788,12 +788,6 @@ a {
   }
 }
 
-@media (max-width: 640px) {
-  .kpi-strip {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 /* --- Баннер риска: разговор, а не выговор. Цвет несёт срочность, текст — вопрос --- */
 .risk-band {
   display: flex;
@@ -1505,5 +1499,157 @@ a {
 @media (max-width: 640px) {
   .mgrid-row {
     grid-template-columns: 132px repeat(var(--cols), minmax(84px, 1fr));
+  }
+}
+
+/*
+ * Телефон (решение владельца 2026-08-01): полоса KPI перестаёт быть полосой и становится ответом
+ * сверху вниз по важности. На узком экране «до сгиба» помещается один-два блока, поэтому первым
+ * идёт цифра дня, вторым — диаграмма раздачи: картинка отвечает «почему на жизнь столько» быстрее
+ * любого столбца цифр. Дальше карта периода (она следует за полосой в разметке), и только потом
+ * второстепенные суммы — парами, чтобы не съедать экран по одной.
+ *
+ * Порядок задаётся здесь, а не разметкой: у широкого экрана он свой, и дублировать JSX ради двух
+ * раскладок значит завести две правды об одном экране.
+ */
+@media (max-width: 640px) {
+  /*
+   * `display: contents` растворяет полосу: клетки становятся прямыми детьми `.dense`, и в один
+   * порядок с ними попадает карта периода — второй график экрана. Иначе карта осталась бы за
+   * всеми пятью клетками, то есть на четвёртом пролистывании.
+   */
+  .dense-plan {
+    display: flex;
+    flex-direction: column;
+  }
+  .dense-plan .kpi-strip {
+    display: contents;
+  }
+  /* Разделители полосы держались на её фоне; без полосы их несёт каждая клетка сама. */
+  .dense-plan .kpi {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dense-plan .mode-row {
+    order: 0;
+  }
+  .dense-plan .kpi-hero {
+    order: 1;
+  }
+  .dense-plan .kpi-cascade {
+    order: 2;
+  }
+  /* Тревога идёт сразу за ответом: она объясняет, почему цифра дня такая. */
+  .dense-plan .risk-band {
+    order: 3;
+  }
+  .dense-plan .pmap {
+    order: 4;
+  }
+  .dense-plan .kpi-left {
+    order: 5;
+  }
+  .dense-plan .kpi-money {
+    order: 6;
+  }
+  .dense-plan .kpi-exchange {
+    order: 7;
+  }
+  .dense-plan .panels {
+    order: 8;
+  }
+
+  /*
+   * Подписи оси лежат абсолютно и на узком экране переносятся на вторую строку — на десктопном
+   * запасе они наезжали на следующий блок. Высоту даём подписям, а не полосе.
+   */
+  .pmap {
+    padding-bottom: 44px;
+  }
+
+  /* Переключатели вида — служебная строка: на телефоне она не должна стоить экрана. */
+  .mode-row {
+    padding: 5px 12px;
+  }
+  .mode-row .seg-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  /* Герой на телефоне — единственная крупная цифра экрана, ей можно всю ширину. */
+  .kpi-hero .kpi-value {
+    font-size: 40px;
+  }
+  .kpi-hero .kpi-value .kpi-sub {
+    font-size: 14px;
+  }
+  .kpi-hero,
+  .kpi-cascade {
+    padding: 18px 18px 20px;
+  }
+
+  /* Диаграмма крупнее: на 84px дуги сливаются, и картинка перестаёт что-либо объяснять. */
+  .kpi-cascade .donut {
+    width: 116px;
+    height: 116px;
+  }
+  .kpi-cascade .legend {
+    font-size: 12px;
+    gap: 5px;
+  }
+
+  /* Второстепенные суммы — компактнее: они справка, а не ответ. */
+  .kpi-left,
+  .kpi-money,
+  .kpi-exchange {
+    padding: 10px 18px 12px;
+  }
+  .kpi-left .kpi-value,
+  .kpi-money .kpi-value,
+  .kpi-exchange .kpi-value {
+    font-size: 20px;
+  }
+
+  /*
+   * «Статистика» на телефоне: четыре числа в две колонки вместо четырёх экранов, и картинки выше
+   * ведомостей — структура расходов и спарклайны по периодам отвечают «куда уходит» быстрее, чем
+   * список строк. Сигналы идут сразу за ними: они по-прежнему то, ради чего экран открывают.
+   */
+  .dense-stats {
+    display: flex;
+    flex-direction: column;
+  }
+  .dense-stats .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    order: 0;
+  }
+  .dense-stats .kpi {
+    padding: 10px 14px 12px;
+  }
+  .dense-stats .kpi-value {
+    font-size: 20px;
+  }
+  .dense-stats .panels {
+    display: contents;
+  }
+  .dense-stats .col {
+    display: contents;
+  }
+  /* Порядок по умолчанию идёт первым: иначе он, стоя ниже, перебивал бы именованные роли. */
+  .dense-stats .panel {
+    order: 5;
+  }
+  .dense-stats .panel-structure {
+    order: 1;
+  }
+  .dense-stats .panel-periods {
+    order: 2;
+  }
+  .dense-stats .panel-signals {
+    order: 3;
+  }
+  .dense-stats .panel-providers {
+    order: 4;
   }
 }
