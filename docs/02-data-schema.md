@@ -23,7 +23,7 @@ create table income_sources (      -- только деньги: сколько 
   workspace_id uuid not null references workspaces on delete cascade,
   label text not null,             -- «Аванс», «Зарплата», «Подработка»
   currency char(3) not null,       -- фриланс в USD — не обязательно базовая
-  schedule jsonb not null,         -- IncomeSchedule: monthly-days | every-weeks | one-off | irregular
+  schedule jsonb not null,         -- IncomeSchedule: monthly-days | every-weeks | daily | weekly | one-off | irregular
   amount jsonb not null,           -- IncomeAmount: absolute{amountMinor} | percent{percent, ofMinor}; суммы — строки-целые
   stability text not null default 'fixed' check (stability in ('fixed','variable')),
   active boolean not null default true,
