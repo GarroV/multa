@@ -25,14 +25,14 @@ export const demoRoute = new Hono<{ Variables: AppVariables }>();
 /** Демо-пользователь: создаётся один раз обычной регистрацией, чтобы пароль лёг как у всех. */
 async function ensureDemoUser(): Promise<string> {
   const existing = await findDemoWorkspace();
-  if (existing) return existing.userId;
+  if (existing) return markVerified(existing.userId);
 
   const rows = await db
     .select({ id: user.id })
     .from(user)
     .where(eq(user.email, DEMO_EMAIL))
     .limit(1);
-  if (rows[0]) return rows[0].id;
+  if (rows[0]) return markVerified(rows[0].id);
 
   await auth.api.signUpEmail({
     body: { email: DEMO_EMAIL, password: DEMO_PASSWORD, name: 'Multa demo' },
@@ -43,7 +43,21 @@ async function ensureDemoUser(): Promise<string> {
     .where(eq(user.email, DEMO_EMAIL))
     .limit(1);
   if (!created[0]) throw new Error('demo: не удалось создать пользователя');
-  return created[0].id;
+  return markVerified(created[0].id);
+}
+
+/**
+ * Почта демо считается подтверждённой (issue #85). Подтверждать её некому и нечем — писем продукт
+ * пока не шлёт, — а в день, когда включат `requireEmailVerification`, сервер перестал бы пускать
+ * демо-пользователя: первый же клик «посмотреть без регистрации» умер бы.
+ *
+ * Ставится на каждом входе, а не только при создании: демо-пользователь уже существует на проде с
+ * неподтверждённой почтой, и «поправим потом руками» — ровно тот способ, которым такие вещи и
+ * остаются непоправленными.
+ */
+async function markVerified(userId: string): Promise<string> {
+  await db.update(user).set({ emailVerified: true }).where(eq(user.id, userId));
+  return userId;
 }
 
 demoRoute.post('/demo/enter', async (c) => {

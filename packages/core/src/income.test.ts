@@ -222,3 +222,69 @@ describe('rhythmMismatches', () => {
     expect(rhythmMismatches(rhythm, [advance], 'as-is', '2026-07-12', 2)).toEqual(['2026-07-25']);
   });
 });
+
+describe('несистемный доход: ежедневный и недельный (Оксана, 2026-08-03)', () => {
+  /*
+   * Живая находка: человек с ежедневным доходом застрял на онбординге, потому что модель знала
+   * только выплаты по числам месяца. Такой доход — не «нерегулярный»: он как раз предсказуем, но
+   * не датами, а частотой. Планировать его надо от суммы за раз, а не от суммы за период.
+   */
+  const period = { startsOn: '2026-08-10', endsOn: '2026-08-17' };
+
+  it('ежедневный доход даёт приход на каждый день периода', () => {
+    const events = incomeEventsIn(
+      [
+        {
+          id: 'shift',
+          label: 'Смена',
+          currency: 'RUB',
+          schedule: { kind: 'daily' },
+          amount: { kind: 'absolute', amountMinor: 300_000n },
+          active: true,
+        },
+      ],
+      period,
+    );
+    // Полуинтервал: 10..16 включительно, 17-е принадлежит следующему периоду.
+    expect(events).toHaveLength(7);
+    expect(events[0]?.date).toBe('2026-08-10');
+    expect(events.at(-1)?.date).toBe('2026-08-16');
+    expect(events.every((e) => e.amountMinor === 300_000n)).toBe(true);
+  });
+
+  it('недельный доход приходит в свой день недели', () => {
+    // 2026-08-10 — понедельник; просим пятницу (5).
+    const events = incomeEventsIn(
+      [
+        {
+          id: 'week',
+          label: 'Расчёт за неделю',
+          currency: 'RUB',
+          schedule: { kind: 'weekly', weekday: 5 },
+          amount: { kind: 'absolute', amountMinor: 1_500_000n },
+          active: true,
+        },
+      ],
+      period,
+    );
+    expect(events.map((e) => e.date)).toEqual(['2026-08-14']);
+  });
+
+  it('срок жизни источника уважается и у ежедневного', () => {
+    const events = incomeEventsIn(
+      [
+        {
+          id: 'shift',
+          label: 'Смена',
+          currency: 'RUB',
+          schedule: { kind: 'daily' },
+          amount: { kind: 'absolute', amountMinor: 300_000n },
+          active: true,
+          startsOn: '2026-08-14',
+        },
+      ],
+      period,
+    );
+    expect(events.map((e) => e.date)).toEqual(['2026-08-14', '2026-08-15', '2026-08-16']);
+  });
+});

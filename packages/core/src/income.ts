@@ -22,6 +22,13 @@ export type IncomeSchedule =
   | { readonly kind: 'monthly-days'; readonly days: readonly number[] } // «10 и 25»
   | { readonly kind: 'every-weeks'; readonly weeks: number; readonly startsOn: string } // цикл от реальной даты выплаты
   | { readonly kind: 'one-off'; readonly date: string } // разовый гонорар
+  /**
+   * Каждый день (смены, торговля, такси). Такой доход не «нерегулярный»: он предсказуем, но не
+   * датами, а частотой — планируется от суммы за раз, а не от суммы за период.
+   */
+  | { readonly kind: 'daily' }
+  /** Раз в неделю в определённый день; 0 — воскресенье, как у `Date.getUTCDay`. */
+  | { readonly kind: 'weekly'; readonly weekday: number }
   | { readonly kind: 'irregular' }; // «когда как» — в план не идёт, только факт
 
 export type IncomeAmount =
@@ -75,6 +82,13 @@ export function amountOfSource(amount: IncomeAmount): bigint {
 const SHIFT_MARGIN_DAYS = 3;
 
 /** Сырые даты расписания в окне вокруг периода, до применения правила выходных. */
+/** Каждый день окна включительно. Отдельной функцией: шаг в день через «недели» читался бы ребусом. */
+function dailyDatesBetween(fromIso: string, toIso: string): string[] {
+  const out: string[] = [];
+  for (let day = fromIso; day <= toIso; day = addDays(day, 1)) out.push(day);
+  return out;
+}
+
 function rawDatesAround(schedule: IncomeSchedule, period: PayPeriod): string[] {
   const from = addDays(period.startsOn, -SHIFT_MARGIN_DAYS);
   const to = addDays(period.endsOn, SHIFT_MARGIN_DAYS);
@@ -85,6 +99,13 @@ function rawDatesAround(schedule: IncomeSchedule, period: PayPeriod): string[] {
       return everyWeeksDatesBetween(schedule.weeks, schedule.startsOn, from, to);
     case 'one-off':
       return schedule.date >= from && schedule.date <= to ? [schedule.date] : [];
+    case 'daily':
+      return dailyDatesBetween(from, to);
+    case 'weekly': {
+      // Первый нужный день недели в окне, дальше шаг в неделю.
+      const shift = (schedule.weekday - new Date(`${from}T00:00:00Z`).getUTCDay() + 7) % 7;
+      return everyWeeksDatesBetween(1, addDays(from, shift), from, to);
+    }
     case 'irregular':
       return []; // в план не идёт по инварианту
   }
