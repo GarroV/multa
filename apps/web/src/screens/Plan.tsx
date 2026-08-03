@@ -1,5 +1,5 @@
 import type { TranslationKey } from '@multa/i18n';
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
 import { MasterGrid } from '../components/MasterGrid.tsx';
@@ -10,7 +10,7 @@ import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag, type Accent } from '../components/ui/Panel.tsx';
 import { CascadeDonut } from '../components/ui/CascadeDonut.tsx';
 import { PeriodMap } from '../components/ui/PeriodMap.tsx';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useIsMember } from '../lib/role.ts';
 import {
@@ -256,7 +256,7 @@ function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
         const first = rev.moves[0];
         return (
           <div className="prow" key={rev.id}>
-            <span className="prow-day">{rev.createdAt.slice(5, 10)}</span>
+            <span className="prow-day">{formatDate(rev.createdAt)}</span>
             <span className="prow-name">
               <span>
                 {first
@@ -336,9 +336,12 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   const [receiptFor, setReceiptFor] = useState<IncomeEventDto | null>(null);
   /*
    * Мастер-режим (issue #47) — не отдельный экран, а другой взгляд на тот же план: полгода вперёд
-   * таблицей. Переключатель здесь, потому что уходить с «Плана» ради этого незачем.
+   * таблицей. Сам переключатель стоит в топбаре рядом с прочим управлением, а выбранный вид живёт
+   * в адресе: экран его только читает.
    */
-  const [master, setMaster] = useState(false);
+  const master = useRouterState({
+    select: (s) => (s.location.search as { view?: string }).view === 'table',
+  });
   const cancelReceipt = useCancelIncomeReceipt();
   const balances = useBalances(!isMember);
 
@@ -366,24 +369,6 @@ function PlanBody({ plan }: { plan: PlanDto }) {
     <div className="dense dense-plan">
       {receiptFor && (
         <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
-      )}
-      {/* Мастер-сетка пока не умеет матрицу видимости — участнику её не предлагаем (issue #46). */}
-      {!isMember && (
-        <div className="mode-row">
-          <span className="seg" role="group" aria-label={t('plan.master.title')}>
-            {([false, true] as const).map((on) => (
-              <button
-                key={String(on)}
-                type="button"
-                className="seg-btn"
-                aria-pressed={master === on}
-                onClick={() => setMaster(on)}
-              >
-                {t(on ? 'plan.master.on' : 'plan.master.off')}
-              </button>
-            ))}
-          </span>
-        </div>
       )}
       {/* Мастер-режим — другой взгляд на тот же план, а не второй экран рядом: панели уступают ему место. */}
       {master && !isMember && <MasterGrid />}
@@ -439,7 +424,10 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 <span className="kpi-sub">{t('plan.kpi.perDay')}</span>
               </span>
               <span className="kpi-sub">
-                {t('plan.today.until', { date: plan.period.endsOn.slice(5), days: plan.daysLeft })}
+                {t('plan.today.until', {
+                  date: formatDate(plan.period.endsOn),
+                  days: plan.daysLeft,
+                })}
                 {BigInt(plan.bufferMinor) > 0n &&
                   ` · ${t('plan.kpi.buffer', { amount: withCcy(plan.bufferMinor) })}`}
               </span>
@@ -477,7 +465,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
           {risky && (
             <div className="risk-band">
               <span className="risk-text">
-                {t('signal.burn.title', { date: plan.burn.runsOutOn!.slice(5) })} ·{' '}
+                {t('signal.burn.title', { date: formatDate(plan.burn.runsOutOn!) })} ·{' '}
                 {t('signal.burn.body', {
                   perDay: withCcy(plan.burn.perDayMinor),
                   perDayPlan: withCcy(plan.canSpendPerDayMinor),
@@ -728,9 +716,12 @@ export function Plan() {
   const { t } = useI18n();
   /*
    * «Глазами участника» (issue #46): владелец проверяет, что именно увидит партнёр при выбранной
-   * матрице видимости. Права при этом не меняются — сужается только показанное.
+   * матрице видимости. Права при этом не меняются — сужается только показанное. Переключатель — в
+   * топбаре, состояние — в адресе.
    */
-  const [asMember, setAsMember] = useState(false);
+  const asMember = useRouterState({
+    select: (s) => (s.location.search as { as?: string }).as === 'member',
+  });
   const { data: me } = useMe();
   /*
    * Обучение (issue #28). Показывается один раз владельцу и только когда план уже собран: тур по
@@ -779,23 +770,6 @@ export function Plan() {
             patchSettings.mutate({ tour: { planDone: true } });
           }}
         />
-      )}
-      {me?.role === 'owner' && (
-        <div className="mode-row">
-          <span className="seg" role="group" aria-label={t('share.viewAs')}>
-            {([false, true] as const).map((on) => (
-              <button
-                key={String(on)}
-                type="button"
-                className="seg-btn"
-                aria-pressed={asMember === on}
-                onClick={() => setAsMember(on)}
-              >
-                {t(on ? 'share.viewAs' : 'share.viewAsOff')}
-              </button>
-            ))}
-          </span>
-        </div>
       )}
       {plan.sharing?.previewAsMember && (
         <div className="risk-band info">{t('share.banner.preview')}</div>

@@ -2,7 +2,7 @@ import type { TranslationKey } from '@multa/i18n';
 import { useState } from 'react';
 import { ApiError } from '../lib/api.ts';
 import { Panel, Tag } from './ui/Panel.tsx';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   useImportBatches,
@@ -230,7 +230,7 @@ export function ImportExcel({ base }: { base: string }) {
           </div>
           {batches.map((batch) => (
             <div className="prow" key={batch.id}>
-              <span className="prow-day">{batch.createdAt.slice(5, 10)}</span>
+              <span className="prow-day">{formatDate(batch.createdAt)}</span>
               <span className="prow-name">
                 <span>{batch.filename}</span>
                 {batch.status === 'rolled_back' && <Tag>{t('imp.rolledBack')}</Tag>}

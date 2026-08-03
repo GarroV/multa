@@ -1,6 +1,6 @@
 import type { TranslationKey } from '@multa/i18n';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ReceiptEntry } from './components/ReceiptEntry.tsx';
 import { SpendEntry } from './components/SpendEntry.tsx';
@@ -27,6 +27,79 @@ const NAV: { to: string; key: TranslationKey; ownerOnly?: true }[] = [
   { to: '/settings', key: 'nav.settings' },
 ];
 
+type PlanSearch = { view?: 'table'; as?: 'member' };
+
+/**
+ * Инструменты экрана «План» в топбаре (2026-08-03).
+ *
+ * Раньше над планом стояли три полосы подряд: топбар, предпросмотр «глазами участника» и
+ * переключатель «панели/таблица». Две нижние несли по одному сегменту на всю ширину и отодвигали
+ * первую цифру вниз на треть экрана телефона — хром важнее содержимого выглядел как ошибка, ею и
+ * был.
+ *
+ * Оба переключателя стали пиктограммами и переехали сюда, к остальному управлению. Подписи
+ * остались — в `aria-label` и `title`: пиктограмма экономит место, но не смысл.
+ *
+ * Предпросмотр показывается только когда в воркспейсе есть кому смотреть. Владельцу-одиночке
+ * (а это все, пока он никого не позвал) предлагать «взгляд участника» не на что.
+ */
+function PlanTools({ hasMembers }: { hasMembers: boolean }) {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const search = useRouterState({ select: (s) => s.location.search as PlanSearch });
+  const isTable = search.view === 'table';
+  const isPreview = search.as === 'member';
+
+  return (
+    <>
+      <span className="seg" role="group" aria-label={t('plan.master.title')}>
+        {([false, true] as const).map((table) => (
+          <button
+            key={String(table)}
+            type="button"
+            className="seg-btn seg-icon"
+            aria-pressed={isTable === table}
+            aria-label={t(table ? 'plan.master.on' : 'plan.master.off')}
+            title={t(table ? 'plan.master.on' : 'plan.master.off')}
+            onClick={() =>
+              void navigate({
+                to: '/plan',
+                search: (prev: PlanSearch): PlanSearch => ({
+                  ...prev,
+                  view: table ? 'table' : undefined,
+                }),
+              })
+            }
+          >
+            {/* Полосы — панели друг под другом, клетка — таблица периодов. */}
+            {table ? '▦' : '▤'}
+          </button>
+        ))}
+      </span>
+      {hasMembers && (
+        <button
+          type="button"
+          className="act act-icon"
+          aria-pressed={isPreview}
+          aria-label={t(isPreview ? 'share.viewAsOff' : 'share.viewAs')}
+          title={t(isPreview ? 'share.viewAsOff' : 'share.viewAs')}
+          onClick={() =>
+            void navigate({
+              to: '/plan',
+              search: (prev: PlanSearch): PlanSearch => ({
+                ...prev,
+                as: isPreview ? undefined : 'member',
+              }),
+            })
+          }
+        >
+          {isPreview ? '◉' : '◎'}
+        </button>
+      )}
+    </>
+  );
+}
+
 export function AppShell() {
   const { t, locale, setLocale } = useI18n();
   const qc = useQueryClient();
@@ -40,9 +113,16 @@ export function AppShell() {
    * сервер их всё равно отклонит, а кнопка, которая всегда падает, — обман, а не ограничение.
    */
   const isMember = me?.role === 'member';
-  // Имя владельца в баннере: «чужой кабинет» без имени звучит тревожнее, чем есть на самом деле.
-  const { data: members } = useMembers(isMember);
+  /*
+   * Состав участников нужен обеим сторонам: участнику — имя владельца в баннере («чужой кабинет»
+   * без имени звучит тревожнее, чем есть), владельцу — знать, есть ли вообще кому смотреть его
+   * план: без приглашённых предпросмотр «глазами участника» показывать не на чем.
+   */
+  const { data: members } = useMembers(Boolean(me?.workspace));
   const ownerName = members?.members.find((m) => m.role === 'owner')?.name ?? '';
+  const hasMembers = (members?.members ?? []).some((m) => m.role !== 'owner');
+  // Инструменты вида относятся к плану: на других экранах они переключали бы невидимое.
+  const onPlan = useRouterState({ select: (s) => s.location.pathname.startsWith('/plan') });
 
   return (
     <div className="app-frame">
@@ -61,10 +141,22 @@ export function AppShell() {
           ))}
         </nav>
         <div className="topbar-right">
+          {/* Мастер-таблица матрицу видимости пока не умеет — участнику её не предлагаем (#46). */}
+          {onPlan && !isMember && <PlanTools hasMembers={hasMembers} />}
           {/* Ввод факта доступен с любого экрана: трату записывают на ходу (04-web-ux §Ввод). */}
           {base && !isMember && (
             <>
-              <button type="button" className="act" onClick={() => setSpendOpen(true)}>
+              {/*
+               * Главное действие продукта, и выглядит оно теперь как главное. Прежнее название
+               * «Записать трату» врало половиной: за кнопкой и трата, и приход, а приходу она
+               * нужнее — у кого доход ежедневный, тот заходит сюда отмечать смену, а не покупку.
+               */}
+              <button
+                type="button"
+                className="act act-primary"
+                title={t('spend.openHint')}
+                onClick={() => setSpendOpen(true)}
+              >
                 {t('spend.open')}
               </button>
               <button type="button" className="act" onClick={() => setReceiptOpen(true)}>

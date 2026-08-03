@@ -1,6 +1,6 @@
 import { fromMajor, parseEntry, toMajorString, money } from '@multa/core';
 import { useState } from 'react';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { ApiError } from '../lib/api.ts';
 import {
@@ -37,7 +37,7 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
   return (
     <div className="list-item">
       <span className="row" style={{ gap: 8 }}>
-        <span className="sub num">{tx.occurredOn.slice(5)}</span>
+        <span className="sub num">{formatDate(tx.occurredOn)}</span>
         <span>{catName ?? t('spend.noCategory')}</span>
         {tx.note && <span className="sub">· {tx.note}</span>}
         {del.isError && <span className="sub danger">⚠ {t('common.error')}</span>}

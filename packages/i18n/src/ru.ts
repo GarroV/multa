@@ -451,7 +451,8 @@ export const ru: Record<TranslationKey, string> = {
   'settings.signOut': 'Выйти',
 
   // Факт трат (Спринт 3)
-  'spend.open': 'Записать трату',
+  'spend.open': 'Записать',
+  'spend.openHint': 'Трата или приход',
   'spend.title': 'Что потратил?',
   'spend.subtitle': 'Крупным мазком — тоже нормально. Точность до копейки не нужна.',
   'spend.amount': 'Сколько',

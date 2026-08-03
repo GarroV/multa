@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePlanGrid, type GridCellDto, type GridGroupDto } from '../lib/queries.ts';
 
@@ -28,9 +28,6 @@ const GROUP_LABEL = {
   category: 'plan.groups.category',
   goal: 'plan.groups.goal',
 } as const;
-
-/** Месяц-день из ISO-даты: в шапке колонки год не нужен, места мало. */
-const shortDate = (iso: string): string => iso.slice(5).replace('-', '.');
 
 export function MasterGrid({ periods = 6 }: { periods?: number }) {
   const { t, locale } = useI18n();
@@ -111,7 +108,7 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
           <span className="mgrid-name">{t('plan.master.col1')}</span>
           {data.periods.map((p) => (
             <span className="mgrid-cell" key={p.startsOn}>
-              {shortDate(p.startsOn)}
+              {formatDate(p.startsOn)}
               {p.materialized && <i className="mgrid-now">{t('plan.master.now')}</i>}
             </span>
           ))}

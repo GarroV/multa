@@ -454,7 +454,8 @@ export const en = {
   'settings.signOut': 'Sign out',
 
   // Факт трат (Спринт 3)
-  'spend.open': 'Log a spend',
+  'spend.open': 'Log',
+  'spend.openHint': 'Spend or income',
   'spend.title': 'What did you spend?',
   'spend.subtitle': 'Broad strokes are fine — no need for exact cents.',
   'spend.amount': 'How much',

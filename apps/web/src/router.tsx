@@ -24,7 +24,20 @@ const todayRoute = createRoute({
     throw redirect({ to: '/plan' });
   },
 });
-const planRoute = createRoute({ getParentRoute: () => rootRoute, path: '/plan', component: Plan });
+/**
+ * Вид плана и предпросмотр живут в адресе, а не в состоянии экрана: оба переключателя переехали в
+ * топбар (он вне экрана и до его состояния не дотянется), а заодно ссылка стала честной — «покажи,
+ * как это выглядит таблицей» пересылается как ссылка, а не как инструкция куда нажать.
+ */
+const planRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/plan',
+  component: Plan,
+  validateSearch: (search: Record<string, unknown>): { view?: 'table'; as?: 'member' } => ({
+    ...(search.view === 'table' ? { view: 'table' as const } : {}),
+    ...(search.as === 'member' ? { as: 'member' as const } : {}),
+  }),
+});
 const statisticsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/statistics',

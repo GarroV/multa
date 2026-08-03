@@ -15,7 +15,8 @@ test('трата записывается и попадает в факт кат
   const groceries = page.locator('.prow', { hasText: 'Groceries' }).first();
   const before = await groceries.locator('.prow-num b').innerText();
 
-  await page.locator('.act', { hasText: 'Log a spend' }).click();
+  // Главное действие топбара: одна кнопка на трату и приход, поэтому и подпись без «траты».
+  await page.locator('.act-primary').click();
   const sheet = page.locator('.sheet');
   await expect(sheet).toBeVisible();
 

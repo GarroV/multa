@@ -1266,6 +1266,61 @@ a {
   border-radius: 5px;
   overflow: hidden;
 }
+/*
+ * Пиктограммная клетка сегмента: подпись ушла в aria-label и title, поэтому кнопка сжимается до
+ * квадрата, а глиф набирается крупнее обычной подписи — иначе он читается как опечатка, а не как
+ * значок.
+ */
+.seg-icon {
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 0;
+  padding: 5px 9px;
+}
+.act-icon {
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+/* Включённый предпросмотр обязан быть видно и без баннера: это чужой взгляд на свои деньги. */
+.act-icon[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/*
+ * Главное действие в топбаре — запись денег. Остальные кнопки там намеренно тихие (обводка на
+ * прозрачном), и на их фоне заливка читается как «начни отсюда», не требуя ни размера крупнее, ни
+ * восклицательного знака в подписи.
+ *
+ * Текст берёт цвет холста, а не белый: в светлой теме акцент тёмно-бирюзовый, и белый по нему
+ * прошёл бы по контрасту впритык, а чёрный в тёмной теме — единственный способ не светиться.
+ */
+.act-primary {
+  color: var(--bg-void);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.act-primary:hover {
+  background: var(--cyan-hi);
+  border-color: var(--cyan-hi);
+  color: var(--bg-void);
+}
+/*
+ * В светлой теме акцент светлее холста, поэтому заливка меняется на тёмный вариант: белым по
+ * #0089ab выходило 4.06:1, а подпись здесь 10px — ей нужно минимум 4.5. На тёмном варианте 7.4:1,
+ * и наведение уводит ещё темнее, а не светлее: иначе кнопка теряла бы контраст ровно в тот момент,
+ * когда на неё смотрят.
+ */
+:root[data-theme='light'] .act-primary {
+  background: var(--cyan-hi);
+  border-color: var(--cyan-hi);
+}
+:root[data-theme='light'] .act-primary:hover {
+  background: color-mix(in oklab, var(--cyan-hi) 82%, var(--ink));
+  border-color: color-mix(in oklab, var(--cyan-hi) 82%, var(--ink));
+}
 .seg-btn {
   font: inherit;
   font-family: var(--font-mono);
@@ -1395,14 +1450,6 @@ a {
 
 /* --- Мастер-режим: строки × периоды (issue #47) --------------------------------------------- */
 
-/* Переключатель взгляда живёт над содержимым плана и не спорит с ним за внимание. */
-.mode-row {
-  display: flex;
-  justify-content: flex-end;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
-}
-
 /*
  * Таблица шире экрана по определению: полгода колонок не помещаются в телефон. Скроллим её саму,
  * а не страницу — горизонтальный скролл документа ломает всё остальное.
@@ -1425,7 +1472,7 @@ a {
 .mgrid-row {
   display: grid;
   /* Первая колонка держит название, остальные равны между собой: числа сравниваются взглядом. */
-  grid-template-columns: 200px repeat(var(--cols), minmax(92px, 1fr));
+  grid-template-columns: 168px repeat(var(--cols), minmax(76px, 1fr));
   align-items: center;
   border-bottom: 1px solid var(--line);
   min-width: max-content;
@@ -1445,11 +1492,20 @@ a {
   white-space: nowrap;
 }
 .mgrid-cell {
-  padding: 7px 12px;
+  padding: 7px 10px;
+  /*
+   * Вертикальная сетка на грани видимости: колонки периодов сравнивают взглядом, и линия помогает
+   * держать строку, но стоит ей проявиться — таблица становится решёткой и спорит с числами.
+   * Поэтому не отдельный цвет, а разбавленный тот же --line: он сам меняется вместе с темой.
+   */
+  border-right: 1px solid color-mix(in oklab, var(--line) 45%, transparent);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
+}
+.mgrid-cell:last-child {
+  border-right: 0;
 }
 /* Прочерк вместо суммы: строка кончилась или её в этом периоде нет. Тише, чем настоящий ноль. */
 .mgrid-cell-off {
@@ -1535,9 +1591,6 @@ a {
     border-bottom: 1px solid var(--line);
   }
 
-  .dense-plan .mode-row {
-    order: 0;
-  }
   .dense-plan .kpi-hero {
     order: 1;
   }
@@ -1570,15 +1623,6 @@ a {
    */
   .pmap {
     padding-bottom: 44px;
-  }
-
-  /* Переключатели вида — служебная строка: на телефоне она не должна стоить экрана. */
-  .mode-row {
-    padding: 5px 12px;
-  }
-  .mode-row .seg-btn {
-    padding: 5px 10px;
-    font-size: 11px;
   }
 
   /* Герой на телефоне — единственная крупная цифра экрана, ей можно всю ширину. */

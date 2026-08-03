@@ -1,7 +1,7 @@
 import type { TranslationKey } from '@multa/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   useGoalFreeze,
@@ -52,7 +52,7 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
       case 'days':
         return t('signal.metric.days', { days: metric.days });
       case 'date':
-        return metric.on.slice(5);
+        return formatDate(metric.on);
     }
   };
 

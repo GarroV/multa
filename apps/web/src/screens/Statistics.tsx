@@ -3,7 +3,7 @@ import { ExchangeEntry } from '../components/ExchangeEntry.tsx';
 import { SignalsPanel } from '../components/SignalsPanel.tsx';
 import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   isOnboardingIncomplete,
@@ -63,7 +63,7 @@ function ExchangeRow({ op, locale }: { op: ExchangeOp; locale: string }) {
 
   return (
     <div className="prow">
-      <span className="prow-day">{op.occurredOn.slice(5)}</span>
+      <span className="prow-day">{formatDate(op.occurredOn)}</span>
       <span className="prow-name">
         <span className="mono">
           {formatMinor(op.fromMinor, op.fromCurrency, locale)} {op.fromCurrency}
