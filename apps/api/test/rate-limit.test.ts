@@ -31,14 +31,14 @@ function markerOf(res: Response): string {
 describe('ограничение частоты', () => {
   beforeEach(() => resetRateLimits());
 
-  test('перебор регистрации упирается в лимит и получает Retry-After', async () => {
-    const first = await call('/v1/auth/sign-up/email');
+  test('перебор дорогой ручки упирается в лимит и получает Retry-After', async () => {
+    // Пересев демо: пять на клиента в час — одна из самых дорогих операций в продукте.
+    const first = await call('/v1/demo/reset');
     const cookie = markerOf(first);
     expect(cookie).not.toBe('');
 
     let last = first;
-    // Правило: 10 в час одному клиенту. Одиннадцатый обязан быть отклонён.
-    for (let i = 0; i < 12; i += 1) last = await call('/v1/auth/sign-up/email', { cookie });
+    for (let i = 0; i < 6; i += 1) last = await call('/v1/demo/reset', { cookie });
 
     expect(last.status).toBe(429);
     expect(await last.json()).toMatchObject({ error: 'rate_limited' });
@@ -50,13 +50,13 @@ describe('ограничение частоты', () => {
      * Ровно та причина, по которой лимитер переписан. Первый клиент выбирает свой лимит целиком,
      * второй обязан работать как ни в чём не бывало.
      */
-    const alice = markerOf(await call('/v1/auth/sign-up/email'));
-    for (let i = 0; i < 12; i += 1) await call('/v1/auth/sign-up/email', { cookie: alice });
-    expect((await call('/v1/auth/sign-up/email', { cookie: alice })).status).toBe(429);
+    const alice = markerOf(await call('/v1/demo/reset'));
+    for (let i = 0; i < 6; i += 1) await call('/v1/demo/reset', { cookie: alice });
+    expect((await call('/v1/demo/reset', { cookie: alice })).status).toBe(429);
 
-    const bob = markerOf(await call('/v1/auth/sign-up/email'));
+    const bob = markerOf(await call('/v1/demo/reset'));
     expect(bob).not.toBe(alice);
-    expect((await call('/v1/auth/sign-up/email', { cookie: bob })).status).toBe(200);
+    expect((await call('/v1/demo/reset', { cookie: bob })).status).toBe(200);
   });
 
   test('общий потолок держит того, кто сбрасывает метку', async () => {
@@ -94,8 +94,8 @@ describe('ограничение частоты', () => {
      * Caddy за Tailscale подставляет docker-шлюз. Принять его за клиента значит вернуться ровно к
      * той ошибке, из-за которой всё переписано.
      */
-    const a = await call('/v1/auth/sign-up/email', { 'x-forwarded-for': '172.21.0.1' });
-    const b = await call('/v1/auth/sign-up/email', { 'x-forwarded-for': '172.21.0.1' });
+    const a = await call('/v1/transactions', { 'x-forwarded-for': '172.21.0.1' });
+    const b = await call('/v1/transactions', { 'x-forwarded-for': '172.21.0.1' });
     // Обоим выдана своя метка — значит их не склеили в один ключ.
     expect(markerOf(a)).not.toBe('');
     expect(markerOf(b)).not.toBe('');
@@ -107,5 +107,28 @@ describe('ограничение частоты', () => {
       const res = await call('/v1/health');
       expect(res.status).toBe(200);
     }
+  });
+
+  test('лимитер не трогает ответ входа: сессия обязана дожить до клиента', async () => {
+    /*
+     * Регрессия, пойманная вживую. Метка клиента ставилась на контекст, а better-auth возвращает
+     * свой объект Response со своими `Set-Cookie` — наша кука его заголовок вытесняла. Регистрация
+     * отвечала 200, сессионной куки в ответе не оказывалось, и следующий же запрос получал 401.
+     *
+     * Проверяем именно отсутствие вмешательства: на пути `/v1/auth/*` лимитер не должен добавлять
+     * в ответ ни одной своей куки.
+     */
+    const res = await call('/v1/auth/sign-up/email');
+    expect(markerOf(res)).toBe('');
+
+    // При этом сам лимит на этих путях работает — просто по общей корзине.
+    let blocked = false;
+    for (let i = 0; i < 70; i += 1) {
+      if ((await call('/v1/auth/sign-up/email')).status === 429) {
+        blocked = true;
+        break;
+      }
+    }
+    expect(blocked).toBe(true);
   });
 });

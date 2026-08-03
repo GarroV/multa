@@ -183,6 +183,8 @@ const sharingSettings = z.object({
   envelopes: shareMode.default('open'),
   categories: shareMode.default('open'),
   goals: shareMode.default('open'),
+  /** Регулярные платежи: в каскаде не участвуют, но имя платежа так же личное, как имя долга. */
+  recurring: shareMode.default('open'),
 });
 
 export type ShareMode = z.infer<typeof shareMode>;

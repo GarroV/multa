@@ -133,15 +133,29 @@ export const rateLimit = createMiddleware(async (c, next) => {
 
   let client = clientOf(c);
   if (!client) {
-    // Метки нет — выдаём. Первый запрос при этом считается за новым клиентом, а не за «всеми».
-    client = `c:${randomUUID().replaceAll('-', '')}`;
-    setCookie(c, CLIENT_COOKIE, client.slice(2), {
-      httpOnly: true,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: 365 * 24 * 3600,
-      secure: c.req.url.startsWith('https://'),
-    });
+    /*
+     * Метку выдаём где угодно, кроме `/v1/auth/*`.
+     *
+     * Причина конкретная и поймана вживую: better-auth возвращает СВОЙ объект Response со своими
+     * `Set-Cookie`, и кука, поставленная нами на контекст, его заголовок вытесняла — регистрация
+     * отвечала 200, но сессионной куки в ответе не оказывалось, и следующий же запрос получал 401.
+     *
+     * Интерфейс дёргает `/v1/me` при загрузке, поэтому к моменту входа метка уже есть. Клиент,
+     * который пришёл сразу на auth без метки, попадает в общую корзину — грубее, но безопаснее:
+     * общий потолок правила его всё равно держит, а сессию мы ему не ломаем.
+     */
+    if (path.startsWith('/v1/auth/')) {
+      client = 'anon';
+    } else {
+      client = `c:${randomUUID().replaceAll('-', '')}`;
+      setCookie(c, CLIENT_COOKIE, client.slice(2), {
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 365 * 24 * 3600,
+        secure: c.req.url.startsWith('https://'),
+      });
+    }
   }
 
   const denied =

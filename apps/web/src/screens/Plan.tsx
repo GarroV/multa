@@ -190,8 +190,8 @@ function CategoryRow({ a, base, locale }: { a: PlanAllocation; base: string; loc
  */
 function ForecastPanel({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
-  // Участнику прогноз закрыт: он назвал бы имена скрытых долгов и целей.
-  const { data } = useForecast(!useIsMember());
+  // Прогноз научен матрице (issue #84): имена закрытых разделов в него не попадают.
+  const { data } = useForecast();
   if (!data || (data.dueSoon.length === 0 && data.events.length === 0)) return null;
 
   const label = (e: ForecastEvent): string => {
@@ -328,7 +328,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   const base = plan.baseCurrency;
   // Участник совместного доступа: часть ручек ему закрыта, панели на них не строим (issue #46).
   const isMember = useIsMember();
-  const forecast = useForecast(!isMember);
+  const forecast = useForecast();
   // Пересборка живёт в строке категории (там известно, сколько не хватает), поэтому баннер
   // риска не открывает свой модал, а раскрывает редактор категорий — оттуда один шаг до варианта.
   const [editingCats, setEditingCats] = useState(false);

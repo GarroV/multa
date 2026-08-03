@@ -97,6 +97,9 @@ export const requireWorkspace = createMiddleware<{ Variables: AppVariables }>(as
 const SHARING_AWARE = [
   /** Фильтруется `applySharing`: скрытое сворачивается в «Личное», а не исчезает. */
   '/v1/plan/current',
+  /** Сигналы и прогноз выбрасывают всё, что называет закрытый раздел по имени (issue #84). */
+  '/v1/signals',
+  '/v1/forecast',
   /** Состав участников и собственная роль; матрицу видимости участник видит как свои ограничения. */
   '/v1/workspace/members',
   /** Пороги и предпочтения воркспейса — денег в них нет. */
@@ -105,6 +108,7 @@ const SHARING_AWARE = [
 
 /** Списки разделов: у них свой сторож `requireSection`, который знает режим раздела. */
 const SECTION_GUARDED = [
+  '/v1/recurring-items',
   '/v1/debts',
   '/v1/envelopes',
   '/v1/goals',
@@ -139,7 +143,8 @@ export async function roleIn(workspaceId: string, userId: string): Promise<Works
 }
 
 /** Разделы, у которых есть режим видимости (issue #46). */
-export type ShareSection = 'income' | 'debts' | 'buckets' | 'envelopes' | 'categories' | 'goals';
+export type ShareSection =
+  'income' | 'debts' | 'buckets' | 'envelopes' | 'categories' | 'goals' | 'recurring';
 
 /**
  * Доступ участника к списку раздела. Владельцу — всегда; участнику — только когда раздел открыт.

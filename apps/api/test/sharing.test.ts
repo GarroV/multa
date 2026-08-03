@@ -215,10 +215,7 @@ describe('совместный доступ', () => {
     await setMode(owner, 'goals', 'hidden');
 
     for (const path of [
-      '/v1/signals',
-      '/v1/forecast',
       '/v1/plan/grid?periods=3',
-      '/v1/recurring-items',
       '/v1/analytics/categories',
       '/v1/analytics/spread',
       '/v1/exchange-ops',
@@ -237,6 +234,45 @@ describe('совместный доступ', () => {
     const plan = await planOf(member);
     expect(JSON.stringify(plan)).not.toContain('Мотоцикл');
     expect(plan.sharing.hiddenMinor).toBe('500000');
+  });
+
+  test('обученные ручки отдаются участнику, но без имён из закрытых разделов', async () => {
+    /*
+     * Продолжение #84. Сигналы, прогноз и регулярные платежи научены матрице, поэтому участник их
+     * получает — но «Мотоцикл» и «СЕКРЕТНЫЙ ПЛАТЁЖ» в них не появляются, пока раздел закрыт.
+     */
+    const { owner, member } = await pair();
+    await expectOk(
+      await owner.post('/v1/recurring-items', {
+        name: 'СЕКРЕТНЫЙ ПЛАТЁЖ',
+        amountMinor: '150000',
+        currency: 'RUB',
+        schedule: { kind: 'each-payout' },
+      }),
+      201,
+    );
+    await setMode(owner, 'goals', 'hidden');
+    await setMode(owner, 'recurring', 'hidden');
+
+    const signals = await member.get('/v1/signals');
+    expect(signals.status).toBe(200);
+    expect(JSON.stringify(await signals.json())).not.toContain('Мотоцикл');
+
+    const forecast = await member.get('/v1/forecast');
+    expect(forecast.status).toBe(200);
+    const body = JSON.stringify(await forecast.json());
+    expect(body).not.toContain('Мотоцикл');
+    expect(body).not.toContain('СЕКРЕТНЫЙ ПЛАТЁЖ');
+
+    // Список закрытого раздела по-прежнему отвечает отказом, а не пустотой.
+    expect((await member.get('/v1/recurring-items')).status).toBe(403);
+
+    // Открыли — и всё вернулось: закрыт был раздел, а не ручка.
+    await setMode(owner, 'goals', 'open');
+    await setMode(owner, 'recurring', 'open');
+    const openList = await member.get('/v1/recurring-items');
+    expect(openList.status).toBe(200);
+    expect(JSON.stringify(await openList.json())).toContain('СЕКРЕТНЫЙ ПЛАТЁЖ');
   });
 
   test('владельца новый сторож не трогает', async () => {

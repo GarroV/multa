@@ -1,6 +1,7 @@
 import { fromMajor } from '@multa/core';
 import { useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
+import { useIsMember } from '../lib/role.ts';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -713,12 +714,17 @@ function BucketsSection({ base }: SectionProps) {
 export function Obligations() {
   const { data: me } = useMe();
   const base = me?.workspace?.baseCurrency ?? 'RUB';
+  /*
+   * Участник совместного доступа смотрит и не правит (issue #46). Счета матрицы не знают вовсе,
+   * поэтому их раздел ему не показываем — иначе он получит отказ вместо содержимого (issue #84).
+   */
+  const isMember = useIsMember();
   return (
     <div className="dense">
       {/* Четыре вида обязательств равнозначны: две колонки, ни один не главнее. */}
       <div className="panels">
         <div className="col">
-          <AccountsSection base={base} />
+          {!isMember && <AccountsSection base={base} />}
           <DebtsSection base={base} />
           <GoalsSection base={base} />
         </div>

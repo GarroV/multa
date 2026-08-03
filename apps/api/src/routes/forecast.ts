@@ -12,6 +12,8 @@ import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import { debts, goals, recurringItems } from '../db/schema/domain.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
+import { sectionVisible } from '../plan/sharing.ts';
+import { settingsOf } from '../settings/store.ts';
 
 /**
  * Прогноз-таймлайн (Спринт 4): когда закроются долги, когда соберутся цели и где риск.
@@ -25,15 +27,16 @@ const HORIZON_PERIODS = 12;
 forecastRoute.get('/forecast', async (c) => {
   const ws = c.get('workspace')!;
   if (!ws.periodAnchors) return c.json({ error: 'onboarding_incomplete' }, 409);
-  return c.json(await forecastOf(ws));
+  return c.json(await forecastOf(ws, c.get('role') === 'member'));
 });
 
 /**
  * Прогноз как функция: его читает и ручка, и движок сигналов (issue #50). «Долг закроется» должно
  * считаться одним кодом, иначе лента «Что впереди» и сигнал разойдутся в датах.
  */
-export async function forecastOf(ws: Workspace) {
+export async function forecastOf(ws: Workspace, asMember = false) {
   const asOf = today(ws.timezone);
+  const sharing = settingsOf(ws).sharing;
 
   const [current] = generatePeriods(ws.periodAnchors as PeriodConfig, asOf, 2);
   // Период не определяется — это сбой ритма, а не пустой прогноз: молчать здесь нельзя.
@@ -90,9 +93,22 @@ export async function forecastOf(ws: Workspace) {
     })),
   });
 
+  /*
+   * Матрица видимости (issue #84): события называют долг и цель по имени, а `dueSoon` — регулярный
+   * платёж. Закрытый раздел не должен протекать через ленту «Что впереди».
+   */
+  const visibleEvents = events.filter((e) =>
+    sectionVisible(
+      e.kind === 'goal_at_risk' || e.kind === 'goal_reached' ? 'goal' : 'debt',
+      sharing,
+      asMember,
+    ),
+  );
+  const recurringVisible = !asMember || sharing.recurring === 'open';
+
   return {
     horizonPeriods: HORIZON_PERIODS,
-    dueSoon: dueSoon.map((d) => ({
+    dueSoon: (recurringVisible ? dueSoon : []).map((d) => ({
       id: d.id,
       name: d.name,
       amountMinor: d.amountMinor.toString(),
@@ -100,7 +116,7 @@ export async function forecastOf(ws: Workspace) {
       on: d.on,
       showOnMap: showOnMap.get(d.id) ?? true,
     })),
-    events: events.map((e) => ({
+    events: visibleEvents.map((e) => ({
       kind: e.kind,
       targetId: e.targetId,
       name: e.name,

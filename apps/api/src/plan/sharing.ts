@@ -23,6 +23,23 @@ const SECTION_OF: Record<string, keyof SharingSettings> = {
   goal: 'goals',
 };
 
+/**
+ * Виден ли участнику раздел, к которому относится строка (issue #84).
+ *
+ * Общая для всех ручек, а не только для плана: сигналы, прогноз и мастер-сетка называют долги и
+ * цели по имени, и без этой проверки закрытый раздел утекал бы через них. Владелец видит всё.
+ */
+export function sectionVisible(
+  targetKind: string,
+  sharing: SharingSettings,
+  asMember: boolean,
+): boolean {
+  if (!asMember) return true;
+  const section = SECTION_OF[targetKind];
+  // Строка вне матрицы (например регулярный платёж) прячется вместе со своим разделом отдельно.
+  return section === undefined ? true : sharing[section] === 'open';
+}
+
 export interface PlanSharingDto {
   /** Кто смотрит: владелец видит всё, участник — по матрице. */
   role: WorkspaceRole;

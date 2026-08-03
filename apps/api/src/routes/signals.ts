@@ -4,6 +4,7 @@ import { today } from '../clock.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import { getCurrentPlan } from '../plan/assemble.ts';
 import { settingsOf } from '../settings/store.ts';
+import { sectionVisible } from '../plan/sharing.ts';
 import { balancesOf } from './accounts.ts';
 import { categoryAnalytics } from './analytics.ts';
 import { forecastOf } from './forecast.ts';
@@ -27,6 +28,14 @@ function serializeMetric(metric: SignalMetric) {
   return metric.kind === 'money'
     ? { kind: metric.kind, minor: metric.minor.toString(), currency: metric.currency }
     : metric;
+}
+
+/** К какому виду строки относится правило: по нему и определяется раздел матрицы. */
+function sectionKindOf(rule: string): string {
+  if (rule === 'median_overrun' || rule === 'volatile_category') return 'category';
+  if (rule === 'goal_at_risk') return 'goal';
+  if (rule === 'freed_money' || rule === 'debt_closing') return 'debt';
+  return '';
 }
 
 signalsRoute.get('/signals', async (c) => {
@@ -98,9 +107,21 @@ signalsRoute.get('/signals', async (c) => {
     maxSignals: settings.signals.maxSignals,
   });
 
+  /*
+   * Матрица видимости (issue #84). Сигнал называет цель по имени — «На "Мотоцикл" не хватает», —
+   * поэтому закрытый раздел утёк бы через него целиком. Сигналы без цели (темп трат, доля
+   * зафиксированного) имени не раскрывают и остаются: участник видит те же деньги в плане.
+   */
+  const asMember = c.get('role') === 'member';
+  const visible = signals.filter((s) =>
+    s.targetId === undefined
+      ? true
+      : sectionVisible(sectionKindOf(s.rule), settings.sharing, asMember),
+  );
+
   return c.json({
     baseCurrency: plan.baseCurrency,
-    signals: signals.map((s) => ({
+    signals: visible.map((s) => ({
       id: s.id,
       rule: s.rule,
       severity: s.severity,

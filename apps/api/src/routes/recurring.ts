@@ -3,7 +3,7 @@ import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { recurringItems } from '../db/schema/domain.ts';
-import { requireWorkspace, type AppVariables } from '../middleware.ts';
+import { requireSection, requireWorkspace, type AppVariables } from '../middleware.ts';
 import { recurringCreateSchema, recurringPatchSchema } from '../validation.ts';
 
 /**
@@ -30,7 +30,7 @@ function serialize(row: typeof recurringItems.$inferSelect) {
   };
 }
 
-recurringRoute.get('/recurring-items', async (c) => {
+recurringRoute.get('/recurring-items', requireSection('recurring'), async (c) => {
   const ws = c.get('workspace')!;
   const rows = await db
     .select()

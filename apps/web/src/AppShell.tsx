@@ -17,10 +17,13 @@ import { useTheme } from './lib/theme.ts';
 
 const NAV: { to: string; key: TranslationKey; ownerOnly?: true }[] = [
   { to: '/plan', key: 'nav.plan' },
-  // Статистика и обязательства пока не умеют матрицу видимости (issue #46): участнику их ручки
-  // закрыты, и вкладка вела бы на экран из одних сообщений об отказе.
+  /*
+   * «Статистика» участнику пока закрыта: её ручки (аналитика категорий, спред по провайдерам,
+   * история разменов) матрицу видимости ещё не умеют — issue #84. Открывать вкладку раньше, чем
+   * это сделано, значит вести человека на экран из сообщений об отказе.
+   */
   { to: '/statistics', key: 'nav.statistics', ownerOnly: true },
-  { to: '/obligations', key: 'nav.obligations', ownerOnly: true },
+  { to: '/obligations', key: 'nav.obligations' },
   { to: '/settings', key: 'nav.settings' },
 ];
 
