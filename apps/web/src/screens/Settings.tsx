@@ -10,7 +10,12 @@ import { Panel, Tag } from '../components/ui/Panel.tsx';
 import { api } from '../lib/api.ts';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { payoutsToSources, rhythmToPayload, type RhythmForm } from '../lib/income.ts';
+import {
+  draftToSource,
+  rhythmToPayload,
+  type RhythmForm,
+  type SourceDraft,
+} from '../lib/income.ts';
 import {
   useCreateIncomeSource,
   useDeleteIncomeSource,
@@ -58,12 +63,27 @@ function amountLabel(amount: unknown, currency: string, locale: string): string 
   return '—';
 }
 
+/** Короткое имя дня недели в языке интерфейса: 0 — воскресенье, как у `Date.getUTCDay`. */
+function weekdayName(weekday: number, locale: string): string {
+  // 2026-08-02 — воскресенье; сдвигом от него получаем любой день недели без таблицы имён.
+  const date = new Date(Date.UTC(2026, 7, 2 + weekday));
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(date);
+}
+
 /** Читаемое расписание источника. */
-function scheduleLabel(schedule: unknown): string {
-  const s = schedule as { kind?: string; days?: number[]; weeks?: number; date?: string };
+function scheduleLabel(schedule: unknown, locale: string, everyDay: string): string {
+  const s = schedule as {
+    kind?: string;
+    days?: number[];
+    weeks?: number;
+    date?: string;
+    weekday?: number;
+  };
   if (s?.kind === 'monthly-days') return (s.days ?? []).join(', ');
   if (s?.kind === 'every-weeks') return `×${s.weeks}`;
   if (s?.kind === 'one-off') return s.date ?? '—';
+  if (s?.kind === 'daily') return everyDay;
+  if (s?.kind === 'weekly') return weekdayName(s.weekday ?? 1, locale);
   return '—';
 }
 
@@ -89,13 +109,22 @@ export function Settings() {
   const removeSource = useDeleteIncomeSource();
   const addSource = useCreateIncomeSource();
 
-  // Новая выплата: метка + число месяца + сумма. Здесь же закрывается путь после «пропустить настройку».
-  const [draft, setDraft] = useState({ label: '', day: 25, amount: '' });
-  const draftPayload = payoutsToSources([{ ...draft, percent: '' }], {
+  /*
+   * Новая выплата: ритм + метка + сумма. Ритм бывает не только «числом месяца»: у смен, такси и
+   * торговли доход ежедневный или недельный, и без этого выбора такой человек упирался в форму,
+   * которая его случай не описывает.
+   */
+  const [draft, setDraft] = useState<SourceDraft>({
+    label: '',
+    kind: 'monthly',
+    day: 25,
+    weekday: 5,
+    amount: '',
+  });
+  const draftPayload = draftToSource(draft, {
     currency: ws?.baseCurrency ?? 'RUB',
-    usePercent: false,
-    gross: '',
-  })[0];
+    sort: sources.length,
+  });
 
   const [currency, setCurrency] = useState(ws?.baseCurrency ?? 'RUB');
   const [rhythm, setRhythm] = useState<RhythmForm>(
@@ -225,16 +254,45 @@ export function Settings() {
                   value={draft.label}
                   onChange={(e) => setDraft({ ...draft, label: e.target.value })}
                 />
-                <input
-                  className="field num field-ccy"
-                  inputMode="numeric"
-                  aria-label={t('income.amounts.day')}
-                  value={draft.day}
-                  onChange={(e) => {
-                    const n = Number(e.target.value.replace(/\D/g, ''));
-                    setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
-                  }}
-                />
+                <select
+                  className="field field-sm"
+                  aria-label={t('income.kind.legend')}
+                  value={draft.kind}
+                  onChange={(e) =>
+                    setDraft({ ...draft, kind: e.target.value as SourceDraft['kind'] })
+                  }
+                >
+                  <option value="monthly">{t('income.kind.monthly')}</option>
+                  <option value="weekly">{t('income.kind.weekly')}</option>
+                  <option value="daily">{t('income.kind.daily')}</option>
+                </select>
+                {/* Ежедневному доходу день не нужен: поле, которое ни на что не влияет, только врёт. */}
+                {draft.kind === 'monthly' && (
+                  <input
+                    className="field num field-ccy"
+                    inputMode="numeric"
+                    aria-label={t('income.amounts.day')}
+                    value={draft.day}
+                    onChange={(e) => {
+                      const n = Number(e.target.value.replace(/\D/g, ''));
+                      setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
+                    }}
+                  />
+                )}
+                {draft.kind === 'weekly' && (
+                  <select
+                    className="field field-sm"
+                    aria-label={t('income.kind.weekday')}
+                    value={draft.weekday}
+                    onChange={(e) => setDraft({ ...draft, weekday: Number(e.target.value) })}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                      <option value={d} key={d}>
+                        {weekdayName(d, locale)}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <input
                   className="field num field-sm"
                   inputMode="decimal"
@@ -249,10 +307,9 @@ export function Settings() {
                   disabled={addSource.isPending || !draftPayload}
                   onClick={() =>
                     draftPayload &&
-                    addSource.mutate(
-                      { ...draftPayload, sort: sources.length },
-                      { onSuccess: () => setDraft({ label: '', day: 25, amount: '' }) },
-                    )
+                    addSource.mutate(draftPayload, {
+                      onSuccess: () => setDraft({ ...draft, label: '', amount: '' }),
+                    })
                   }
                 >
                   {t('common.add')}
@@ -290,7 +347,9 @@ export function Settings() {
           )}
           {sources.map((s) => (
             <div className="prow" key={s.id}>
-              <span className="prow-day">{scheduleLabel(s.schedule)}</span>
+              <span className="prow-day">
+                {scheduleLabel(s.schedule, locale, t('income.kind.dailyShort'))}
+              </span>
               <span className="prow-name">
                 <span>{s.label}</span>
                 {s.stability === 'variable' && <Tag tone="amber">{t('income.variable')}</Tag>}

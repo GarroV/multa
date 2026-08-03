@@ -7,6 +7,7 @@ import {
   rhythmToConfig,
   rhythmToPayload,
   withRhythmKind,
+  draftToSource,
   type RhythmForm,
 } from './income.ts';
 
@@ -178,5 +179,58 @@ describe('percentSum', () => {
 
   it('пустой процент считает нулём', () => {
     expect(percentSum([{ label: 'a', day: 10, amount: '', percent: '' }])).toBe(0);
+  });
+});
+
+/**
+ * Несистемный доход (2026-08-03). Первый живой тестировщик бросил онбординг: доход у неё
+ * ежедневный, а форма умела только «число месяца». «Когда как» её случай не описывает — доход
+ * предсказуем частотой, и он обязан попадать в план.
+ */
+describe('draftToSource', () => {
+  const opts = { currency: 'RUB' } as const;
+
+  it('ежедневный доход → расписание daily и сумма за раз', () => {
+    const out = draftToSource(
+      { label: 'Смены', kind: 'daily', day: 25, weekday: 5, amount: '2500' },
+      opts,
+    );
+    expect(out).toEqual({
+      label: 'Смены',
+      currency: 'RUB',
+      schedule: { kind: 'daily' },
+      amount: { kind: 'absolute', amountMinor: '250000' },
+      // Ежедневный доход по своей природе плавает: помечаем его так, а не выдаём за оклад.
+      stability: 'variable',
+      active: true,
+      sort: 0,
+    });
+  });
+
+  it('недельный доход → расписание weekly с днём недели', () => {
+    const out = draftToSource(
+      { label: 'Пятницы', kind: 'weekly', day: 25, weekday: 5, amount: '8000' },
+      opts,
+    );
+    expect(out?.schedule).toEqual({ kind: 'weekly', weekday: 5 });
+    expect(out?.stability).toBe('variable');
+  });
+
+  it('число месяца → прежнее monthly-days и «оклад»', () => {
+    const out = draftToSource(
+      { label: 'Аванс', kind: 'monthly', day: 10, weekday: 5, amount: '30000' },
+      opts,
+    );
+    expect(out?.schedule).toEqual({ kind: 'monthly-days', days: [10] });
+    expect(out?.stability).toBe('fixed');
+  });
+
+  it('пустая метка или нечисловая сумма → null, а не источник с нулём', () => {
+    expect(
+      draftToSource({ label: '', kind: 'daily', day: 1, weekday: 1, amount: '10' }, opts),
+    ).toBe(null);
+    expect(
+      draftToSource({ label: 'Смены', kind: 'daily', day: 1, weekday: 1, amount: '—' }, opts),
+    ).toBe(null);
   });
 });

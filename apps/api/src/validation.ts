@@ -61,6 +61,13 @@ export const incomeScheduleSchema = z.discriminatedUnion('kind', [
     startsOn: isoDate,
   }),
   z.object({ kind: z.literal('one-off'), date: isoDate }),
+  /*
+   * Ежедневный и недельный доход — не «нерегулярный»: он предсказуем частотой, а не датами.
+   * Без них смена, такси и торговля попадали в «когда как» и выпадали из плана вместе с цифрой дня.
+   */
+  z.object({ kind: z.literal('daily') }),
+  // 0 — воскресенье, как у `Date.getUTCDay`: ядро считает по тому же соглашению.
+  z.object({ kind: z.literal('weekly'), weekday: z.number().int().min(0).max(6) }),
   z.object({ kind: z.literal('irregular') }),
 ]);
 

@@ -139,6 +139,56 @@ export function payoutsToSources(
   return out;
 }
 
+/** Вид ритма отдельного источника — шире ритма периода: доход бывает чаще, чем период. */
+export type SourceKind = 'monthly' | 'daily' | 'weekly';
+
+export interface SourceDraft {
+  label: string;
+  kind: SourceKind;
+  /** Число месяца — для `monthly`. */
+  day: number;
+  /** День недели для `weekly`; 0 — воскресенье, как у `Date.getUTCDay`. */
+  weekday: number;
+  amount: string;
+}
+
+/**
+ * Черновик формы → источник дохода.
+ *
+ * Ежедневный и недельный доход существуют отдельно от «когда как»: смена, такси и торговля
+ * предсказуемы частотой, а не датами, и обязаны попадать в план — иначе у человека нет цифры дня,
+ * ради которой он и пришёл. Сумма при этом означает «за раз», а не «за период».
+ *
+ * `variable` у них не украшение: такой доход плавает от дня ко дню, и выдавать его за оклад
+ * значило бы обещать точность, которой нет.
+ */
+export function draftToSource(
+  draft: SourceDraft,
+  opts: { currency: string; sort?: number },
+): SourcePayload | null {
+  const label = draft.label.trim();
+  if (!label) return null;
+  const amountMinor = toMinor(draft.amount, opts.currency);
+  if (!amountMinor || amountMinor === '0') return null;
+
+  const schedule =
+    draft.kind === 'daily'
+      ? { kind: 'daily' }
+      : draft.kind === 'weekly'
+        ? { kind: 'weekly', weekday: draft.weekday }
+        : { kind: 'monthly-days', days: [draft.day] };
+
+  return {
+    label,
+    currency: opts.currency,
+    schedule,
+    amount: { kind: 'absolute', amountMinor },
+    stability: draft.kind === 'monthly' ? 'fixed' : 'variable',
+    active: true,
+    sort: opts.sort ?? 0,
+  };
+}
+
 /** Сумма процентов выплат — для информационной подсказки (жёсткой валидации нет). */
 export function percentSum(payouts: readonly PayoutForm[]): number {
   return payouts.reduce((acc, p) => {
