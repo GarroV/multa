@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePlanGrid, type GridCellDto, type GridGroupDto } from '../lib/queries.ts';
@@ -62,10 +63,27 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
     </span>
   );
 
+  /* Куда идти заполнять раздел: доход — в настройки, остальное — на «Обязательства». */
+  const SECTION_HREF: Record<string, string> = {
+    income: '/settings',
+    debt: '/obligations',
+    bucket: '/obligations',
+    envelope: '/obligations',
+    goal: '/obligations',
+  };
+
   const group = (g: GridGroupDto) => (
     <div className="mgrid-group" key={g.kind}>
       <div className="mgrid-row mgrid-row-head">
-        <span className="mgrid-name">{t(GROUP_LABEL[g.kind])}</span>
+        <span className="mgrid-name">
+          {t(GROUP_LABEL[g.kind])}
+          {/* Пустой раздел — не украшение, а приглашение: строку заводят в своём разделе. */}
+          {g.rows.length === 0 && SECTION_HREF[g.kind] && (
+            <Link className="act mgrid-add" to={SECTION_HREF[g.kind]}>
+              {t('plan.master.addRow')}
+            </Link>
+          )}
+        </span>
         {g.totals.map((v, i) => (
           <span className="mgrid-cell" key={i}>
             {fmt(v)}

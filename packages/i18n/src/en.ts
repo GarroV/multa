@@ -228,6 +228,7 @@ export const en = {
   'plan.master.on': 'Table',
   'plan.master.off': 'Panels',
   'plan.master.col1': 'Line',
+  'plan.master.addRow': 'add',
   'plan.master.now': 'now',
   'plan.master.free': 'Free remainder',
   'plan.master.perDay': 'Per day',

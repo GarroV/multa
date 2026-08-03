@@ -241,10 +241,14 @@ export function projectGrid(input: GridInput): Grid {
   });
 
   // Порядок строк = порядок каскада: таблица читается сверху вниз так же, как раздаются деньги.
+  /*
+   * Разделы показываем все пять, даже пустые. Пустая таблица без разделов — это лист бумаги: она
+   * не показывает, что вообще можно заполнить. Человек, пришедший из Excel, ждёт готовую форму со
+   * строками «долги», «корзины», «конверты», «категории», «цели» — и заполняет её по месту.
+   */
   const groups: GridGroup[] = [];
   for (const kind of GROUP_ORDER) {
     const groupRows = built.filter((r) => r.targetKind === kind);
-    if (groupRows.length === 0) continue;
     const totals = periods.map((_, i) =>
       groupRows.reduce((acc, r) => acc + (r.cells[i]?.minor ?? 0n), 0n),
     );
