@@ -211,6 +211,50 @@ describe('пересборка из обязательства (находка �
     expect(BigInt(plan.compressedMinor)).toBe(0n);
   });
 
+  test('перенос из конверта переживает следующую пересборку плана', async () => {
+    /*
+     * Конверты, в отличие от целей, пересобираются из своей таблицы при каждом открытии плана.
+     * Списание, сделанное пересборкой, обязано это пережить — иначе человек переносит деньги,
+     * видит результат, обновляет страницу и обнаруживает, что ничего не произошло.
+     *
+     * Тест вырос из отладочной пробы (issue #74): гипотезу она проверяла, но не утверждала ничего —
+     * `expect(true).toBe(true)` и стена console.log.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    await expectOk(
+      await client.post('/v1/envelopes', {
+        name: 'Подушка',
+        currency: 'RUB',
+        ruleKind: 'fixed',
+        ruleValue: '2000000',
+      }),
+      201,
+    );
+    const envelopes = await expectOk<{ id: string; name: string }[]>(
+      await client.get('/v1/envelopes'),
+    );
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '400000' }),
+    );
+
+    await expectOk(
+      await client.post('/v1/plan/current/rebalance', {
+        fromKind: 'envelope',
+        fromId: envelopes.find((e) => e.name === 'Подушка')!.id,
+        toId: food,
+        amountMinor: '300000',
+      }),
+    );
+
+    // getPlan пересобирает период — именно здесь списание и терялось.
+    const plan = await getPlan(client);
+    const envelope = plan.allocations.find((a) => a.targetKind === 'envelope')!;
+    const category = plan.allocations.find((a) => a.targetId === food)!;
+    expect(BigInt(envelope.allocatedMinor)).toBe(1_700_000n);
+    expect(BigInt(category.allocatedMinor)).toBe(700_000n);
+  });
+
   test('прибавка выживает и при порядке сжатия «категории первыми»', async () => {
     const client = await onboarded({ payoutMinor: '30000000' });
     const { food, goalA } = await tightPlan(client);
