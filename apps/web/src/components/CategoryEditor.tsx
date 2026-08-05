@@ -88,10 +88,9 @@ function CategoryRow({
 
   return (
     <div className="list-item">
-      <span className="row" style={{ gap: 8 }}>
+      <span className="row row-8">
         <button
           className="btn btn-ghost"
-          style={{ padding: '2px 8px' }}
           aria-pressed={cat.protected}
           title={t(cat.protected ? 'cat.protected.on' : 'cat.protected.off')}
           onClick={() => patch.mutate({ id: cat.id, protected: !cat.protected })}
@@ -110,13 +109,13 @@ function CategoryRow({
           <span className={`sub num${overspent ? ' st-over' : ''}`}>· {factLabel}</span>
         )}
         {rowError && (
-          <span className="danger" title={t('common.error')} style={{ fontSize: 13 }}>
+          <span className="danger text-sm" title={t('common.error')}>
             ⚠ {t('common.retry')}
           </span>
         )}
         {badInput && <span className="sub danger">{t('spend.badAmount')}</span>}
       </span>
-      <span className="row" style={{ gap: 8 }}>
+      <span className="row row-8">
         <input
           className="field num field-sm"
           inputMode="decimal"
@@ -126,12 +125,10 @@ function CategoryRow({
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
-        <span className="sub num" style={{ width: 32 }}>
-          {base}
-        </span>
+        <span className="sub num num-w-32">{base}</span>
         {budget?.advice && (
-          <span className="row" style={{ gap: 6 }}>
-            <span className="dim" style={{ fontSize: 12 }}>
+          <span className="row row-6">
+            <span className="dim text-xs">
               {t(budget.advice.kind === 'raise' ? 'advice.raise' : 'advice.lower', {
                 amount: `${formatMinor(budget.advice.suggestedMinor, base, locale)} ${base}`,
                 periods: budget.advice.periods,
@@ -139,7 +136,6 @@ function CategoryRow({
             </span>
             <button
               className="btn btn-ghost"
-              style={{ padding: '2px 8px', fontSize: 12 }}
               onClick={() => {
                 const next = budget.advice!.suggestedMinor;
                 setVal(toMajorString(money(BigInt(next), base)));
@@ -155,7 +151,6 @@ function CategoryRow({
         {overspent && budget && (
           <button
             className="btn btn-ghost"
-            style={{ padding: '4px 10px', fontSize: 12 }}
             title={t('rebalance.open')}
             onClick={() => setRebalancing(true)}
           >
@@ -175,7 +170,6 @@ function CategoryRow({
         {!cat.isSystem && (
           <button
             className="btn btn-ghost"
-            style={{ padding: '4px 10px' }}
             title={t('common.delete')}
             onClick={() => del.mutate(cat.id)}
           >
@@ -227,7 +221,7 @@ export function CategoryEditor({
           locale={locale}
         />
       ))}
-      <div className="form-row" style={{ marginTop: 10 }}>
+      <div className="form-row mt-md">
         <input
           className="field grow"
           placeholder={t('cat.new.placeholder')}
@@ -239,11 +233,7 @@ export function CategoryEditor({
           {t('common.add')}
         </button>
       </div>
-      {create.isError && (
-        <div className="sub danger" style={{ marginTop: 6 }}>
-          ⚠ {t('common.error')}
-        </div>
-      )}
+      {create.isError && <div className="sub danger mt-sm">⚠ {t('common.error')}</div>}
     </section>
   );
 }

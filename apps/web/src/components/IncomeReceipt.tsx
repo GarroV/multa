@@ -65,7 +65,7 @@ export function IncomeReceipt({
       aria-label={t('income.received')}
     >
       <div className="sheet">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div className="row row-between">
           <span className="panel-name">{t('income.received')}</span>
           <button type="button" className="act" onClick={onClose} aria-label={t('common.cancel')}>
             ✕

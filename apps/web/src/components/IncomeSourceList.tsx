@@ -27,11 +27,9 @@ export function IncomeSourceList({
     onChange(payouts.map((p, idx) => (idx === i ? { ...p, ...field } : p)));
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="stack">
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('income.amounts.title')}
-        </label>
+        <label className="micro field-legend">{t('income.amounts.title')}</label>
         <p className="dim micro">{t('income.amounts.hint')}</p>
       </div>
 
@@ -47,7 +45,6 @@ export function IncomeSourceList({
         {usePercent && (
           <input
             className="field mono"
-            style={{ width: 150 }}
             inputMode="decimal"
             aria-label={t('income.amounts.gross')}
             placeholder={`${t('income.amounts.gross')} · ${currency}`}
@@ -57,12 +54,11 @@ export function IncomeSourceList({
         )}
       </div>
 
-      <div className="card" style={{ display: 'grid', gap: 8 }}>
+      <div className="card stack-sm">
         {payouts.map((payout, i) => (
           <div className="row" key={i}>
             <input
               className="field"
-              style={{ flex: 2, minWidth: 110 }}
               aria-label={t('income.amounts.label')}
               placeholder={t('income.amounts.label')}
               value={payout.label}
@@ -70,7 +66,6 @@ export function IncomeSourceList({
             />
             <input
               className="field mono"
-              style={{ width: 64 }}
               inputMode="numeric"
               aria-label={t('income.amounts.day')}
               title={t('income.amounts.day')}
@@ -83,7 +78,6 @@ export function IncomeSourceList({
             {usePercent ? (
               <input
                 className="field mono"
-                style={{ width: 90 }}
                 inputMode="decimal"
                 aria-label={t('income.amounts.percent')}
                 placeholder={t('income.amounts.percent')}
@@ -93,7 +87,6 @@ export function IncomeSourceList({
             ) : (
               <input
                 className="field mono"
-                style={{ flex: 1, minWidth: 100 }}
                 inputMode="decimal"
                 aria-label={t('income.amounts.amount')}
                 placeholder={`${t('income.amounts.amount')} · ${currency}`}

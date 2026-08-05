@@ -16,12 +16,10 @@ export function NoIncomeYet() {
   const base = me?.workspace?.baseCurrency;
 
   return (
-    <div style={{ display: 'grid', placeItems: 'center', padding: '48px 16px' }}>
-      <div className="card" style={{ maxWidth: 620, width: '100%' }}>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>{t('plan.empty.title')}</div>
-        <div className="dim" style={{ marginTop: 6, marginBottom: 14 }}>
-          {t('plan.empty.needIncome')}
-        </div>
+    <div className="page-center-loose">
+      <div className="card card-wide">
+        <div className="title-md">{t('plan.empty.title')}</div>
+        <div className="dim empty-lead">{t('plan.empty.needIncome')}</div>
         {base ? (
           <IncomeEditor base={base} locale={locale} />
         ) : (

@@ -246,7 +246,7 @@ export function RecurringPayments({ base }: { base: string }) {
               {formatMinor(item.amountMinor, item.currency, locale)} {item.currency}
             </b>
           </span>
-          <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+          <span className="row row-tight">
             {/* Тумблер прячет метку на карте, но не событие: «что впереди» продолжает о нём знать. */}
             <button
               type="button"

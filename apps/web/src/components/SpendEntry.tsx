@@ -36,13 +36,13 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
 
   return (
     <div className="list-item">
-      <span className="row" style={{ gap: 8 }}>
+      <span className="row row-8">
         <span className="sub num">{formatDate(tx.occurredOn)}</span>
         <span>{catName ?? t('spend.noCategory')}</span>
         {tx.note && <span className="sub">· {tx.note}</span>}
         {del.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
       </span>
-      <span className="row" style={{ gap: 10 }}>
+      <span className="row">
         <span className="num">
           {formatMinor(tx.amountMinor, tx.currency, locale)} {tx.currency}
           {converted && (
@@ -55,7 +55,6 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
         <button
           type="button"
           className="btn btn-ghost"
-          style={{ padding: '4px 10px' }}
           title={t('common.delete')}
           disabled={del.isPending}
           onClick={() => del.mutate(tx.id)}
@@ -163,12 +162,10 @@ export function SpendEntry({
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t('spend.title')}>
       <div className="sheet">
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
+        <div className="row row-between-top">
           <div>
-            <div style={{ fontWeight: 600 }}>
-              {t(isIncome ? 'spend.titleIncome' : 'spend.title')}
-            </div>
-            <div className="sub" style={{ marginTop: 2 }}>
+            <div className="strong">{t(isIncome ? 'spend.titleIncome' : 'spend.title')}</div>
+            <div className="sub mt-xs">
               {t(isIncome ? 'spend.subtitleIncome' : 'spend.subtitle')}
             </div>
           </div>
@@ -183,7 +180,7 @@ export function SpendEntry({
         </div>
 
         {/* Трата или приход: один ввод на оба случая — «пришло сегодня» так же частый жест, как трата. */}
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row row-8">
           {(['expense', 'income'] as const).map((k) => (
             <button
               key={k}
@@ -197,7 +194,7 @@ export function SpendEntry({
           ))}
         </div>
 
-        <div style={{ display: 'grid', gap: 6 }}>
+        <div className="stack-xs">
           <input
             className="field"
             placeholder={t('spend.smart.placeholder')}
@@ -214,12 +211,11 @@ export function SpendEntry({
           <span className="sub">{t('spend.smart.hint')}</span>
         </div>
 
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div className="stack-sm">
           <span className="micro">{t('spend.amount')}</span>
-          <div className="row" style={{ gap: 8 }}>
+          <div className="row row-8">
             <input
-              className="field num"
-              style={{ flex: 1, fontSize: 20 }}
+              className="field num field-amount"
               inputMode="decimal"
               autoFocus
               placeholder="0"
@@ -233,9 +229,9 @@ export function SpendEntry({
         </div>
 
         {!isIncome && (
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div className="stack-sm">
             <span className="micro">{t('spend.category')}</span>
-            <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <div className="row row-8">
               <button
                 type="button"
                 className="chip"
@@ -259,8 +255,8 @@ export function SpendEntry({
           </div>
         )}
 
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
+        <div className="row row-8">
+          <div className="stack-sm">
             <span className="micro">{t('spend.date')}</span>
             <input
               className="field num"
@@ -270,7 +266,7 @@ export function SpendEntry({
               onChange={(e) => setOccurredOn(e.target.value)}
             />
           </div>
-          <div style={{ display: 'grid', gap: 8, flex: 1, minWidth: 160 }}>
+          <div className="stack-sm stack-grow">
             <span className="micro">{t('common.name')}</span>
             <input
               className="field"

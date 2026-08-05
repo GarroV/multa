@@ -10,20 +10,13 @@ export function OnboardingShell({ step, children }: { step: number; children: Re
   const skip = useSkipOnboarding();
 
   return (
-    <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <div style={{ width: 'min(560px, 100%)', display: 'grid', gap: 20 }}>
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 8, flex: 1 }}>
+    <div className="page-center">
+      <div className="shell-body">
+        <div className="row row-between">
+          <div className="steps-bar">
             {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-              <div
-                key={i}
-                style={{
-                  height: 3,
-                  flex: 1,
-                  borderRadius: 2,
-                  background: i < step ? 'var(--accent)' : 'var(--line)',
-                }}
-              />
+              /* Пройденность шага — состояние, а не стиль: класс, чтобы цвет жил в токенах. */
+              <div key={i} className={i < step ? 'step-tick step-tick-done' : 'step-tick'} />
             ))}
           </div>
           {/* Скип обучения целиком: в приложение с пустым планом, доход задаётся позже в настройках. */}

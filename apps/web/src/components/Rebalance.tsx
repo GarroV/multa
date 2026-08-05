@@ -34,12 +34,10 @@ export function Rebalance({
       aria-label={t('rebalance.open')}
     >
       <div className="sheet">
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
+        <div className="row row-between-top">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>
-              {t('rebalance.title', { category: categoryName })}
-            </div>
-            <div className="dim mono" style={{ marginTop: 4, fontSize: 13 }}>
+            <div className="title-md">{t('rebalance.title', { category: categoryName })}</div>
+            <div className="dim mono note-tight text-sm">
               {t('rebalance.need')} {formatMinor(needMinor, base, locale)} {base}
             </div>
           </div>
@@ -61,14 +59,10 @@ export function Rebalance({
 
         {options.map((o) => (
           <div key={`${o.targetKind}:${o.targetId}`} className="list-item">
-            <span className="row" style={{ gap: 8 }}>
+            <span className="row row-8">
               <span>{o.name}</span>
-              {o.usual && (
-                <span className="chip" style={{ padding: '2px 8px', fontSize: 11 }}>
-                  {t('rebalance.usual')}
-                </span>
-              )}
-              <span className="dim mono" style={{ fontSize: 13 }}>
+              {o.usual && <span className="chip chip-xs">{t('rebalance.usual')}</span>}
+              <span className="dim mono text-sm">
                 {formatMinor(o.availableMinor, base, locale)} {base}
               </span>
             </span>

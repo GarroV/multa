@@ -65,8 +65,8 @@ export function BehaviourSettings() {
         </span>
         <span className="prow-num" />
         <span />
-        <span className="prow-bar" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
-          <span className="row" style={{ gap: 6 }}>
+        <span className="prow-bar prow-bar-full">
+          <span className="row row-6">
             {COMPRESS_PRESETS.map((order) => (
               <button
                 key={order.join('-')}

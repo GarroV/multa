@@ -41,7 +41,7 @@ export function CascadeDonut({ plan }: { plan: PlanDto }) {
   const fmt = (minor: string | bigint) => formatMinor(String(minor), plan.baseCurrency, locale);
 
   return (
-    <div className="row" style={{ gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
+    <div className="row donut-row">
       <svg className="donut" viewBox="0 0 32 32" aria-hidden>
         <circle className="track" cx="16" cy="16" r={RADIUS} pathLength={100} />
         {arcs.map((arc) => (

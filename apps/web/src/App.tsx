@@ -30,11 +30,7 @@ export function App() {
   }, [wsLocale, setLocale]);
 
   if (isLoading) {
-    return (
-      <div className="dim" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-        {t('common.loading')}
-      </div>
-    );
+    return <div className="dim page-center-full">{t('common.loading')}</div>;
   }
   /*
    * Демо — единственный экран, который живёт до сессии: он её и получает. Без этой ветки гейт

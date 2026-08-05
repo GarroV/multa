@@ -46,11 +46,9 @@ export function RhythmPicker({
     .join(' · ');
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="stack">
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('income.rhythm.title')}
-        </label>
+        <label className="micro field-legend">{t('income.rhythm.title')}</label>
         <div className="row">
           {KINDS.map(({ kind, key }) => (
             <button
@@ -64,9 +62,7 @@ export function RhythmPicker({
             </button>
           ))}
         </div>
-        <p className="dim micro" style={{ marginTop: 8 }}>
-          {t('income.rhythm.hint')}
-        </p>
+        <p className="dim micro screen-sub">{t('income.rhythm.hint')}</p>
       </div>
 
       {value.kind === 'twiceMonthly' && (
@@ -75,8 +71,7 @@ export function RhythmPicker({
           {[0, 1].map((i) => (
             <input
               key={i}
-              className="field mono"
-              style={{ width: 64 }}
+              className="field mono field-w-sm"
               inputMode="numeric"
               aria-label={t('income.rhythm.day')}
               value={value.days[i] ?? ''}
@@ -94,8 +89,7 @@ export function RhythmPicker({
         <div className="row">
           <label className="micro">{t('income.rhythm.day')}</label>
           <input
-            className="field mono"
-            style={{ width: 64 }}
+            className="field mono field-w-sm"
             inputMode="numeric"
             aria-label={t('income.rhythm.day')}
             value={value.days[0] ?? ''}
@@ -107,12 +101,11 @@ export function RhythmPicker({
       )}
 
       {value.kind === 'everyWeeks' && (
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div className="stack-sm">
           <div className="row">
             <label className="micro">{t('income.rhythm.weeks')}</label>
             <input
-              className="field mono"
-              style={{ width: 64 }}
+              className="field mono field-w-sm"
               inputMode="numeric"
               aria-label={t('income.rhythm.weeks')}
               value={value.weeks}
@@ -123,9 +116,7 @@ export function RhythmPicker({
             />
           </div>
           <div>
-            <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-              {t('income.rhythm.anchorDate')}
-            </label>
+            <label className="micro field-legend">{t('income.rhythm.anchorDate')}</label>
             <input
               className="field mono"
               type="date"
@@ -138,9 +129,7 @@ export function RhythmPicker({
       )}
 
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('income.weekend.label')}
-        </label>
+        <label className="micro field-legend">{t('income.weekend.label')}</label>
         <div className="row">
           {WEEKEND_RULES.map(({ rule, key }) => (
             <button

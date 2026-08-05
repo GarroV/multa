@@ -47,8 +47,8 @@ export function ReceiptEntry({
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t('receipt.title')}>
       <div className="sheet">
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'start' }}>
-          <div style={{ fontWeight: 600 }}>{t('receipt.title')}</div>
+        <div className="row row-between-top">
+          <div className="strong">{t('receipt.title')}</div>
           <button
             type="button"
             className="btn btn-ghost"
@@ -61,7 +61,7 @@ export function ReceiptEntry({
 
         {!parsed && (
           <>
-            <div style={{ display: 'grid', gap: 6 }}>
+            <div className="stack-xs">
               <span className="micro">{t('receipt.parseQr')}</span>
               <input
                 className="field mono"
@@ -80,7 +80,7 @@ export function ReceiptEntry({
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: 6 }}>
+            <div className="stack-xs">
               <span className="micro">{t('receipt.photo')}</span>
               <input
                 className="field"
@@ -103,7 +103,7 @@ export function ReceiptEntry({
 
         {parsed && (
           <>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div className="row row-between">
               <span className="sub">
                 {t('receipt.total')}
                 {parsed.merchant ? ` · ${parsed.merchant}` : ''}

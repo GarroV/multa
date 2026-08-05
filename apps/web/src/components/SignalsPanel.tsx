@@ -144,7 +144,7 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
             <span className="prow-num">
               <b>{metricText(signal.metric)}</b>
             </span>
-            <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+            <span className="row row-tight">
               {signal.actions.map((action) => (
                 <button
                   key={action.kind}
