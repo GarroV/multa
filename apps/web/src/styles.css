@@ -33,8 +33,11 @@
   --ink: #eaf2ff;
   --mid: #93a4c3;
   /* Осознанное отклонение от прототипа (там #55648a): микролейблы набраны 9–11px, а на фоне
-     #07090f это контраст 3.4 — ниже WCAG AA. Осветлено до 4.6, иерархия ink → mid → dim цела. */
-  --dim: #6d80a8;
+     #07090f это контраст 3.4 — ниже WCAG AA. Осветлено, иерархия ink → mid → dim цела.
+     Второй заход (05.08.2026): 6d80a8 давал 4.37 на --panel2 — фоне шапок групп в мастер-сетке,
+     то есть именно там, где им и подписаны разделы. Ещё чуть светлее: 4.60 на самом тёмном из
+     фонов, где этот цвет встречается. */
+  --dim: #7084ad;
 
   --cyan: #00e5ff;
   --cyan-hi: #7ff3ff;
@@ -43,10 +46,22 @@
   --mag-rgb: 255, 46, 151;
   --vio: #8b5cf6;
   --vio-rgb: 139, 92, 246;
+  /* Текстовый вариант: #8b5cf6 на панели даёт 4.41 при кегле 10px — ниже AA. */
+  --vio-ink: #9160ff;
   --lime: #b6ff2e;
   --lime-rgb: 182, 255, 46;
   --amber: #ffb020;
   --amber-rgb: 255, 176, 32;
+
+  /*
+   * `-ink` — тот же акцент, но пригодный как ЦВЕТ ТЕКСТА поверх поверхности. Разделение появилось
+   * потому, что чипы набраны 10px: для них порог AA 4.5, а заливкам и рамкам достаточно 3.0. Где
+   * акцент проходит как текст, `-ink` равен ему — правило остаётся одно на все тона.
+   */
+  --cyan-ink: var(--cyan);
+  --mag-ink: var(--mag);
+  --lime-ink: var(--lime);
+  --amber-ink: var(--amber);
 
   --hover1: rgba(19, 26, 46, 0.4);
   --hover2: rgba(19, 26, 46, 0.5);
@@ -126,6 +141,17 @@
   --lime-rgb: 76, 133, 0;
   --amber: #a06a08;
   --amber-rgb: 160, 106, 8;
+
+  /*
+   * Текстовые варианты акцентов. На светлой панели (#f6f8fc) чипы 10px давали 3.82 (cyan), 4.24
+   * (lime) и 4.33 (amber) — ниже AA. Затемнено ровно до прохождения порога с небольшим запасом,
+   * чтобы тон остался узнаваемым: цвет здесь несёт смысл (правило 2 дизайн-системы).
+   */
+  --cyan-ink: #007996;
+  --mag-ink: var(--mag);
+  --vio-ink: var(--vio);
+  --lime-ink: #477d00;
+  --amber-ink: #9a6608;
 
   --hover1: rgba(10, 16, 32, 0.035);
   --hover2: rgba(10, 16, 32, 0.055);
@@ -574,7 +600,8 @@ a {
   color: var(--ok);
 }
 .st-warn {
-  color: var(--warn);
+  /* То же, что у чипов: как текст амбер проходит порог только в затемнённом варианте (было 4.33). */
+  color: var(--amber-ink);
 }
 .st-over {
   color: var(--over);
@@ -982,23 +1009,23 @@ a {
   white-space: nowrap;
 }
 .tag.cyan {
-  color: var(--cyan);
+  color: var(--cyan-ink);
   border-color: rgba(var(--cyan-rgb), 0.45);
 }
 .tag.mag {
-  color: var(--mag);
+  color: var(--mag-ink);
   border-color: rgba(var(--mag-rgb), 0.45);
 }
 .tag.vio {
-  color: var(--vio);
+  color: var(--vio-ink);
   border-color: rgba(var(--vio-rgb), 0.45);
 }
 .tag.lime {
-  color: var(--lime);
+  color: var(--lime-ink);
   border-color: rgba(var(--lime-rgb), 0.45);
 }
 .tag.amber {
-  color: var(--amber);
+  color: var(--amber-ink);
   border-color: rgba(var(--amber-rgb), 0.45);
 }
 
@@ -1884,7 +1911,8 @@ a {
   text-transform: uppercase;
 }
 .mgrid-now {
-  color: var(--accent);
+  /* Текстовый вариант акцента: «сейчас» набрано мелко, и чистый --accent давал в светлой 4.06. */
+  color: var(--cyan-ink);
   font-style: normal;
   margin-left: 6px;
 }

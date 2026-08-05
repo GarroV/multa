@@ -232,6 +232,122 @@ test.describe('демо-данные', () => {
     expect(tracks.at(-1)!, 'пустой добор справа').toBeGreaterThan(100);
   });
 
+  test('весь текст проходит контраст AA в обеих темах', async ({ page }) => {
+    /*
+     * Проверка не одного элемента, а всего текста: сплошной обход нашёл 4 провала, которые
+     * одиночная проверка `.act-primary` не видела, — чипы `.tag` (10px акцентом: cyan 3.82, lime
+     * 4.24, amber 4.33 в светлой; vio 4.41 в тёмной), метку «сейчас» в мастер-сетке (4.06) и
+     * предупреждение `.st-warn` (4.33). Исправлено текстовыми вариантами акцентов (`--*-ink`).
+     *
+     * Два свойства измерителя, без которых он врёт:
+     *
+     * 1. Полупрозрачные фоны смешиваются вниз по цепочке. Без этого `--accent-quiet`
+     *    (`rgba(0,229,255,0.14)`) читается как ярко-голубой и даёт три фантомных провала по 1.37.
+     * 2. Подписи карты периода исключены: в DOM они лежат внутри `.pmap-line`, у которой фон —
+     *    цвет линии оси, а на экране рисуются НИЖЕ этой линии, на панели. Измерять их по
+     *    DOM-предку — измерять не тот фон. Чтобы исключение не превратилось в слепое пятно, тест
+     *    отдельно проверяет, что подписи и правда не накрывают линию.
+     */
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    for (const path of SCREENS) {
+      await page.goto(path);
+      await page.locator('.panel, .mgrid-row').first().waitFor();
+      await stopMotion(page);
+      const themeButtons = page.getByRole('group', { name: /theme|тема/i }).locator('button');
+
+      for (const [index, theme] of (['dark', 'light'] as const).entries()) {
+        await themeButtons.nth(index).click();
+        await expect
+          .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+          .toBe(theme);
+
+        const fails = await page.evaluate(() => {
+          const parse = (c: string): number[] => {
+            const v = (c.match(/[\d.]+/g) ?? []).map(Number);
+            return [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0, v[3] === undefined ? 1 : v[3]];
+          };
+          const lum = (rgb: number[]) => {
+            const f = rgb.slice(0, 3).map((x) => {
+              const t = x / 255;
+              return t <= 0.03928 ? t / 12.92 : Math.pow((t + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * f[0]! + 0.7152 * f[1]! + 0.0722 * f[2]!;
+          };
+          const bgOf = (el: Element): number[] => {
+            const layers: number[][] = [];
+            let n: Element | null = el;
+            while (n) {
+              const c = parse(getComputedStyle(n).backgroundColor);
+              if (c[3]! > 0) layers.push(c);
+              if (c[3]! >= 1) break;
+              n = n.parentElement;
+            }
+            let base = [255, 255, 255];
+            for (const [r, g, b, a] of layers.reverse()) {
+              base = [
+                r! * a! + base[0]! * (1 - a!),
+                g! * a! + base[1]! * (1 - a!),
+                b! * a! + base[2]! * (1 - a!),
+              ];
+            }
+            return base;
+          };
+
+          const out: string[] = [];
+          for (const el of document.querySelectorAll('body *')) {
+            if (el.closest('.pmap-line')) continue;
+            const hasOwnText = [...el.childNodes].some(
+              (n) => n.nodeType === 3 && (n.textContent ?? '').trim(),
+            );
+            if (!hasOwnText) continue;
+            const box = el.getBoundingClientRect();
+            if (box.width === 0 || box.height === 0) continue;
+            const cs = getComputedStyle(el);
+            if (cs.visibility === 'hidden' || cs.opacity === '0') continue;
+            const size = parseFloat(cs.fontSize);
+            const bold = Number(cs.fontWeight) >= 700;
+            const need = size >= 24 || (size >= 18.66 && bold) ? 3 : 4.5;
+            const a = lum(parse(cs.color));
+            const b = lum(bgOf(el));
+            const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+            if (ratio < need) {
+              const cls = (el.className || el.tagName).toString().slice(0, 40);
+              out.push(`${cls} = ${Math.round(ratio * 100) / 100} (нужно ${need})`);
+            }
+          }
+          return [...new Set(out)];
+        });
+
+        expect(fails, `${path} · тема ${theme}`).toEqual([]);
+      }
+    }
+  });
+
+  test('подписи карты периода не накрывают линию оси', async ({ page }) => {
+    /*
+     * Страховка к исключению в проверке контраста выше: подписи выведены из измерения потому, что
+     * визуально они лежат на панели, а не на линии. Если однажды они на линию наедут, контраст
+     * измерялся бы не по тому фону — и никто бы не заметил. Здесь это утверждение проверяется.
+     */
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/plan');
+    await page.locator('.pmap-cap').first().waitFor();
+
+    const overlaps = await page.evaluate(() => {
+      const line = document.querySelector('.pmap-line')?.getBoundingClientRect();
+      if (!line) return ['нет линии оси'];
+      const bad: string[] = [];
+      for (const cap of document.querySelectorAll('.pmap-cap')) {
+        const r = cap.getBoundingClientRect();
+        const overlapY = Math.min(r.bottom, line.bottom) - Math.max(r.top, line.top);
+        if (overlapY > 1) bad.push((cap.textContent ?? '').trim().slice(0, 24));
+      }
+      return bad;
+    });
+    expect(overlaps).toEqual([]);
+  });
+
   test('пиктограммы переключателя вида различимы', async ({ page }) => {
     /*
      * «▤» и «▦» в интерфейсном шрифте рисовались двумя почти одинаковыми квадратиками. Эталон здесь
