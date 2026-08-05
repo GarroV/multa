@@ -99,7 +99,7 @@ export const en = {
   'plan.groups.debt': 'Debts',
   'plan.groups.bucket': 'To exchange',
   'plan.groups.envelope': 'Envelopes',
-  'plan.groups.category': 'Categories',
+  'plan.groups.category': 'Spending',
   'plan.groups.goal': 'Goals',
   'plan.groups.income': 'Income',
   'tour.next': 'Next',
@@ -112,10 +112,10 @@ export const en = {
     'How much you can spend per day until the next payday. It comes from what is left, not from the plan: spend more today and the number drops today, not at the end of the month.',
   'tour.cascade.title': 'Where the payout went',
   'tour.cascade.body':
-    'Money goes in order: debts, exchange, envelopes, categories, goals. When it falls short, goals give way first, then envelopes, then categories. Debts and currency baskets are never trimmed.',
+    'Money goes in order: debts, exchange, envelopes, spending, goals. When it falls short, goals give way first, then envelopes, then spending. Debts and currency baskets are never trimmed.',
   'tour.map.title': 'What happens before payday',
   'tour.map.body': 'The axis from payday to payday: income, large payments and where today sits.',
-  'tour.categories.title': 'Categories',
+  'tour.categories.title': 'Spending',
   'tour.categories.body':
     'Plan against fact. Budgets are edited right here, and when a line runs out early the app offers where to take the rest from.',
   'tour.obligations.title': 'Debts, goals, baskets',
@@ -255,7 +255,7 @@ export const en = {
   'plan.summary.perDay': 'To live on, per day',
   'plan.summary.toExchange': 'To exchange',
   'plan.compressed.note':
-    'Not enough for everything — trimmed {amount} {ccy}. Goals give first, then envelopes, then categories; debts and baskets stay whole.',
+    'Not enough for everything — trimmed {amount} {ccy}. Goals give first, then envelopes, then spending; debts and baskets stay whole.',
   'plan.row.trimmed': 'trimmed {amount}',
   'plan.category.budgetHint': 'budget / period',
   'cat.protected.on': 'Protected — not auto-trimmed under a shortfall',
