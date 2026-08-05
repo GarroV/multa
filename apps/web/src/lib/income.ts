@@ -189,6 +189,49 @@ export function draftToSource(
   };
 }
 
+/** Как приходят деньги — вопрос первого экрана, шире, чем «по каким числам». */
+export type IncomeMode = 'monthly' | 'weekly' | 'daily';
+
+export interface OnboardingIncomeForm {
+  mode: IncomeMode;
+  label: string;
+  amount: string;
+  /** Для `weekly`; 0 — воскресенье, как у `Date.getUTCDay`. */
+  weekday: number;
+}
+
+/**
+ * Шаг дохода для несистемного заработка: источник плюс ритм периода.
+ *
+ * Первый экран спрашивал «по каким числам тебе платят» — вопрос, у которого для смен, такси и
+ * торговли нет ответа. Живой тестер (2026-08-05) на этом шаге и остановился.
+ *
+ * Ключевое отличие от `payoutsToSources`: там даты выплат ЗАДАЮТ границы периодов, здесь их задать
+ * нечем — выплата каждый день. Поэтому период берётся отдельным решением: двухнедельные отрезки от
+ * сегодня. Это честный дефолт, а не догадка о заработке; сменить его можно в настройках, и текст
+ * шага об этом говорит прямо.
+ */
+export function onboardingIncome(
+  form: OnboardingIncomeForm,
+  opts: { currency: string; today: string },
+): {
+  sources: SourcePayload[];
+  rhythm: Record<string, unknown>;
+  weekendRule: WeekendRule;
+} | null {
+  const source = draftToSource(
+    { label: form.label, kind: form.mode, day: 1, weekday: form.weekday, amount: form.amount },
+    { currency: opts.currency },
+  );
+  if (!source) return null;
+  return {
+    sources: [source],
+    rhythm: { kind: 'every-weeks', weeks: 2, startsOn: opts.today },
+    // Деньги приходят и в субботу — переносить такой доход с выходных не на что.
+    weekendRule: 'as-is',
+  };
+}
+
 /** Сумма процентов выплат — для информационной подсказки (жёсткой валидации нет). */
 export function percentSum(payouts: readonly PayoutForm[]): number {
   return payouts.reduce((acc, p) => {

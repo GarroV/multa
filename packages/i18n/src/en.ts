@@ -55,6 +55,10 @@ export const en = {
   'income.variable': 'floats',
   'income.kind.legend': 'Income rhythm',
   'income.editor.rhythmHint': 'Period boundaries come from the payout rhythm —',
+  'onboarding.income.how': 'How the money arrives',
+  'onboarding.income.perArrival': 'How much per arrival',
+  'onboarding.income.periodNote':
+    'We will plan in two-week stretches — with daily income there are no payout dates to draw period boundaries from. Change the stretch in settings.',
   'income.kind.monthly': 'Day of month',
   'income.kind.weekly': 'Weekly',
   'income.kind.daily': 'Every day',

@@ -54,6 +54,10 @@ export const ru: Record<TranslationKey, string> = {
   'income.variable': 'плавает',
   'income.kind.legend': 'Ритм дохода',
   'income.editor.rhythmHint': 'Границы периодов задаёт ритм выплат —',
+  'onboarding.income.how': 'Как приходят деньги',
+  'onboarding.income.perArrival': 'Сколько приходит за раз',
+  'onboarding.income.periodNote':
+    'Считать будем двухнедельными отрезками — при ежедневном доходе границы периода из дат выплат не выведешь. Отрезок меняется в настройках.',
   'income.kind.monthly': 'Число месяца',
   'income.kind.weekly': 'Раз в неделю',
   'income.kind.daily': 'Каждый день',

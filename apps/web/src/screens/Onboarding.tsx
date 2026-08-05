@@ -2,12 +2,15 @@ import { fromMajor, rhythmMismatches, type IncomeSource } from '@multa/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { IncomeSourceList } from '../components/IncomeSourceList.tsx';
+import { weekdayName } from '../components/IncomeEditor.tsx';
 import { OnboardingShell } from '../components/OnboardingShell.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   formatPayday,
+  onboardingIncome,
+  type IncomeMode,
   payoutsToSources,
   rhythmToConfig,
   rhythmToPayload,
@@ -65,6 +68,13 @@ function toProbeSources(sources: readonly SourcePayload[]): IncomeSource[] {
 function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
   const { t, locale } = useI18n();
   const today = todayISO();
+  /*
+   * Первый вопрос шага — КАК приходят деньги, а не по каким числам. «По числам месяца» отвечает
+   * оклад, но у смен, такси и торговли числа нет вовсе: живой тестер (05.08.2026) остановился
+   * именно здесь, потому что вопрос был не про неё.
+   */
+  const [mode, setMode] = useState<IncomeMode>('monthly');
+  const [oneOff, setOneOff] = useState({ label: '', amount: '', weekday: 5 });
   const [rhythm, setRhythm] = useState<RhythmForm>({
     kind: 'twiceMonthly',
     days: [10, 25],
@@ -84,17 +94,23 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
   const save = useSaveOnboardingIncome();
 
   const sources = payoutsToSources(payouts, { currency: base, usePercent, gross });
+  const irregular =
+    mode === 'monthly' ? null : onboardingIncome({ mode, ...oneOff }, { currency: base, today });
   const canContinue =
-    sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '');
-  const mismatches = canContinue
-    ? rhythmMismatches(
-        rhythmToConfig(rhythm),
-        toProbeSources(sources),
-        rhythm.weekendRule,
-        today,
-        2,
-      )
-    : [];
+    mode === 'monthly'
+      ? sources.length > 0 && (rhythm.kind !== 'everyWeeks' || rhythm.anchorDate !== '')
+      : irregular !== null;
+  /* Расхождение «ритм против дат выплат» бывает только у выплат по числам: сравнивать нечего. */
+  const mismatches =
+    mode === 'monthly' && canContinue
+      ? rhythmMismatches(
+          rhythmToConfig(rhythm),
+          toProbeSources(sources),
+          rhythm.weekendRule,
+          today,
+          2,
+        )
+      : [];
 
   return (
     <OnboardingShell step={2}>
@@ -104,16 +120,81 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
           {t('onboarding.payday.subtitle')}
         </p>
       </div>
-      <RhythmPicker value={rhythm} onChange={setRhythm} today={today} />
-      <IncomeSourceList
-        payouts={payouts}
-        usePercent={usePercent}
-        gross={gross}
-        currency={base}
-        onChange={setPayouts}
-        onTogglePercent={setUsePercent}
-        onGrossChange={setGross}
-      />
+      <div>
+        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
+          {t('onboarding.income.how')}
+        </label>
+        <div className="row">
+          {(['monthly', 'weekly', 'daily'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className="chip"
+              aria-pressed={mode === m}
+              onClick={() => setMode(m)}
+            >
+              {t(
+                m === 'monthly'
+                  ? 'income.kind.monthly'
+                  : m === 'weekly'
+                    ? 'income.kind.weekly'
+                    : 'income.kind.daily',
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {mode === 'monthly' ? (
+        <>
+          <RhythmPicker value={rhythm} onChange={setRhythm} today={today} />
+          <IncomeSourceList
+            payouts={payouts}
+            usePercent={usePercent}
+            gross={gross}
+            currency={base}
+            onChange={setPayouts}
+            onTogglePercent={setUsePercent}
+            onGrossChange={setGross}
+          />
+        </>
+      ) : (
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div className="form-row">
+            <input
+              className="field grow"
+              aria-label={t('income.amounts.label')}
+              placeholder={t('income.amounts.label')}
+              value={oneOff.label}
+              onChange={(e) => setOneOff({ ...oneOff, label: e.target.value })}
+            />
+            {mode === 'weekly' && (
+              <select
+                className="field field-sm"
+                aria-label={t('income.kind.weekday')}
+                value={oneOff.weekday}
+                onChange={(e) => setOneOff({ ...oneOff, weekday: Number(e.target.value) })}
+              >
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                  <option value={d} key={d}>
+                    {weekdayName(d, locale)}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input
+              className="field num field-sm"
+              inputMode="decimal"
+              aria-label={`${t('onboarding.income.perArrival')} · ${base}`}
+              placeholder={t('onboarding.income.perArrival')}
+              value={oneOff.amount}
+              onChange={(e) => setOneOff({ ...oneOff, amount: e.target.value.replace(',', '.') })}
+            />
+          </div>
+          {/* Границы периода — решение продукта, а не догадка о заработке: говорим об этом прямо. */}
+          <p className="dim micro">{t('onboarding.income.periodNote')}</p>
+        </div>
+      )}
       {mismatches.map((date) => (
         <div className="note-band" key={date}>
           {t('income.amounts.mismatch', { date: formatPayday(date, locale) })}
@@ -127,7 +208,13 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
           disabled={save.isPending || !canContinue}
           onClick={() =>
             save.mutate(
-              { rhythm: rhythmToPayload(rhythm), weekendRule: rhythm.weekendRule, sources },
+              irregular
+                ? {
+                    rhythm: irregular.rhythm,
+                    weekendRule: irregular.weekendRule,
+                    sources: irregular.sources,
+                  }
+                : { rhythm: rhythmToPayload(rhythm), weekendRule: rhythm.weekendRule, sources },
               { onSuccess: onDone }, // НЕ инвалидируем 'me' — иначе гейт откроет приложение до шагов 3-4
             )
           }

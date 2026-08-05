@@ -51,3 +51,37 @@ test('новый человек попадает в план за два шаг�
   await expect(page.locator('.kpi-hero')).toBeVisible();
   await expect(page.locator('.tour')).toHaveCount(0);
 });
+
+test('человек с ежедневным доходом проходит онбординг и получает цифру дня', async ({ page }) => {
+  /*
+   * Живой тестер (05.08.2026) бросил продукт на шаге дохода: он спрашивал «по каким числам тебе
+   * платят», а доход у неё ежедневный — вопрос не про неё. Проверяем весь путь до цифры дня, а не
+   * только наличие кнопки: важно, что план на таком доходе действительно собирается.
+   */
+  await page.goto('/');
+  const email = `daily-e2e-${Date.now()}@multa.local`;
+  await page.locator('form.card input').nth(0).fill('Daily E2E');
+  await page.locator('form.card input').nth(1).fill(email);
+  await page.locator('form.card input').nth(2).fill('SmokeTest123!');
+  await page.locator('form.card button[type=submit]').click();
+
+  // Шаг 1: валюта по умолчанию.
+  await page.getByRole('button', { name: /^Next$|^Дальше$/ }).click();
+
+  // Шаг 2: «каждый день» вместо чисел месяца.
+  await page.getByRole('button', { name: /^Every day$|^Каждый день$/ }).click();
+  // Полей по числам месяца в этом режиме быть не должно: они спрашивают о том, чего у неё нет.
+  await expect(page.getByLabel(/^Day$|^Число$/)).toHaveCount(0);
+
+  await page.getByLabel(/^Label$|^Метка$/).fill('Shifts');
+  await page.getByLabel(/per arrival|за раз/i).fill('2500');
+  await page.getByRole('button', { name: /^Next$|^Дальше$/ }).click();
+
+  await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
+
+  // Главное: план собрался и цифра дня положительна, а не «0» и не прочерк.
+  const hero = page.locator('.kpi-hero .kpi-value').first();
+  await expect(hero).toBeVisible({ timeout: 20_000 });
+  const perDay = Number((await hero.innerText()).replace(/[^\d]/g, ''));
+  expect(perDay).toBeGreaterThan(0);
+});

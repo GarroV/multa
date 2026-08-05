@@ -8,6 +8,7 @@ import {
   rhythmToPayload,
   withRhythmKind,
   draftToSource,
+  onboardingIncome,
   type RhythmForm,
 } from './income.ts';
 
@@ -232,5 +233,49 @@ describe('draftToSource', () => {
     expect(
       draftToSource({ label: 'Смены', kind: 'daily', day: 1, weekday: 1, amount: '—' }, opts),
     ).toBe(null);
+  });
+});
+
+/**
+ * Несистемный доход в ОНБОРДИНГЕ (2026-08-05). Редактор источников его уже понимал, а первый экран
+ * продукта — нет: он спрашивал «по каким числам тебе платят», и человек с ежедневным доходом
+ * упирался в вопрос не про себя. Именно на этом шаге живой тестер и остановился.
+ */
+describe('onboardingIncome', () => {
+  it('ежедневный доход: один источник daily и период двухнедельными отрезками', () => {
+    const out = onboardingIncome(
+      { mode: 'daily', label: 'Смены', amount: '2500', weekday: 5 },
+      { currency: 'RUB', today: '2026-08-05' },
+    );
+    expect(out?.sources).toHaveLength(1);
+    expect(out?.sources[0]?.schedule).toEqual({ kind: 'daily' });
+    expect(out?.sources[0]?.amount).toEqual({ kind: 'absolute', amountMinor: '250000' });
+    /*
+     * Границы периода из дат выплат вывести нельзя — выплата каждый день. Берём двухнедельные
+     * отрезки от сегодня: это решение по умолчанию, которое человек меняет в настройках, а не
+     * догадка о его зарплате.
+     */
+    expect(out?.rhythm).toEqual({ kind: 'every-weeks', weeks: 2, startsOn: '2026-08-05' });
+    // Ежедневному доходу перенос с выходных не нужен: деньги приходят и в субботу.
+    expect(out?.weekendRule).toBe('as-is');
+  });
+
+  it('недельный доход: расписание с днём недели, период тот же', () => {
+    const out = onboardingIncome(
+      { mode: 'weekly', label: 'Подработка', amount: '8000', weekday: 5 },
+      { currency: 'RUB', today: '2026-08-05' },
+    );
+    expect(out?.sources[0]?.schedule).toEqual({ kind: 'weekly', weekday: 5 });
+    expect(out?.rhythm.kind).toBe('every-weeks');
+  });
+
+  it('без суммы или метки шаг не собирается — план на нуле не строим', () => {
+    const opts = { currency: 'RUB', today: '2026-08-05' } as const;
+    expect(onboardingIncome({ mode: 'daily', label: '', amount: '2500', weekday: 5 }, opts)).toBe(
+      null,
+    );
+    expect(onboardingIncome({ mode: 'daily', label: 'Смены', amount: '', weekday: 5 }, opts)).toBe(
+      null,
+    );
   });
 });
