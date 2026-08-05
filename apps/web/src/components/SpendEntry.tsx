@@ -1,6 +1,7 @@
 import { fromMajor, parseEntry, toMajorString, money } from '@multa/core';
 import { useState } from 'react';
 import { formatDate, formatMinor } from '../lib/format.ts';
+import { useSheet } from '../lib/useSheet.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { ApiError } from '../lib/api.ts';
 import {
@@ -79,6 +80,8 @@ export function SpendEntry({
   locale: string;
   onClose: () => void;
 }) {
+  // Escape закрывает лист, фокус возвращается на кнопку, которой его открыли.
+  useSheet(onClose);
   const { t } = useI18n();
   const { data: categories = [] } = useCategories();
   const { data: txs } = useTransactions();

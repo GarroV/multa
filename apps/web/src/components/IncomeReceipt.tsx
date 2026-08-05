@@ -1,6 +1,7 @@
 import { fromMajor } from '@multa/core';
 import { useState } from 'react';
 import { formatMinor } from '../lib/format.ts';
+import { useSheet } from '../lib/useSheet.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useConfirmIncome, type IncomeEventDto } from '../lib/queries.ts';
 
@@ -22,6 +23,8 @@ export function IncomeReceipt({
   onClose: () => void;
 }) {
   const { t, locale } = useI18n();
+  // Escape закрывает лист, фокус возвращается на кнопку, которой его открыли.
+  useSheet(onClose);
   const confirm = useConfirmIncome();
   const majorOf = (minor: string, ccy: string) => formatMinor(minor, ccy, 'en').replace(/,/g, '');
 

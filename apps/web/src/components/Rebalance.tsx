@@ -1,4 +1,5 @@
 import { formatMinor } from '../lib/format.ts';
+import { useSheet } from '../lib/useSheet.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useApplyRebalance, useRebalanceOptions } from '../lib/queries.ts';
 
@@ -23,6 +24,8 @@ export function Rebalance({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  // Escape закрывает лист, фокус возвращается на кнопку, которой его открыли.
+  useSheet(onClose);
   const { data: options = [], isLoading } = useRebalanceOptions(categoryId, needMinor);
   const apply = useApplyRebalance();
 
