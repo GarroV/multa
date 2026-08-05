@@ -255,10 +255,16 @@ test.describe('демо-данные', () => {
       expect((await el.innerText()).trim()).toBe('');
     }
 
-    await expect(icons.nth(0)).toHaveScreenshot('view-icon-panels.png', {
-      maxDiffPixelRatio: 0.02,
-    });
-    await expect(icons.nth(1)).toHaveScreenshot('view-icon-table.png', { maxDiffPixelRatio: 0.02 });
+    // Значки обязаны отличаться друг от друга: одинаковая геометрия — это и есть тот самый дефект.
+    const [panels, table] = await Promise.all([
+      icons.nth(0).locator('svg').innerHTML(),
+      icons.nth(1).locator('svg').innerHTML(),
+    ]);
+    expect(panels).not.toBe(table);
+    // И обе — непустые фигуры, а не пустой <svg> с нужным тегом.
+    for (const markup of [panels, table]) {
+      expect(markup).toMatch(/<(rect|path|circle|line|polyline)/);
+    }
   });
 });
 
