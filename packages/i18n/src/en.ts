@@ -90,10 +90,7 @@ export const en = {
   'plan.empty.subtitle': 'Route set once you add income and where it goes.',
   'plan.hero.canSpend': 'YOU CAN SPEND',
   'plan.hero.perDay': '/day',
-  'plan.today.periodLabel': 'THIS PERIOD',
   'plan.today.until': 'until {date} · {days} days left',
-  'plan.today.daysLeft': '{days} days to payday',
-  'plan.today.expected': 'Expected this period',
 
   // План периода — автосборка каскадом (Спринт 2)
   'plan.groups.debt': 'Debts',
@@ -267,7 +264,6 @@ export const en = {
     'Some obligations have no rate yet — the daily figure leaves them out and may read too high.',
   'plan.empty.noPlan': 'Nothing to route yet — set income and add obligations.',
   'plan.empty.needIncome': 'Setup was skipped. Add an income source and the plan builds itself.',
-  'plan.today.viewFull': 'Full plan →',
   // Dense layout from the prototype (issue #30): KPI strip, period axis, panels.
   'plan.kpi.left': 'LEFT · {days} DAYS',
   'plan.kpi.canSpend': 'YOU CAN SPEND',
@@ -318,7 +314,6 @@ export const en = {
   'common.retry': 'Retry',
 
   // Навигация
-  'nav.today': 'Today',
   'nav.plan': 'Plan',
   'fx.title': 'Exchange',
   'fx.gave': 'Gave',

@@ -90,10 +90,7 @@ export const ru: Record<TranslationKey, string> = {
   'plan.empty.subtitle': 'Курс проложим, как добавишь доход и куда он идёт.',
   'plan.hero.canSpend': 'МОЖНО ТРАТИТЬ',
   'plan.hero.perDay': '/день',
-  'plan.today.periodLabel': 'ПЕРИОД',
   'plan.today.until': 'до {date} · осталось дней: {days}',
-  'plan.today.daysLeft': 'до выплаты дней: {days}',
-  'plan.today.expected': 'Ожидаемый доход периода',
 
   // План периода — автосборка каскадом (Спринт 2)
   'plan.groups.debt': 'Долги',
@@ -266,7 +263,6 @@ export const ru: Record<TranslationKey, string> = {
     'У части обязательств нет курса — цифра дня их не учитывает и может быть завышена.',
   'plan.empty.noPlan': 'Пока раскладывать нечего — задай доход и добавь обязательства.',
   'plan.empty.needIncome': 'Настройку пропустили. Добавь источник дохода — план соберётся сам.',
-  'plan.today.viewFull': 'Весь план →',
   // Плотная раскладка по прототипу (issue #30): KPI-полоса, ось периода, панели.
   'plan.kpi.left': 'ОСТАЛОСЬ · ДНЕЙ: {days}',
   'plan.kpi.canSpend': 'МОЖНО ТРАТИТЬ',
@@ -317,7 +313,6 @@ export const ru: Record<TranslationKey, string> = {
   'common.retry': 'Повторить',
 
   // Навигация
-  'nav.today': 'Сегодня',
   'nav.plan': 'План',
   'fx.title': 'Размен',
   'fx.gave': 'Отдал',
