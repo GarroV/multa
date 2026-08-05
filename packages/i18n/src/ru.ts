@@ -238,7 +238,7 @@ export const ru: Record<TranslationKey, string> = {
   'plan.master.on': 'Таблица',
   'plan.master.off': 'Панели',
   'plan.master.col1': 'Статья',
-  'plan.master.addRow': 'завести',
+  'plan.master.addRow': 'Добавить строку',
   'plan.master.now': 'сейчас',
   'plan.master.free': 'Свободный остаток',
   'plan.master.perDay': 'На день',

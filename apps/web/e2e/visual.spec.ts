@@ -195,6 +195,43 @@ test.describe('демо-данные', () => {
     }
   });
 
+  test('колонки таблицы не растягиваются по ширине окна', async ({ page }) => {
+    /*
+     * `minmax(76px, 1fr)` растягивал шесть колонок на всю ширину монитора: на 2560px «57 420» и
+     * «133 980» стояли в полуметре друг от друга, а таблица существует ровно для того, чтобы
+     * сравнить их взглядом. Правка минимума не помогала — растягивал `1fr`.
+     *
+     * Проверяем оба требования сразу: колонки узкие и РАВНЫЕ между собой. Равенство важно не меньше:
+     * ради него и держится минимум, иначе каждая колонка сжимается под своё содержимое и столбец
+     * перестаёт читаться как столбец.
+     */
+    await page.setViewportSize({ width: 1900, height: 800 });
+    await page.goto('/plan?view=table');
+    await page.locator('.mgrid-row').first().waitFor();
+
+    const tracks = await page
+      .locator('.mgrid-row')
+      .first()
+      .evaluate((el) =>
+        getComputedStyle(el)
+          .gridTemplateColumns.split(' ')
+          .map((v) => Math.round(parseFloat(v))),
+      );
+
+    // Первая дорожка — подписи, последняя — пустой добор до края; числа живут между ними.
+    const numeric = tracks.slice(1, -1);
+    expect(numeric.length, 'колонок периодов').toBeGreaterThan(3);
+    for (const w of numeric) {
+      expect(w, `ширина колонки при окне 1900px: ${numeric.join(', ')}`).toBeLessThanOrEqual(120);
+    }
+    expect(
+      Math.max(...numeric) - Math.min(...numeric),
+      'разброс ширин колонок',
+    ).toBeLessThanOrEqual(2);
+    // Добор обязан существовать: без него разделители обрывались бы там, где кончились числа.
+    expect(tracks.at(-1)!, 'пустой добор справа').toBeGreaterThan(100);
+  });
+
   test('пиктограммы переключателя вида различимы', async ({ page }) => {
     /*
      * «▤» и «▦» в интерфейсном шрифте рисовались двумя почти одинаковыми квадратиками. Эталон здесь

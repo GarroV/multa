@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePlanGrid, type GridCellDto, type GridGroupDto } from '../lib/queries.ts';
+import { IconPlus } from './ui/icons.tsx';
 
 /**
  * Мастер-режим (issue #47) — та самая таблица, которую основатель вёл в Excel: строки статей
@@ -67,12 +68,17 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
     </span>
   );
 
-  /* Куда идти заполнять раздел: доход — в настройки, остальное — на «Обязательства». */
+  /*
+   * Куда идти заполнять раздел. Доход и категории правятся на самом «Плане» (панели), остальное —
+   * на «Обязательствах». Пустые категории раньше не предлагали ничего: у них не было адреса, и
+   * единственный раздел без плюса выглядел как недоделка, а не как правило.
+   */
   const SECTION_HREF: Record<string, string> = {
-    income: '/settings',
+    income: '/plan',
     debt: '/obligations',
     bucket: '/obligations',
     envelope: '/obligations',
+    category: '/plan',
     goal: '/obligations',
   };
 
@@ -102,8 +108,13 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
             )}
             {/* Пустой раздел — не украшение, а приглашение: строку заводят в своём разделе. */}
             {g.rows.length === 0 && SECTION_HREF[g.kind] && (
-              <Link className="act mgrid-add" to={SECTION_HREF[g.kind]}>
-                {t('plan.master.addRow')}
+              <Link
+                className="act act-icon mgrid-add"
+                to={SECTION_HREF[g.kind]}
+                aria-label={t('plan.master.addRow')}
+                title={t('plan.master.addRow')}
+              >
+                <IconPlus />
               </Link>
             )}
           </span>
