@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { PlanAllocation, PlanDto } from './queries.ts';
-import { cascadeGroups, clusterMarks, donutArcs, markPosition } from './planView.ts';
+import { axisMinGapPct, cascadeGroups, clusterMarks, donutArcs, markPosition } from './planView.ts';
 
 /**
  * Подготовка данных плана к плотной раскладке прототипа: донат каскада и карта периода.
@@ -177,5 +177,40 @@ describe('clusterMarks', () => {
 
   test('пустой вход — пустой выход', () => {
     expect(clusterMarks([], 7)).toEqual([]);
+  });
+});
+
+/**
+ * Зазор подписей на оси (issue #87). Раньше он был константой в процентах — 9% оси. На ноутбуке
+ * это 130px и подписи не спорили, на телефоне те же 9% превращались в 31px, и «01 · Utilities
+ * 8,200 RSD», «Сегодня» и «Internet + mobile» печатались друг поверх друга.
+ */
+describe('axisMinGapPct', () => {
+  test('на широкой оси зазор — доля от неё, подписи почти не схлопываются', () => {
+    const pct = axisMinGapPct(1390);
+    expect(pct).toBeGreaterThan(8);
+    expect(pct).toBeLessThan(14);
+  });
+
+  test('на телефоне зазор растёт настолько, что рядом стоящие подписи схлопнутся', () => {
+    const pct = axisMinGapPct(342);
+    expect(pct).toBeGreaterThan(30);
+  });
+
+  test('чем уже ось, тем больше зазор — никогда наоборот', () => {
+    const widths = [1440, 1024, 768, 560, 390, 320];
+    const pcts = widths.map(axisMinGapPct);
+    for (let i = 1; i < pcts.length; i += 1) {
+      expect(pcts[i]!).toBeGreaterThanOrEqual(pcts[i - 1]!);
+    }
+  });
+
+  test('нулевая или неизмеренная ширина не даёт делить на ноль', () => {
+    expect(Number.isFinite(axisMinGapPct(0))).toBe(true);
+    expect(axisMinGapPct(0)).toBeLessThanOrEqual(100);
+  });
+
+  test('зазор не превышает всей оси: иначе схлопнется даже единственная метка группы', () => {
+    expect(axisMinGapPct(120)).toBeLessThanOrEqual(100);
   });
 });

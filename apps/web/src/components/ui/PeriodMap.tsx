@@ -1,6 +1,13 @@
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.tsx';
 import { formatMinor } from '../../lib/format.ts';
-import { clusterMarks, markPosition, todayInPeriod, type AxisMark } from '../../lib/planView.ts';
+import {
+  axisMinGapPct,
+  clusterMarks,
+  markPosition,
+  todayInPeriod,
+  type AxisMark,
+} from '../../lib/planView.ts';
 import type { ForecastEvent, PlanDto, RecurringDue } from '../../lib/queries.ts';
 
 /**
@@ -11,10 +18,11 @@ import type { ForecastEvent, PlanDto, RecurringDue } from '../../lib/queries.ts'
  * Метки, стоящие вплотную, схлопываются (`planView.clusterMarks`): подписи на оси иначе
  * наезжают друг на друга, и карта перестаёт читаться. Приоритет в тесной группе — у риска и
  * «сегодня», потому что именно они меняют решение.
+ *
+ * Насколько «вплотную» — зависит от ширины оси в пикселях, поэтому ось приходится измерять
+ * (issue #87). Проценты сами по себе этого не знают: 9% ноутбука — это 130px, а 9% телефона —
+ * 31px, и на телефоне подписи налезали друг на друга при формально том же зазоре.
  */
-
-/** Минимальный зазор между подписями, проценты ширины оси. Подобран под подпись ~140px. */
-const MIN_GAP_PCT = 9;
 
 interface PeriodMapProps {
   plan: PlanDto;
@@ -24,6 +32,27 @@ interface PeriodMapProps {
 
 export function PeriodMap({ plan, dueSoon = [], events = [] }: PeriodMapProps) {
   const { t, locale } = useI18n();
+  /*
+   * Ширина оси — внешняя величина: её задаёт вёрстка, а меняют поворот экрана, боковая панель и
+   * смена шрифта. Поэтому измеряем до отрисовки (иначе первый кадр покажет наложение) и слушаем
+   * изменения.
+   */
+  const lineRef = useRef<HTMLDivElement | null>(null);
+  const [axisPx, setAxisPx] = useState(0);
+  const measure = useCallback(() => {
+    const w = lineRef.current?.getBoundingClientRect().width ?? 0;
+    setAxisPx((prev) => (Math.abs(prev - w) > 1 ? w : prev));
+  }, []);
+
+  useLayoutEffect(() => {
+    measure();
+    const el = lineRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure]);
+
   const { startsOn, endsOn } = plan.period;
   const at = (on: string) => markPosition(startsOn, endsOn, on);
   const day = (on: string) => on.slice(8, 10);
@@ -71,12 +100,12 @@ export function PeriodMap({ plan, dueSoon = [], events = [] }: PeriodMapProps) {
     });
   }
 
-  const clusters = clusterMarks(marks, MIN_GAP_PCT);
+  const clusters = clusterMarks(marks, axisMinGapPct(axisPx));
 
   return (
     <div className="pmap">
       <span className="kpi-label">{t('plan.map.title')}</span>
-      <div className="pmap-line">
+      <div className="pmap-line" ref={lineRef}>
         {clusters.map((c) => (
           <span key={c.lead.key} className="pmap-mark" style={{ ['--at' as string]: `${c.at}%` }}>
             <span

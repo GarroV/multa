@@ -1272,15 +1272,23 @@ a {
  * значок.
  */
 .seg-icon {
-  font-size: 15px;
+  /* Клетка под нарисованную иконку: подпись ушла в aria-label, лишний воздух ей уже не нужен. */
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
   line-height: 1;
-  letter-spacing: 0;
-  padding: 5px 9px;
 }
 .act-icon {
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
   line-height: 1;
-  padding: 4px 8px;
+}
+/* Контур иконки тонкий, но не волосяной: на 14px он иначе пропадает в светлой теме. */
+.seg-icon svg,
+.act-icon svg {
+  stroke-width: 1.2;
+  stroke-linecap: round;
 }
 /* Включённый предпросмотр обязан быть видно и без баннера: это чужой взгляд на свои деньги. */
 .act-icon[aria-pressed='true'] {

@@ -187,3 +187,37 @@ test('на широком экране порядок прежний: полос
   expect(Math.abs(money.y - hero.y)).toBeLessThan(2);
   expect(money.x).toBeLessThan(hero.x);
 });
+
+test('подписи на карте периода не встают вплотную на телефоне (#87)', async ({ page }) => {
+  /*
+   * Зазор между подписями считался в процентах оси, и на телефоне те же 9% давали 31px вместо
+   * 130px: соседние подписи вставали в один-три пикселя друг от друга, а при другой раскладке дат
+   * прямо налезали одна на другую.
+   *
+   * Проверяется зазор, а не пересечение: пересечение зависит от того, какие события попали в
+   * период сегодня, и тест на него зелёный через день после того, как баг вернулся. Требование
+   * «между подписями видно пустое место» от данных не зависит.
+   */
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/plan');
+  await page.locator('.pmap-cap').first().waitFor();
+
+  const boxes = await page.locator('.pmap-cap').evaluateAll((els) =>
+    els
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, text: el.textContent ?? '' };
+      })
+      .sort((a, b) => a.left - b.left),
+  );
+
+  const MIN_GAP_PX = 8;
+  for (let i = 1; i < boxes.length; i += 1) {
+    const prev = boxes[i - 1]!;
+    const cur = boxes[i]!;
+    expect(
+      cur.left - prev.right,
+      `«${prev.text}» и «${cur.text}» стоят вплотную`,
+    ).toBeGreaterThanOrEqual(MIN_GAP_PX);
+  }
+});
