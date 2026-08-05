@@ -46,7 +46,7 @@ export interface GridCellDto {
 }
 
 export interface GridRowDto {
-  targetKind: TargetKind;
+  targetKind: TargetKind | 'income';
   targetId: string;
   name: string;
   sourceCurrency: string;
@@ -251,20 +251,58 @@ export async function getPlanGrid(
 
   const cellsToStrings = (cells: readonly bigint[]) => cells.map((v) => v.toString());
 
-  // Доход — отдельная группа сверху: это не строка каскада, но без неё таблица не читается.
+  /*
+   * Доход — отдельная группа сверху: это не строка каскада, но без неё таблица не читается.
+   *
+   * Внутри группы — строка на источник, чтобы «57 420» можно было развернуть и увидеть, из чего
+   * они сложились. Колонка «сейчас» считается той же арифметикой, что и итог периода в плане:
+   * подтверждённое поступление берётся по своему снапшоту курса, ожидаемое — по сегодняшнему
+   * (и ноль, если курса нет). Иначе строки не сошлись бы с суммой над ними, а таблица с двумя
+   * разными правдами про одни деньги хуже таблицы без разбивки.
+   */
+  /* Нет курса — ноль, ровно как в итоге периода: план тоже не выдумывает неизвестную сумму. */
+  const incomeToBase = (amountMinor: bigint, currency: string): bigint =>
+    toBase(amountMinor, currency) ?? 0n;
+
+  const incomeBySource = new Map<string, { label: string; currency: string; cells: bigint[] }>();
+  const ensureRow = (sourceId: string, label: string, currency: string) => {
+    const existing = incomeBySource.get(sourceId);
+    if (existing) return existing;
+    const fresh = { label, currency, cells: periods.map(() => 0n) };
+    incomeBySource.set(sourceId, fresh);
+    return fresh;
+  };
+
+  for (const e of plan.income.events) {
+    const row = ensureRow(e.sourceId, e.label, e.currency);
+    row.cells[0] =
+      (row.cells[0] ?? 0n) +
+      (e.baseAmountMinor !== undefined
+        ? BigInt(e.baseAmountMinor)
+        : incomeToBase(BigInt(e.amountMinor), e.currency));
+  }
+
+  periods.forEach((period: PayPeriod, i: number) => {
+    if (i === 0) return;
+    for (const e of incomeEventsIn(sources, period, weekendRule)) {
+      const row = ensureRow(e.sourceId, e.label, e.currency);
+      row.cells[i] = (row.cells[i] ?? 0n) + incomeToBase(e.amountMinor, e.currency);
+    }
+  });
+
+  const incomeRows: GridRowDto[] = [...incomeBySource.entries()].map(([sourceId, row]) => ({
+    targetKind: 'income' as const,
+    targetId: sourceId,
+    name: row.label,
+    sourceCurrency: row.currency,
+    cells: row.cells.map((v) => ({ minor: v.toString(), state: 'planned' as const })),
+    totalMinor: row.cells.reduce((a, b) => a + b, 0n).toString(),
+    endsAfterIndex: null,
+  }));
+
   const incomeGroup: GridGroupDto = {
     kind: 'income',
-    rows: [
-      {
-        targetKind: 'category',
-        targetId: 'income',
-        name: '',
-        sourceCurrency: base,
-        cells: incomeMinor.map((v) => ({ minor: v.toString(), state: 'planned' as const })),
-        totalMinor: incomeMinor.reduce((a, b) => a + b, 0n).toString(),
-        endsAfterIndex: null,
-      },
-    ],
+    rows: incomeRows,
     totals: incomeMinor.map((v) => v.toString()),
     totalMinor: incomeMinor.reduce((a, b) => a + b, 0n).toString(),
   };

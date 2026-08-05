@@ -40,6 +40,21 @@ describe('вход в демо', () => {
     for (const a of plan.allocations)
       expect(BigInt(a.allocatedMinor)).toBeGreaterThanOrEqual(100_000n);
     expect(BigInt(plan.canSpendPerDayMinor)).toBeGreaterThan(0n);
+    /*
+     * Демо обязано выглядеть здоровым в ЛЮБОЙ день периода (issue #88). Раньше эта проверка
+     * падала во второй половине периода — история закрытых месяцев отсчитывалась от «сегодня» и
+     * заезжала внутрь текущего периода, — и выглядело это как флейк, а не как баг. Инвариант
+     * называем прямо: перерасхода в демо быть не должно, а факт по категории не может превышать
+     * её план.
+     */
+    expect(plan.overspentMinor).toBe('0');
+    for (const a of plan.allocations) {
+      if (a.targetKind !== 'category') continue;
+      expect(
+        BigInt(a.spentMinor ?? '0') <= BigInt(a.allocatedMinor),
+        `${a.name}: факт ${a.spentMinor} больше плана ${a.allocatedMinor}`,
+      ).toBe(true);
+    }
   });
 
   test('остаток по счетам заполнен и считается в базовой валюте', async () => {

@@ -151,6 +151,30 @@ describe('мастер-сетка', () => {
     ]);
   });
 
+  test('доход разбит по источникам, и строки сходятся с итогом в каждой колонке', async () => {
+    /*
+     * Разбивку добавили, чтобы «57 420» можно было развернуть и увидеть, из чего они сложились
+     * (запрос владельца 2026-08-05). Инвариант тут один и он важнее самой разбивки: сумма строк
+     * обязана равняться итогу группы в КАЖДОЙ колонке. Таблица, где строки не сходятся с суммой
+     * над ними, не объясняет число, а подрывает доверие ко всей сетке.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const dto = await grid(client);
+    const income = dto.groups.find((g) => g.kind === 'income');
+    if (!income) throw new Error('группы дохода нет');
+
+    expect(income.rows.length).toBeGreaterThan(0);
+    for (const row of income.rows) {
+      expect(row.name).not.toBe('');
+      expect(row.targetKind).toBe('income');
+    }
+
+    income.totals.forEach((total, i) => {
+      const sum = income.rows.reduce((acc, r) => acc + BigInt(r.cells[i]!.minor), 0n);
+      expect(sum.toString(), `колонка ${i}`).toBe(total);
+    });
+  });
+
   test('«к размену» разбит по валютам получения и совпадает с итогом', async () => {
     const client = await onboarded();
     await expectOk(

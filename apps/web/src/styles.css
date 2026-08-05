@@ -1496,8 +1496,64 @@ a {
   background: var(--bg-panel);
   border-right: 1px solid var(--line);
   overflow: hidden;
+  white-space: nowrap;
+  /*
+   * Ряд, а не строка текста: рядом с подписью живут кнопка разворота, валюта и «завести». Раньше
+   * ячейка обрезала всё разом по ellipsis, и «ВАЛЮТНЫЕ КОРЗИ…» съедала кнопку до огрызка.
+   */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Обрезается только подпись. Кнопки и валюта не жмутся: обрезанная кнопка выглядит как поломка. */
+.mgrid-label {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.mgrid-name > .act,
+.mgrid-name > .dim {
+  flex: 0 0 auto;
+}
+/* Разворот раздела: кликается вся подпись, а не только треугольник. */
+.mgrid-toggle {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: left;
+}
+.mgrid-chev {
+  color: var(--text-mid);
+  /* 0.7rem превращало треугольник в точку — знак «здесь разворачивается» пропадал. */
+  font-size: 0.85rem;
+  line-height: 1;
+  /* Ширина фиксирована: иначе подписи разделов разъезжаются при сворачивании. */
+  width: 10px;
+}
+.mgrid-toggle:hover .mgrid-chev {
+  color: var(--accent);
+}
+/* Строка раздела отбита от подписи отступом: видно, что она под ней, а не рядом. */
+.mgrid-row-item .mgrid-name {
+  padding-left: 26px;
+}
+/* Ведёт глаз по строке до нужной колонки — на шести колонках без этого сбиваешься. */
+.mgrid-row-item:hover .mgrid-cell,
+.mgrid-row-item:hover .mgrid-name {
+  background: var(--hover1);
+}
+/* Разделы отделены друг от друга сильнее, чем строки внутри раздела. */
+.mgrid-group + .mgrid-group {
+  border-top: 1px solid var(--line-strong);
 }
 .mgrid-cell {
   padding: 7px 10px;

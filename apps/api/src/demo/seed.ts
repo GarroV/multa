@@ -497,9 +497,22 @@ export async function seedDemo(userId: string): Promise<string> {
   // Факт закрытых периодов: по одной сводной трате на категорию и период («крупный мазок» —
   // легитимный сценарий продукта, а не деградация).
   const historyRows: (typeof transactions.$inferInsert)[] = [];
+  /*
+   * Дни истории отсчитываются от НАЧАЛА текущего периода, а не от «сегодня» (issue #88).
+   *
+   * Было `shift(asOf, -15 * back + 4)`: при полумесячном ритме и длинном периоде ближайший день
+   * истории (asOf − 11) заезжал внутрь текущего периода, и сводная трата закрытого месяца
+   * записывалась как трата этого. Демо копило чужой факт — 88 878 вместо 26 000 — и показывало
+   * «деньги кончились сегодня, на день 0». Причём только во второй половине периода, из-за чего
+   * это выглядело как флейк теста, а не как баг.
+   */
   for (let back = 6; back >= 1; back -= 1) {
-    const day = shift(asOf, -15 * back + 4);
+    const day = shift(current.period.startsOn, -15 * back + 4);
     const { periodId } = await ensurePeriodForDate(ws, day);
+    // Fail-fast: молчаливое попадание истории в текущий период — ровно тот баг, что был выше.
+    if (periodId === current.periodId) {
+      throw new Error(`demo_seed_history_in_current_period:${day}`);
+    }
     for (const [name, series] of Object.entries(HISTORY)) {
       const amount = BigInt(series[6 - back] ?? series[series.length - 1]!);
       historyRows.push({
@@ -541,6 +554,40 @@ export async function seedDemo(userId: string): Promise<string> {
     { name: 'Eating out', minor: 450n, currency: 'EUR', day: shift(asOf, -1), note: 'coffee' },
     { name: 'Home', minor: 214_000n, currency: 'RSD', day: shift(asOf, -1) },
   ];
+  /*
+   * Факт масштабируется по пройденной части периода (issue #88).
+   *
+   * До этого суммы были фиксированными: демо тратило одни и те же 26 000 и на второй день периода,
+   * и на предпоследний. Ближе к выплате это превращалось в «деньги кончились сегодня, на день 0» —
+   * то есть человек, которому дали ссылку, видел сломанный бюджет вместо продукта. Теперь темп
+   * трат ровный: доля потраченного равна доле прошедшего времени, а сама доля заведомо ниже плана,
+   * поэтому цифра дня остаётся положительной в любой день периода.
+   */
+  const periodDays = BigInt(
+    Math.max(
+      1,
+      Math.round(
+        (Date.parse(`${current.period.endsOn}T00:00:00Z`) -
+          Date.parse(`${current.period.startsOn}T00:00:00Z`)) /
+          86_400_000,
+      ),
+    ),
+  );
+  const elapsedDays = BigInt(
+    Math.min(
+      Number(periodDays),
+      Math.max(
+        1,
+        Math.round(
+          (Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${current.period.startsOn}T00:00:00Z`)) /
+            86_400_000,
+        ),
+      ),
+    ),
+  );
+  /** Целочисленно: деньги — minor units, float в них запрещён (правило 1). */
+  const soFar = (minor: bigint): bigint => (minor * elapsedDays) / periodDays;
+
   for (const f of currentFacts) {
     const snap = f.currency === 'RUB' ? null : f.currency === 'EUR' ? eurRate : rsdRate;
     /*
@@ -548,14 +595,19 @@ export async function seedDemo(userId: string): Promise<string> {
      * 1), и он же игнорирует экспоненты валют — RSD с exponent 0 пересчитывался как двузначный.
      * Рядом, у разменов, уже использовался convert; здесь остался старый расчёт (найдено аудитом).
      */
-    const baseAmountMinor = snap ? convert(money(f.minor, f.currency), snap).minor : f.minor;
+    const amountMinor = soFar(f.minor);
+    // Ноль тратой не показываем: пустая строка «0» в списке трат читается как сбой ввода.
+    if (amountMinor <= 0n) continue;
+    const baseAmountMinor = snap
+      ? convert(money(amountMinor, f.currency), snap).minor
+      : amountMinor;
     historyRows.push({
       workspaceId,
       periodId: current.periodId,
       kind: 'expense',
       targetKind: 'category',
       targetId: catId(f.name),
-      amountMinor: f.minor,
+      amountMinor,
       currency: f.currency,
       baseAmountMinor,
       rate: snap ? snap.rate : '1',

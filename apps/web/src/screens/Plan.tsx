@@ -2,6 +2,7 @@ import type { TranslationKey } from '@multa/i18n';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
+import { IncomeEditor } from '../components/IncomeEditor.tsx';
 import { MasterGrid } from '../components/MasterGrid.tsx';
 import { Tour } from '../components/tour/Tour.tsx';
 import { PLAN_TOUR } from '../components/tour/steps.ts';
@@ -332,6 +333,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   // Пересборка живёт в строке категории (там известно, сколько не хватает), поэтому баннер
   // риска не открывает свой модал, а раскрывает редактор категорий — оттуда один шаг до варианта.
   const [editingCats, setEditingCats] = useState(false);
+  /* Правка дохода раскрывается на месте, как у категорий: уводить с плана на «Настройки» значило
+     терять из виду то самое число, ради которого человек нажал «править». */
+  const [editingIncome, setEditingIncome] = useState(false);
   // Подтверждение поступления (issue #48): открывается чипом «ждём» у конкретной выплаты.
   const [receiptFor, setReceiptFor] = useState<IncomeEventDto | null>(null);
   /*
@@ -506,57 +510,68 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 sum={withCcy(plan.incomeMinor)}
                 accent="lime"
                 tools={
-                  <Link className="act" to="/settings">
+                  <button
+                    type="button"
+                    className="act"
+                    aria-pressed={editingIncome}
+                    onClick={() => setEditingIncome((v) => !v)}
+                  >
                     {t('plan.act.edit')}
-                  </Link>
+                  </button>
                 }
               >
-                {plan.income.events.length === 0 && (
+                {editingIncome && (
+                  <div style={{ padding: '10px 14px' }}>
+                    <IncomeEditor base={base} locale={locale} />
+                  </div>
+                )}
+                {!editingIncome && plan.income.events.length === 0 && (
                   <div className="prow">
                     <span />
                     <span className="dim">{t('common.empty')}</span>
                   </div>
                 )}
-                {plan.income.events.map((e) => (
-                  <div className="prow" key={`${e.sourceId}:${e.date}`}>
-                    <span className="prow-day">{e.date.slice(8, 10)}</span>
-                    <span className="prow-name">
-                      <span>{e.label}</span>
-                      {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
-                      {e.status === 'received' && (
-                        <Tag tone="lime">{t('income.chip.received')}</Tag>
+                {!editingIncome &&
+                  plan.income.events.map((e) => (
+                    <div className="prow" key={`${e.sourceId}:${e.date}`}>
+                      <span className="prow-day">{e.date.slice(8, 10)}</span>
+                      <span className="prow-name">
+                        <span>{e.label}</span>
+                        {e.currency !== base && <Tag tone="vio">{e.currency}</Tag>}
+                        {e.status === 'received' && (
+                          <Tag tone="lime">{t('income.chip.received')}</Tag>
+                        )}
+                      </span>
+                      <span className="prow-num">
+                        <b>
+                          {formatMinor(e.amountMinor, e.currency, locale)} {e.currency}
+                        </b>
+                        {e.baseAmountMinor && e.currency !== base && (
+                          <i>
+                            ≈ {formatMinor(e.baseAmountMinor, base, locale)} {base}
+                          </i>
+                        )}
+                      </span>
+                      {/* Пока «ждём» — чип открывает подтверждение факта; после — даёт его отменить. */}
+                      {e.status === 'expected' ? (
+                        <button type="button" className="act" onClick={() => setReceiptFor(e)}>
+                          {t('income.chip.expected')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="act"
+                          disabled={cancelReceipt.isPending}
+                          onClick={() => e.receiptId && cancelReceipt.mutate(e.receiptId)}
+                        >
+                          {t('income.cancelReceipt')}
+                        </button>
                       )}
-                    </span>
-                    <span className="prow-num">
-                      <b>
-                        {formatMinor(e.amountMinor, e.currency, locale)} {e.currency}
-                      </b>
-                      {e.baseAmountMinor && e.currency !== base && (
-                        <i>
-                          ≈ {formatMinor(e.baseAmountMinor, base, locale)} {base}
-                        </i>
+                      {cancelReceipt.isError && (
+                        <span className="prow-note danger">⚠ {t('common.error')}</span>
                       )}
-                    </span>
-                    {/* Пока «ждём» — чип открывает подтверждение факта; после — даёт его отменить. */}
-                    {e.status === 'expected' ? (
-                      <button type="button" className="act" onClick={() => setReceiptFor(e)}>
-                        {t('income.chip.expected')}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="act"
-                        disabled={cancelReceipt.isPending}
-                        onClick={() => e.receiptId && cancelReceipt.mutate(e.receiptId)}
-                      >
-                        {t('income.cancelReceipt')}
-                      </button>
-                    )}
-                    {cancelReceipt.isError && (
-                      <span className="prow-note danger">⚠ {t('common.error')}</span>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  ))}
                 {BigInt(plan.extraIncomeMinor) > 0n && (
                   <div className="prow">
                     <span className="prow-day" aria-hidden />
@@ -666,14 +681,22 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 ссылка «завести обязательство» ведёт туда, где он ничего не может.
               */}
               {obligationGroups.length === 0 && !collapsedForViewer && (
-                <Panel label={t('plan.empty.title')} accent="amber">
-                  <div className="prow">
-                    <span />
-                    <span className="dim">{t('plan.empty.noPlan')}</span>
+                /*
+                 * Кнопка живёт в шапке панели, как у всех остальных: раньше она стояла внутри
+                 * строки содержимого и висела не на той высоте, что «править» у соседей.
+                 */
+                <Panel
+                  label={t('plan.empty.title')}
+                  accent="amber"
+                  tools={
                     <Link className="act" to="/obligations">
                       {t('nav.obligations')}
                     </Link>
+                  }
+                >
+                  <div className="prow">
                     <span />
+                    <span className="dim">{t('plan.empty.noPlan')}</span>
                   </div>
                 </Panel>
               )}

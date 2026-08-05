@@ -53,6 +53,7 @@ export const ru: Record<TranslationKey, string> = {
   'income.extra.irregularNote': 'Нерегулярный доход в план не идёт — только в факт.',
   'income.variable': 'плавает',
   'income.kind.legend': 'Ритм дохода',
+  'income.editor.rhythmHint': 'Границы периодов задаёт ритм выплат —',
   'income.kind.monthly': 'Число месяца',
   'income.kind.weekly': 'Раз в неделю',
   'income.kind.daily': 'Каждый день',

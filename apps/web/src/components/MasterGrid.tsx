@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -18,6 +19,10 @@ import { usePlanGrid, type GridCellDto, type GridGroupDto } from '../lib/queries
  *
  * Правка идёт из разделов («Обязательства», редактор категорий), а не по ячейке: вторая точка
  * ввода тех же сумм означала бы вторую правду о планах.
+ *
+ * Разделы разворачиваются (запрос владельца 2026-08-05): итог сверху отвечает «сколько», строки
+ * под ним — «из чего». Раскрыты по умолчанию, потому что таблицу открывают ради разбивки; сложить
+ * её можно, когда мешает. Доход раньше разбивки не имел вовсе — теперь у него строка на источник.
  */
 
 const GROUP_LABEL = {
@@ -32,6 +37,8 @@ const GROUP_LABEL = {
 export function MasterGrid({ periods = 6 }: { periods?: number }) {
   const { t, locale } = useI18n();
   const { data, isPending, isError, refetch } = usePlanGrid(periods);
+  /* Сложенные разделы: состояние экрана, не домена, поэтому живёт здесь и не уезжает на сервер. */
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   if (isPending) return <div className="mgrid-note">{t('common.loading')}</div>;
   if (isError || !data) {
@@ -69,37 +76,56 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
     goal: '/obligations',
   };
 
-  const group = (g: GridGroupDto) => (
-    <div className="mgrid-group" key={g.kind}>
-      <div className="mgrid-row mgrid-row-head">
-        <span className="mgrid-name">
-          {t(GROUP_LABEL[g.kind])}
-          {/* Пустой раздел — не украшение, а приглашение: строку заводят в своём разделе. */}
-          {g.rows.length === 0 && SECTION_HREF[g.kind] && (
-            <Link className="act mgrid-add" to={SECTION_HREF[g.kind]}>
-              {t('plan.master.addRow')}
-            </Link>
-          )}
-        </span>
-        {g.totals.map((v, i) => (
-          <span className="mgrid-cell" key={i}>
-            {fmt(v)}
+  const group = (g: GridGroupDto) => {
+    const open = collapsed[g.kind] !== true;
+    const label = t(GROUP_LABEL[g.kind]);
+    return (
+      <div className="mgrid-group" key={g.kind}>
+        <div className="mgrid-row mgrid-row-head">
+          <span className="mgrid-name">
+            {g.rows.length > 0 ? (
+              <button
+                type="button"
+                className="mgrid-toggle"
+                aria-expanded={open}
+                onClick={() => setCollapsed((prev) => ({ ...prev, [g.kind]: open }))}
+              >
+                {/* Треугольник — общий знак «здесь есть что раскрыть»; смысл несёт aria-expanded. */}
+                <span className="mgrid-chev" aria-hidden>
+                  {open ? '▾' : '▸'}
+                </span>
+                <span className="mgrid-label">{label}</span>
+                {!open && <span className="dim"> · {g.rows.length}</span>}
+              </button>
+            ) : (
+              <span className="mgrid-label">{label}</span>
+            )}
+            {/* Пустой раздел — не украшение, а приглашение: строку заводят в своём разделе. */}
+            {g.rows.length === 0 && SECTION_HREF[g.kind] && (
+              <Link className="act mgrid-add" to={SECTION_HREF[g.kind]}>
+                {t('plan.master.addRow')}
+              </Link>
+            )}
           </span>
-        ))}
-      </div>
-      {/* Доход — одна строка на группу: разбивка по источникам живёт на «Плане». */}
-      {g.kind !== 'income' &&
-        g.rows.map((r) => (
-          <div className="mgrid-row" key={r.targetId}>
-            <span className="mgrid-name">
-              {r.name}
-              {r.sourceCurrency !== base && <i className="dim"> {r.sourceCurrency}</i>}
+          {g.totals.map((v, i) => (
+            <span className="mgrid-cell" key={i}>
+              {fmt(v)}
             </span>
-            {r.cells.map((c, i) => cell(c, `${r.targetId}-${i}`))}
-          </div>
-        ))}
-    </div>
-  );
+          ))}
+        </div>
+        {open &&
+          g.rows.map((r) => (
+            <div className="mgrid-row mgrid-row-item" key={r.targetId}>
+              <span className="mgrid-name">
+                <span className="mgrid-label">{r.name}</span>
+                {r.sourceCurrency !== base && <i className="dim"> {r.sourceCurrency}</i>}
+              </span>
+              {r.cells.map((c, i) => cell(c, `${r.targetId}-${i}`))}
+            </div>
+          ))}
+      </div>
+    );
+  };
 
   return (
     <div className="mgrid-wrap">

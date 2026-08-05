@@ -54,6 +54,7 @@ export const en = {
   'income.extra.irregularNote': 'Irregular income stays out of the plan — only recorded as fact.',
   'income.variable': 'floats',
   'income.kind.legend': 'Income rhythm',
+  'income.editor.rhythmHint': 'Period boundaries come from the payout rhythm —',
   'income.kind.monthly': 'Day of month',
   'income.kind.weekly': 'Weekly',
   'income.kind.daily': 'Every day',
