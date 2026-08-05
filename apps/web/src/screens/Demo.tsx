@@ -29,11 +29,9 @@ export function Demo() {
   }, [navigate]);
 
   return (
-    <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
-        <span className="brand" style={{ padding: 0 }}>
-          multa
-        </span>
+    <div className="page-center">
+      <div className="stack-center">
+        <span className="brand brand-flush">multa</span>
         <span className="dim">{failed ? t('demo.failed') : t('demo.entering')}</span>
         {failed && (
           <button className="btn" onClick={() => window.location.reload()}>

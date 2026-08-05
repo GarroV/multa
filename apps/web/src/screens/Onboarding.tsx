@@ -115,15 +115,11 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
   return (
     <OnboardingShell step={2}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.payday.title')}</h1>
-        <p className="dim" style={{ marginTop: 8 }}>
-          {t('onboarding.payday.subtitle')}
-        </p>
+        <h1 className="screen-title">{t('onboarding.payday.title')}</h1>
+        <p className="dim screen-sub">{t('onboarding.payday.subtitle')}</p>
       </div>
       <div>
-        <label className="micro" style={{ display: 'block', marginBottom: 8 }}>
-          {t('onboarding.income.how')}
-        </label>
+        <label className="micro field-legend">{t('onboarding.income.how')}</label>
         <div className="row">
           {(['monthly', 'weekly', 'daily'] as const).map((m) => (
             <button
@@ -159,7 +155,7 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
           />
         </>
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className="stack">
           <div className="form-row">
             <input
               className="field grow"
@@ -201,7 +197,7 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
         </div>
       ))}
       {save.isError && <div className="note-band">{t('common.error')}</div>}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="row-end">
         {/* Хотя бы одна валидная выплата обязательна: иначе план собрался бы на нуле. */}
         <button
           className="btn"

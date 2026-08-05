@@ -115,7 +115,7 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
         </b>
         {secondary && <i>{secondary}</i>}
       </span>
-      <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+      <span className="row row-tight">
         {a.targetKind === 'goal' && (
           <button
             type="button"
@@ -521,7 +521,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                 }
               >
                 {editingIncome && (
-                  <div style={{ padding: '10px 14px' }}>
+                  <div className="panel-inset">
                     <IncomeEditor base={base} locale={locale} />
                   </div>
                 )}
@@ -613,7 +613,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                     <CategoryRow key={a.targetId} a={a} base={base} locale={locale} />
                   ))}
                 {editingCats && (
-                  <div style={{ padding: '10px 14px' }}>
+                  <div className="panel-inset">
                     <CategoryEditor allocations={plan.allocations} base={base} locale={locale} />
                   </div>
                 )}

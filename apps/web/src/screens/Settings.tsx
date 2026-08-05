@@ -134,7 +134,7 @@ export function Settings() {
               </span>
               <span className="prow-num" />
               <span />
-              <span className="prow-bar" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+              <span className="prow-bar prow-bar-full">
                 <RhythmPicker
                   value={rhythm}
                   onChange={(next) => {

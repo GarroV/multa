@@ -61,19 +61,11 @@ export function Login() {
 
   if (needCode) {
     return (
-      <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24 }}>
-        <form
-          onSubmit={submitCode}
-          className="card"
-          style={{ width: 'min(420px, 100%)', display: 'grid', gap: 14 }}
-        >
+      <div className="page-center">
+        <form onSubmit={submitCode} className="card auth-form">
           <div>
-            <div className="brand" style={{ fontSize: 28, fontWeight: 600 }}>
-              {t('twofa.signInTitle')}
-            </div>
-            <div className="dim" style={{ marginTop: 4 }}>
-              {t('twofa.signInHint')}
-            </div>
+            <div className="brand brand-lg">{t('twofa.signInTitle')}</div>
+            <div className="dim note-tight">{t('twofa.signInHint')}</div>
           </div>
           <input
             className="field num"
@@ -88,7 +80,7 @@ export function Login() {
             required
           />
           {!backupMode && (
-            <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <label className="row row-check">
               <input
                 type="checkbox"
                 checked={trustDevice}
@@ -97,11 +89,7 @@ export function Login() {
               <span className="sub">{t('twofa.trustDevice')}</span>
             </label>
           )}
-          {error && (
-            <div className="danger" style={{ fontSize: 14 }}>
-              {error}
-            </div>
-          )}
+          {error && <div className="danger err-line">{error}</div>}
           <button className="btn" type="submit" disabled={busy || code.length === 0}>
             {busy ? t('common.loading') : t('twofa.confirm')}
           </button>
@@ -123,19 +111,11 @@ export function Login() {
   }
 
   return (
-    <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <form
-        onSubmit={submit}
-        className="card"
-        style={{ width: 'min(420px, 100%)', display: 'grid', gap: 14 }}
-      >
+    <div className="page-center">
+      <form onSubmit={submit} className="card auth-form">
         <div>
-          <div className="brand" style={{ fontSize: 28, fontWeight: 600 }}>
-            {t('auth.title')}
-          </div>
-          <div className="dim" style={{ marginTop: 4 }}>
-            {t('auth.subtitle')}
-          </div>
+          <div className="brand brand-lg">{t('auth.title')}</div>
+          <div className="dim note-tight">{t('auth.subtitle')}</div>
         </div>
         {mode === 'up' && (
           <input
@@ -163,11 +143,7 @@ export function Login() {
           required
           minLength={8}
         />
-        {error && (
-          <div className="danger" style={{ fontSize: 14 }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="danger err-line">{error}</div>}
         <button className="btn" type="submit" disabled={busy}>
           {busy ? t('common.loading') : mode === 'up' ? t('auth.signUp') : t('auth.signIn')}
         </button>

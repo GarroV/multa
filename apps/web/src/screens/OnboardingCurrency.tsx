@@ -33,12 +33,10 @@ export function OnboardingCurrency() {
   return (
     <OnboardingShell step={1}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 32 }}>{t('onboarding.currency.title')}</h1>
-        <p className="dim" style={{ marginTop: 8 }}>
-          {t('onboarding.currency.subtitle')}
-        </p>
+        <h1 className="screen-title">{t('onboarding.currency.title')}</h1>
+        <p className="dim screen-sub">{t('onboarding.currency.subtitle')}</p>
       </div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="row-wrap">
         {POPULAR.map((c) => (
           <button
             key={c}
@@ -49,7 +47,6 @@ export function OnboardingCurrency() {
               setCurrency(c);
               setSearch('');
             }}
-            style={{ minWidth: 96 }}
           >
             {c}
           </button>
@@ -62,7 +59,7 @@ export function OnboardingCurrency() {
         onChange={(e) => setSearch(e.target.value.toUpperCase())}
         maxLength={3}
       />
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="row-end">
         <button
           className="btn"
           disabled={mutation.isPending || chosen.length !== 3}
