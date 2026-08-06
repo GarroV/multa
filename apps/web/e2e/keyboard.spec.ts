@@ -29,7 +29,9 @@ test('Escape закрывает лист ввода и возвращает фо
   await expect(page.locator('.sheet')).toHaveCount(0);
 
   const focused = await page.evaluate(() => document.activeElement?.className ?? '');
-  expect(focused, 'фокус обязан вернуться на кнопку, которой лист открыли').toContain('act-primary');
+  expect(focused, 'фокус обязан вернуться на кнопку, которой лист открыли').toContain(
+    'act-primary',
+  );
 });
 
 test('лист ввода открывается и закрывается без мыши вовсе', async ({ page }) => {
