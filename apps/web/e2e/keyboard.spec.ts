@@ -28,10 +28,18 @@ test('Escape закрывает лист ввода и возвращает фо
   await page.keyboard.press('Escape');
   await expect(page.locator('.sheet')).toHaveCount(0);
 
-  const focused = await page.evaluate(() => document.activeElement?.className ?? '');
-  expect(focused, 'фокус обязан вернуться на кнопку, которой лист открыли').toContain(
-    'act-primary',
-  );
+  /*
+   * Возврат фокуса — состояние, наступающее следующим тиком: браузер сбрасывает фокус на body уже
+   * после уборки эффекта, поэтому реализация возвращает его отложенно. Снимать activeElement одним
+   * замером сразу после закрытия — гонка: локально успевало, на CI (медленнее) нет. Ждём
+   * конечного состояния; если фокус не вернётся вовсе, проверка всё равно упадёт по таймауту.
+   */
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.className ?? ''), {
+      message: 'фокус обязан вернуться на кнопку, которой лист открыли',
+      timeout: 5_000,
+    })
+    .toContain('act-primary');
 });
 
 test('лист ввода открывается и закрывается без мыши вовсе', async ({ page }) => {
