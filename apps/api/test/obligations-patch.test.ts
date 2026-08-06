@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { expectOk, onboarded } from './client.ts';
+import { expectOk, onboarded, signedUp } from './client.ts';
 
 /**
  * Правка обязательств (issue #91).
@@ -123,4 +123,27 @@ describe('правка обязательств', () => {
     const res = await client.patch(`/v1/debts/${created.id}`, {});
     expect(res.status).toBe(400);
   });
+});
+
+test('участник не может править чужие обязательства', async () => {
+  /*
+   * Сегодня отказ даёт `requireWorkspace` (участнику закрыт любой не-GET), а не сторож раздела.
+   * Тест закрепляет наблюдаемое поведение: когда появятся правки от участника (#83), он не должен
+   * молча превратиться в разрешение — правило видимости раздела обязано остаться главнее.
+   */
+  const owner = await onboarded();
+  const debt = await expectOk<Row>(await owner.post('/v1/debts', SECTIONS[0].create), 201);
+
+  const invite = await expectOk<{ code: string }>(
+    await owner.post('/v1/workspace/invites', { role: 'member' }),
+    201,
+  );
+  const guest = await signedUp();
+  await expectOk(await guest.post(`/v1/workspace/invites/${invite.code}/accept`));
+
+  const res = await guest.patch(`/v1/debts/${debt.id}`, { name: 'чужое' });
+  expect(res.status).toBe(403);
+
+  const list = await expectOk<Row[]>(await owner.get('/v1/debts'));
+  expect(list.find((r) => r.id === debt.id)?.name).toBe(SECTIONS[0].create.name);
 });

@@ -51,13 +51,19 @@ for (const { path, table, schema, patch } of ENTITIES) {
   });
 
   /*
+   * Сторож раздела стоит и на правке с удалением, хотя сегодня он там не срабатывает: участнику
+   * любой не-GET отбивает `requireWorkspace` раньше (403 read_only_member), а владельцу
+   * `requireSection` всегда пропускает. Это защита на будущее — issue #83 как раз про правки от
+   * участника, и в тот день пропуск сторожа превратился бы в настоящую дыру, которую никто бы не
+   * искал в этом файле (найдено фоновым ревью 06.08.2026).
+   *
    * Правка строки (issue #91). Раньше её не было вовсе: опечатку в названии долга или неверную
    * сумму конверта можно было исправить только удалением и повторным заведением — а вместе с
    * долгом уходила история платежей и прогноз закрытия. У категорий, счетов, регулярных платежей и
    * источников дохода PATCH при этом был, то есть продукт вёл себя по-разному с однородными
    * сущностями.
    */
-  obligations.patch(`/${path}/:id`, async (c) => {
+  obligations.patch(`/${path}/:id`, requireSection(path), async (c) => {
     const ws = c.get('workspace')!;
     const id = c.req.param('id');
     if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
@@ -72,7 +78,7 @@ for (const { path, table, schema, patch } of ENTITIES) {
     return c.json(serialize(updated[0]!));
   });
 
-  obligations.delete(`/${path}/:id`, async (c) => {
+  obligations.delete(`/${path}/:id`, requireSection(path), async (c) => {
     const ws = c.get('workspace')!;
     const id = c.req.param('id');
     if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
