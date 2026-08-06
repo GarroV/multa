@@ -396,6 +396,7 @@ export const en = {
   'obl.envelopes': 'Envelopes',
   'obl.goals': 'Goals',
   'obl.buckets': 'Currency baskets',
+  'obl.name': 'Name',
   'obl.payment': 'Payment / period',
   'obl.target': 'Target',
   'obl.rule.fixed': 'fixed',

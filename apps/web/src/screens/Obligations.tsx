@@ -1,8 +1,9 @@
 import { fromMajor } from '@multa/core';
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { useIsMember } from '../lib/role.ts';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
+import { ObligationEdit } from '../components/ObligationEdit.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
@@ -227,6 +228,8 @@ function DebtsSection({ base }: SectionProps) {
   const { data = [], isError, refetch } = useEntities<Debt>('debts');
   const create = useCreateEntity('debts');
   const del = useDeleteEntity('debts');
+  // Какую строку правим: правка раскрывается под ней, как редактор категорий.
+  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ccy, setCcy] = useState(base);
   const [amount, setAmount] = useState('');
@@ -281,36 +284,64 @@ function DebtsSection({ base }: SectionProps) {
             const paid = principal - remaining;
             const share = principal > 0n ? Number((paid * 1000n) / principal) / 10 : 0;
             return (
-              <div className="prow" key={d.id}>
-                <span className="prow-day" aria-hidden />
-                <span className="prow-name">
-                  <span>{d.name}</span>
-                  {d.currency !== base && <Tag tone="vio">{d.currency}</Tag>}
-                </span>
-                <span className="prow-num">
-                  <b>
-                    {formatMinor(d.paymentMinor, d.currency, locale)} {d.currency}
-                  </b>
-                  <i>{t('obl.payment')}</i>
-                </span>
-                <button
-                  type="button"
-                  className="act"
-                  title={t('common.delete')}
-                  onClick={() => del.mutate(d.id)}
-                >
-                  ✕
-                </button>
-                <span className="prow-bar">
-                  <Bar share={share} tone="lime" label={d.name} />
-                  <span className="prow-num">
-                    <i>
-                      {formatMinor(paid.toString(), d.currency, locale)} /{' '}
-                      {formatMinor(d.principalMinor, d.currency, locale)}
-                    </i>
+              <Fragment key={d.id}>
+                <div className="prow">
+                  <span className="prow-day" aria-hidden />
+                  <span className="prow-name">
+                    <span>{d.name}</span>
+                    {d.currency !== base && <Tag tone="vio">{d.currency}</Tag>}
                   </span>
-                </span>
-              </div>
+                  <span className="prow-num">
+                    <b>
+                      {formatMinor(d.paymentMinor, d.currency, locale)} {d.currency}
+                    </b>
+                    <i>{t('obl.payment')}</i>
+                  </span>
+                  <button
+                    type="button"
+                    className="act"
+                    aria-pressed={editing === d.id}
+                    title={t('plan.act.edit')}
+                    onClick={() => setEditing(editing === d.id ? null : d.id)}
+                  >
+                    {t('plan.act.edit')}
+                  </button>
+                  <button
+                    type="button"
+                    className="act"
+                    title={t('common.delete')}
+                    onClick={() => del.mutate(d.id)}
+                  >
+                    ✕
+                  </button>
+                  <span className="prow-bar">
+                    <Bar share={share} tone="lime" label={d.name} />
+                    <span className="prow-num">
+                      <i>
+                        {formatMinor(paid.toString(), d.currency, locale)} /{' '}
+                        {formatMinor(d.principalMinor, d.currency, locale)}
+                      </i>
+                    </span>
+                  </span>
+                </div>
+                {editing === d.id && (
+                  <ObligationEdit
+                    entity="debts"
+                    id={d.id}
+                    name={d.name}
+                    currency={d.currency}
+                    fields={[
+                      {
+                        key: 'paymentMinor',
+                        label: t('obl.payment'),
+                        kind: 'minor' as const,
+                        value: d.paymentMinor,
+                      },
+                    ]}
+                    onDone={() => setEditing(null)}
+                  />
+                )}
+              </Fragment>
             );
           })
         )
@@ -362,6 +393,8 @@ function EnvelopesSection({ base }: SectionProps) {
   const { data = [], isError, refetch } = useEntities<Envelope>('envelopes');
   const create = useCreateEntity('envelopes');
   const del = useDeleteEntity('envelopes');
+  // Какую строку правим: правка раскрывается под ней, как редактор категорий.
+  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ccy, setCcy] = useState(base);
   const [ruleKind, setRuleKind] = useState<'fixed' | 'percent'>('fixed');
@@ -410,30 +443,58 @@ function EnvelopesSection({ base }: SectionProps) {
           </div>
         ) : (
           data.map((e) => (
-            <div className="prow" key={e.id}>
-              <span className="prow-day" aria-hidden />
-              <span className="prow-name">
-                <span>{e.name}</span>
-                <Tag tone={e.ruleKind === 'percent' ? 'cyan' : 'quiet'}>
-                  {e.ruleKind === 'percent' ? t('obl.rule.percent') : t('obl.rule.fixed')}
-                </Tag>
-              </span>
-              <span className="prow-num">
-                <b>
-                  {e.ruleKind === 'percent'
-                    ? `${Number(e.ruleValue)}%`
-                    : `${formatMinor(e.ruleValue.split('.')[0] ?? '0', e.currency, locale)} ${e.currency}`}
-                </b>
-              </span>
-              <button
-                type="button"
-                className="act"
-                title={t('common.delete')}
-                onClick={() => del.mutate(e.id)}
-              >
-                ✕
-              </button>
-            </div>
+            <Fragment key={e.id}>
+              <div className="prow">
+                <span className="prow-day" aria-hidden />
+                <span className="prow-name">
+                  <span>{e.name}</span>
+                  <Tag tone={e.ruleKind === 'percent' ? 'cyan' : 'quiet'}>
+                    {e.ruleKind === 'percent' ? t('obl.rule.percent') : t('obl.rule.fixed')}
+                  </Tag>
+                </span>
+                <span className="prow-num">
+                  <b>
+                    {e.ruleKind === 'percent'
+                      ? `${Number(e.ruleValue)}%`
+                      : `${formatMinor(e.ruleValue.split('.')[0] ?? '0', e.currency, locale)} ${e.currency}`}
+                  </b>
+                </span>
+                <button
+                  type="button"
+                  className="act"
+                  aria-pressed={editing === e.id}
+                  title={t('plan.act.edit')}
+                  onClick={() => setEditing(editing === e.id ? null : e.id)}
+                >
+                  {t('plan.act.edit')}
+                </button>
+                <button
+                  type="button"
+                  className="act"
+                  title={t('common.delete')}
+                  onClick={() => del.mutate(e.id)}
+                >
+                  ✕
+                </button>
+              </div>
+              {editing === e.id && (
+                <ObligationEdit
+                  entity="envelopes"
+                  id={e.id}
+                  name={e.name}
+                  currency={e.currency}
+                  fields={[
+                    {
+                      key: 'ruleValue',
+                      label: t('obl.rule.fixed'),
+                      kind: 'plain' as const,
+                      value: String(e.ruleValue),
+                    },
+                  ]}
+                  onDone={() => setEditing(null)}
+                />
+              )}
+            </Fragment>
           ))
         )
       }
@@ -486,6 +547,8 @@ function GoalsSection({ base }: SectionProps) {
   const { data = [], isError, refetch } = useEntities<Goal>('goals');
   const create = useCreateEntity('goals');
   const del = useDeleteEntity('goals');
+  // Какую строку правим: правка раскрывается под ней, как редактор категорий.
+  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ccy, setCcy] = useState(base);
   const [target, setTarget] = useState('');
@@ -530,33 +593,61 @@ function GoalsSection({ base }: SectionProps) {
             const saved = BigInt(g.savedMinor);
             const share = target > 0n ? Number((saved * 1000n) / target) / 10 : 0;
             return (
-              <div className="prow" key={g.id}>
-                <span className="prow-day" aria-hidden />
-                <span className="prow-name">
-                  <span>{g.name}</span>
-                  {g.currency !== base && <Tag tone="vio">{g.currency}</Tag>}
-                </span>
-                <span className="prow-num">
-                  <b>
-                    {formatMinor(g.savedMinor, g.currency, locale)} /{' '}
-                    {formatMinor(g.targetMinor, g.currency, locale)}
-                  </b>
-                </span>
-                <button
-                  type="button"
-                  className="act"
-                  title={t('common.delete')}
-                  onClick={() => del.mutate(g.id)}
-                >
-                  ✕
-                </button>
-                <span className="prow-bar">
-                  <Bar share={share} tone="lime" label={g.name} />
-                  <span className="prow-num">
-                    <i>{share.toFixed(0)}%</i>
+              <Fragment key={g.id}>
+                <div className="prow">
+                  <span className="prow-day" aria-hidden />
+                  <span className="prow-name">
+                    <span>{g.name}</span>
+                    {g.currency !== base && <Tag tone="vio">{g.currency}</Tag>}
                   </span>
-                </span>
-              </div>
+                  <span className="prow-num">
+                    <b>
+                      {formatMinor(g.savedMinor, g.currency, locale)} /{' '}
+                      {formatMinor(g.targetMinor, g.currency, locale)}
+                    </b>
+                  </span>
+                  <button
+                    type="button"
+                    className="act"
+                    aria-pressed={editing === g.id}
+                    title={t('plan.act.edit')}
+                    onClick={() => setEditing(editing === g.id ? null : g.id)}
+                  >
+                    {t('plan.act.edit')}
+                  </button>
+                  <button
+                    type="button"
+                    className="act"
+                    title={t('common.delete')}
+                    onClick={() => del.mutate(g.id)}
+                  >
+                    ✕
+                  </button>
+                  <span className="prow-bar">
+                    <Bar share={share} tone="lime" label={g.name} />
+                    <span className="prow-num">
+                      <i>{share.toFixed(0)}%</i>
+                    </span>
+                  </span>
+                </div>
+                {editing === g.id && (
+                  <ObligationEdit
+                    entity="goals"
+                    id={g.id}
+                    name={g.name}
+                    currency={g.currency}
+                    fields={[
+                      {
+                        key: 'targetMinor',
+                        label: t('obl.target'),
+                        kind: 'minor' as const,
+                        value: g.targetMinor,
+                      },
+                    ]}
+                    onDone={() => setEditing(null)}
+                  />
+                )}
+              </Fragment>
             );
           })
         )
@@ -601,6 +692,8 @@ function BucketsSection({ base }: SectionProps) {
   const { data = [], isError, refetch } = useEntities<Bucket>('buckets');
   const create = useCreateEntity('buckets');
   const del = useDeleteEntity('buckets');
+  // Какую строку правим: правка раскрывается под ней, как редактор категорий.
+  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [from, setFrom] = useState(base);
   const [to, setTo] = useState('EUR');
@@ -643,28 +736,57 @@ function BucketsSection({ base }: SectionProps) {
           </div>
         ) : (
           data.map((b) => (
-            <div className="prow" key={b.id}>
-              <span className="prow-day" aria-hidden />
-              <span className="prow-name">
-                <span>{b.name}</span>
-                <Tag tone="vio">
-                  {b.fromCurrency} → {b.toCurrency}
-                </Tag>
-              </span>
-              <span className="prow-num">
-                <b>
-                  {formatMinor(b.amountMinor, b.fromCurrency, locale)} {b.fromCurrency}
-                </b>
-              </span>
-              <button
-                type="button"
-                className="act"
-                title={t('common.delete')}
-                onClick={() => del.mutate(b.id)}
-              >
-                ✕
-              </button>
-            </div>
+            <Fragment key={b.id}>
+              <div className="prow">
+                <span className="prow-day" aria-hidden />
+                <span className="prow-name">
+                  <span>{b.name}</span>
+                  <Tag tone="vio">
+                    {b.fromCurrency} → {b.toCurrency}
+                  </Tag>
+                </span>
+                <span className="prow-num">
+                  <b>
+                    {formatMinor(b.amountMinor, b.fromCurrency, locale)} {b.fromCurrency}
+                  </b>
+                </span>
+                <button
+                  type="button"
+                  className="act"
+                  aria-pressed={editing === b.id}
+                  title={t('plan.act.edit')}
+                  onClick={() => setEditing(editing === b.id ? null : b.id)}
+                >
+                  {t('plan.act.edit')}
+                </button>
+                <button
+                  type="button"
+                  className="act"
+                  title={t('common.delete')}
+                  onClick={() => del.mutate(b.id)}
+                >
+                  ✕
+                </button>
+              </div>
+              {editing === b.id && (
+                <ObligationEdit
+                  entity="buckets"
+                  id={b.id}
+                  name={b.name}
+                  /* Сумма корзины задана в валюте-источнике: её и правим. */
+                  currency={b.fromCurrency}
+                  fields={[
+                    {
+                      key: 'amountMinor',
+                      label: t('obl.buckets'),
+                      kind: 'minor' as const,
+                      value: b.amountMinor,
+                    },
+                  ]}
+                  onDone={() => setEditing(null)}
+                />
+              )}
+            </Fragment>
           ))
         )
       }

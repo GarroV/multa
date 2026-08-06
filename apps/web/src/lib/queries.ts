@@ -219,6 +219,22 @@ export function useCreateEntity(name: EntityName) {
   });
 }
 
+/**
+ * Правка строки обязательства (issue #91). План пересобирается вслед за правкой: сумма долга или
+ * цель влияют на каскад, и оставить на экране прежнюю цифру дня значило бы показать неправду.
+ */
+export function usePatchEntity(name: EntityName) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: unknown }) =>
+      api(`/v1/${name}/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: [name] });
+      await qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
 export function useDeleteEntity(name: EntityName) {
   const qc = useQueryClient();
   return useMutation({

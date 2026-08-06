@@ -394,6 +394,7 @@ export const ru: Record<TranslationKey, string> = {
   'obl.envelopes': 'Конверты',
   'obl.goals': 'Цели',
   'obl.buckets': 'Валютные корзины',
+  'obl.name': 'Название',
   'obl.payment': 'Платёж / период',
   'obl.target': 'Цель',
   'obl.rule.fixed': 'фикс',

@@ -221,3 +221,27 @@ test('подписи на карте периода не встают вплот
     ).toBeGreaterThanOrEqual(MIN_GAP_PX);
   }
 });
+
+test('обязательство можно исправить, а не только завести и удалить (#91)', async ({ page }) => {
+  /*
+   * У долгов, конвертов, целей и корзин была только пара «создать/удалить»: опечатку в названии или
+   * неверную сумму чинили удалением строки, а вместе с долгом уходила история платежей и прогноз
+   * закрытия. Проверяем весь путь, а не ручку: правка из интерфейса и то, что она пережила
+   * перезагрузку, — иначе легко получить «сохранено» только на экране.
+   */
+  await page.goto('/obligations');
+  const row = page.locator('.prow', { hasText: 'Bank credit' }).first();
+  await row.getByRole('button', { name: /edit|править/i }).click();
+
+  const editor = page
+    .locator('.fx-form', { has: page.getByRole('button', { name: /^Save$|^Сохранить$/ }) })
+    .first();
+  await editor.getByLabel(/^Name$|^Название$/).fill('Bank credit 2');
+  await editor.getByRole('button', { name: /^Save$|^Сохранить$/ }).click();
+
+  await expect(page.locator('.prow', { hasText: 'Bank credit 2' }).first()).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.reload();
+  await expect(page.locator('.prow', { hasText: 'Bank credit 2' }).first()).toBeVisible();
+});

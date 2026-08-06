@@ -325,6 +325,36 @@ export const bucketCreateSchema = z.object({
   amountMinor: minor,
 });
 
+/*
+ * Правка обязательств (issue #91). Частичные схемы, а не повтор полных: править одно поле, не
+ * трогая остальные, — и есть смысл PATCH.
+ *
+ * Валюта в список правимого НЕ входит намеренно. Сумма хранится в minor units своей валюты, и смена
+ * валюты у существующей строки молча переозначила бы уже записанное число: 50 000 копеек стали бы
+ * 50 000 центов. Валюту меняют заведением новой строки — там сумма вводится заново.
+ */
+const withoutCurrency = <T extends z.ZodRawShape>(shape: T) => {
+  const { currency: _c, fromCurrency: _f, toCurrency: _t, ...rest } = shape as z.ZodRawShape;
+  return rest;
+};
+
+/** Пустое тело — ошибка, а не no-op: «сохранено», при котором ничего не изменилось, обманывает. */
+const nonEmpty = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.refine((v) => Object.keys(v as object).length > 0, { message: 'empty_patch' });
+
+export const debtPatchSchema = nonEmpty(
+  z.object(withoutCurrency(debtCreateSchema.shape)).partial(),
+);
+export const envelopePatchSchema = nonEmpty(
+  z.object(withoutCurrency(envelopeCreateSchema.shape)).partial(),
+);
+export const goalPatchSchema = nonEmpty(
+  z.object(withoutCurrency(goalCreateSchema.shape)).partial(),
+);
+export const bucketPatchSchema = nonEmpty(
+  z.object(withoutCurrency(bucketCreateSchema.shape)).partial(),
+);
+
 // --- Категории (Спринт 2). Бюджет категории на период — в base-валюте. ---
 
 export const categoryCreateSchema = z.object({
