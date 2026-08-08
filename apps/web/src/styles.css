@@ -706,6 +706,11 @@ a {
   width: 120px;
   text-align: right;
 }
+/** Выпадашка валюты: шире текстового поля на три буквы — внутри «EUR · евро». */
+.field-ccy-wide {
+  min-width: 108px;
+}
+
 .field-ccy {
   width: 66px;
   text-transform: uppercase;

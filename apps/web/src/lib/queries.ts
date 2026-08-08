@@ -502,6 +502,8 @@ export type ShareSection = 'income' | 'debts' | 'buckets' | 'envelopes' | 'categ
 export interface WorkspaceSettingsDto {
   periods: { suggestRaises: boolean };
   currency: {
+    /** Валюты воркспейса: что показывать в выпадашках (решение владельца 06.08.2026). */
+    list: string[];
     rateSource: 'cbr' | 'ecb' | 'manual';
     defaultSpreadBp: number;
     defaultProvider: string | null;

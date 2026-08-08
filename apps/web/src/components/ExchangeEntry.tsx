@@ -1,4 +1,5 @@
 import { fromMajor } from '@multa/core';
+import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { useCreateExchange, useMe, useSettings } from '../lib/queries.ts';
@@ -82,12 +83,11 @@ export function ExchangeEntry() {
           value={fromValue}
           onChange={(e) => setFromValue(e.target.value)}
         />
-        <input
-          className="field num field-ccy"
-          maxLength={3}
-          aria-label={t('common.currency')}
+        <CurrencySelect
           value={fromCurrency}
-          onChange={(e) => setFromCurrency(e.target.value.toUpperCase())}
+          onChange={setFromCurrency}
+          label={t('common.currency')}
+          className="field num field-ccy-wide"
         />
         <span className="dim">→</span>
         <span className="micro">{t('fx.got')}</span>
@@ -99,12 +99,11 @@ export function ExchangeEntry() {
           value={toValue}
           onChange={(e) => setToValue(e.target.value)}
         />
-        <input
-          className="field num field-ccy"
-          maxLength={3}
-          aria-label={t('common.currency')}
+        <CurrencySelect
           value={toCurrency}
-          onChange={(e) => setToCurrency(e.target.value.toUpperCase())}
+          onChange={setToCurrency}
+          label={t('common.currency')}
+          className="field num field-ccy-wide"
         />
       </div>
       <div className="form-row">

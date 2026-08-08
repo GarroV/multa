@@ -3,6 +3,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { useIsMember } from '../lib/role.ts';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
+import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { ObligationEdit } from '../components/ObligationEdit.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -185,12 +186,11 @@ function AccountsSection({ base }: SectionProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <input
-              className="field mono field-ccy"
-              maxLength={3}
-              aria-label={t('common.currency')}
+            <CurrencySelect
               value={ccy}
-              onChange={(e) => setCcy(e.target.value.toUpperCase())}
+              onChange={setCcy}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
             />
           </div>
           <div className="form-row">
@@ -355,12 +355,11 @@ function DebtsSection({ base }: SectionProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <input
-              className="field mono field-ccy"
-              maxLength={3}
-              aria-label={t('common.currency')}
+            <CurrencySelect
               value={ccy}
-              onChange={(e) => setCcy(e.target.value.toUpperCase())}
+              onChange={setCcy}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
             />
           </div>
           <div className="form-row">
@@ -507,12 +506,11 @@ function EnvelopesSection({ base }: SectionProps) {
               value={name}
               onChange={(ev) => setName(ev.target.value)}
             />
-            <input
-              className="field mono field-ccy"
-              maxLength={3}
-              aria-label={t('common.currency')}
+            <CurrencySelect
               value={ccy}
-              onChange={(ev) => setCcy(ev.target.value.toUpperCase())}
+              onChange={setCcy}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
             />
           </div>
           <div className="form-row">
@@ -661,12 +659,11 @@ function GoalsSection({ base }: SectionProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <input
-              className="field mono field-ccy"
-              maxLength={3}
-              aria-label={t('common.currency')}
+            <CurrencySelect
               value={ccy}
-              onChange={(e) => setCcy(e.target.value.toUpperCase())}
+              onChange={setCcy}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
             />
           </div>
           <div className="form-row">
@@ -799,20 +796,18 @@ function BucketsSection({ base }: SectionProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <input
-              className="field mono field-ccy"
-              maxLength={3}
-              aria-label={t('obl.from')}
+            <CurrencySelect
               value={from}
-              onChange={(e) => setFrom(e.target.value.toUpperCase())}
+              onChange={setFrom}
+              label={t('obl.from')}
+              className="field mono field-ccy-wide"
             />
             <span className="dim">→</span>
-            <input
-              className="field mono field-ccy"
-              maxLength={3}
-              aria-label={t('obl.to')}
+            <CurrencySelect
               value={to}
-              onChange={(e) => setTo(e.target.value.toUpperCase())}
+              onChange={setTo}
+              label={t('obl.to')}
+              className="field mono field-ccy-wide"
             />
           </div>
           <div className="form-row">

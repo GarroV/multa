@@ -7,6 +7,7 @@ import { useIsMember } from '../lib/role.ts';
 import { Sharing } from '../components/Sharing.tsx';
 import { TwoFactor } from '../components/TwoFactor.tsx';
 import { Panel } from '../components/ui/Panel.tsx';
+import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { rhythmToPayload, type RhythmForm } from '../lib/income.ts';
@@ -114,15 +115,14 @@ export function Settings() {
                 <span>{t('settings.currency')}</span>
               </span>
               <span className="prow-num">
-                <input
-                  className="field num field-ccy"
-                  aria-label={t('settings.currency')}
+                <CurrencySelect
                   value={currency}
-                  maxLength={3}
-                  onChange={(e) => {
-                    setCurrency(e.target.value.toUpperCase());
+                  onChange={(next) => {
+                    setCurrency(next);
                     setSaved(false);
                   }}
+                  label={t('settings.currency')}
+                  className="field num field-ccy-wide"
                 />
               </span>
               <span />

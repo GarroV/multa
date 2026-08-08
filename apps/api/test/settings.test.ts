@@ -218,3 +218,25 @@ describe('настройки воркспейса', () => {
     expect(bobSettings.signals.medianPeriods).toBe(6);
   });
 });
+
+test('список валют настраивается и по умолчанию покрывает валюты продукта', async () => {
+  /*
+   * Решение владельца 06.08.2026: валюту выбирают списком, а сам список задаётся в настройках — у
+   * каждого он свой. Дефолт обязан быть непустым: пустой список означал бы выпадашку без единого
+   * варианта, то есть невозможность завести строку.
+   */
+  const client = await onboarded();
+  const initial = await expectOk<{ currency: { list: string[] } }>(
+    await client.get('/v1/workspace/settings'),
+  );
+  expect(initial.currency.list).toEqual(['RUB', 'EUR', 'USD', 'KGS', 'KZT']);
+
+  const patched = await expectOk<{ currency: { list: string[] } }>(
+    await client.patch('/v1/workspace/settings', { currency: { list: ['rub', 'kzt', 'rub'] } }),
+  );
+  // Коды приводятся к верхнему регистру, дубли схлопываются: список — множество, а не журнал ввода.
+  expect(patched.currency.list).toEqual(['RUB', 'KZT']);
+
+  const empty = await client.patch('/v1/workspace/settings', { currency: { list: [] } });
+  expect(empty.status).toBe(400);
+});
