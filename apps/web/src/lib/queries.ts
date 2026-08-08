@@ -682,6 +682,8 @@ export interface RecurringItemDto {
   endsOn: string | null;
   /** Тумблер прячет метку на карте периода, но не само событие. */
   showOnMap: boolean;
+  /** Ступени суммы: «с такой-то даты столько-то» (запрос владельца 06.08.2026). */
+  amountSteps: { from: string; amountMinor: string }[] | null;
 }
 
 export interface RecurringInput {
@@ -689,8 +691,13 @@ export interface RecurringInput {
   amountMinor: string;
   currency: string;
   schedule: unknown;
-  startsOn?: string;
+  /* null снимает ограничение срока; отличать от «поле не прислали» обязательно — иначе правка
+     одной даты молча стёрла бы вторую. */
+  startsOn?: string | null;
+  endsOn?: string | null;
   showOnMap?: boolean;
+  /** Ступени суммы: «с такой-то даты столько-то». Пустой список снимает все. */
+  amountSteps?: { from: string; amountMinor: string }[];
 }
 
 export function useRecurringItems(enabled = true) {

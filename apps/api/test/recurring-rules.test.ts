@@ -151,3 +151,36 @@ describe('правила повтора платежа', () => {
     }
   });
 });
+
+test('срок и ступени суммы сохраняются и снимаются (счёт за интернет)', async () => {
+  /*
+   * Живой случай владельца: «интернет 2 500 до октября, потом 4 000». Срок «с — по» и ступени
+   * задаются из контекстного меню строки; здесь проверяется, что API их держит, а не теряет при
+   * следующей правке — иначе человек, поменявший одну дату, молча стирает вторую.
+   */
+  const client = await onboarded();
+  const created = await expectOk<{ id: string; amountSteps: unknown; endsOn: string | null }>(
+    await client.post('/v1/recurring-items', {
+      name: 'Интернет',
+      amountMinor: '250000',
+      currency: 'RUB',
+      schedule: { kind: 'monthly-days', days: [5] },
+      startsOn: '2026-01-05',
+      amountSteps: [{ from: '2026-10-01', amountMinor: '400000' }],
+    }),
+    201,
+  );
+  expect(created.amountSteps).toEqual([{ from: '2026-10-01', amountMinor: '400000' }]);
+
+  const withEnd = await expectOk<{ endsOn: string | null; amountSteps: unknown }>(
+    await client.patch(`/v1/recurring-items/${created.id}`, { endsOn: '2027-01-01' }),
+  );
+  expect(withEnd.endsOn).toBe('2027-01-01');
+  // Правка только срока не должна снести ступени: это разные настройки одной строки.
+  expect(withEnd.amountSteps).toEqual([{ from: '2026-10-01', amountMinor: '400000' }]);
+
+  const cleared = await expectOk<{ amountSteps: unknown }>(
+    await client.patch(`/v1/recurring-items/${created.id}`, { amountSteps: [] }),
+  );
+  expect(cleared.amountSteps).toEqual([]);
+});

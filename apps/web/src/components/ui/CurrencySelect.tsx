@@ -1,4 +1,3 @@
-import { useI18n } from '../../lib/i18n.tsx';
 import { useSettings } from '../../lib/queries.ts';
 
 /**
@@ -16,19 +15,11 @@ import { useSettings } from '../../lib/queries.ts';
  */
 const FALLBACK = ['RUB', 'EUR', 'USD', 'KGS', 'KZT'];
 
-/**
- * Название валюты в языке интерфейса берём у платформы: `Intl.DisplayNames` знает и «евро», и
- * «euro», и склонения там правильные. Свои десять ключей в словаре означали бы перевод того, что
- * уже переведено, и расхождение при добавлении шестой валюты.
+/*
+ * В списке — только код валюты, без расшифровки (решение владельца 06.08.2026). «RUB · рубль»
+ * занимает втрое больше места в плотной строке формы, а трёхбуквенный код человек, живущий между
+ * валютами, читает и так.
  */
-function currencyName(code: string, locale: string): string {
-  try {
-    const name = new Intl.DisplayNames([locale], { type: 'currency' }).of(code);
-    return name && name !== code ? `${code} · ${name}` : code;
-  } catch {
-    return code;
-  }
-}
 
 export function CurrencySelect({
   value,
@@ -41,7 +32,6 @@ export function CurrencySelect({
   label: string;
   className?: string;
 }) {
-  const { locale } = useI18n();
   const { data: settings } = useSettings();
   const list = settings?.currency.list?.length ? settings.currency.list : FALLBACK;
   /*
@@ -59,7 +49,7 @@ export function CurrencySelect({
     >
       {options.map((code) => (
         <option value={code} key={code}>
-          {currencyName(code, locale)}
+          {code}
         </option>
       ))}
     </select>

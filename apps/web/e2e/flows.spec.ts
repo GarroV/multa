@@ -245,3 +245,37 @@ test('обязательство можно исправить, а не толь
   await page.reload();
   await expect(page.locator('.prow', { hasText: 'Bank credit 2' }).first()).toBeVisible();
 });
+
+test('срок и смена суммы задаются из меню строки и переживают перезагрузку', async ({ page }) => {
+  /*
+   * Живой случай владельца: «интернет 2 500 до октября, потом 4 000». Срок «с — по» и ступени
+   * суммы нужны редко, поэтому спрятаны за «…» — строка остаётся из названия, повтора и суммы.
+   *
+   * Проверяется именно сохранение: раньше такое выражалось двумя строками, и человек видел в
+   * списке два интернета вместо одного.
+   */
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/obligations');
+  const rows = page.locator('.panel', { hasText: /RECURRING|РЕГУЛЯРНЫЕ/i }).locator('.prow');
+  const row = rows.first();
+  await row.getByRole('button', { name: /Dates and amount|Срок и смена/i }).click();
+
+  const panel = page
+    .locator('.fx-form', { has: page.getByRole('button', { name: /^Save$|^Сохранить$/ }) })
+    .first();
+  await expect(panel).toBeVisible();
+
+  await panel.getByRole('button', { name: /From a date|С даты/i }).click();
+  // Третье поле даты — дата ступени: первые два это срок «с» и «по».
+  await panel.locator('input[type=date]').nth(2).fill('2026-10-01');
+  await panel
+    .getByLabel(/^Amount$|^Сумма$/)
+    .last()
+    .fill('4000');
+  await panel.getByRole('button', { name: /^Save$|^Сохранить$/ }).click();
+  await expect(panel).toHaveCount(0, { timeout: 10_000 });
+
+  await page.reload();
+  await row.getByRole('button', { name: /Dates and amount|Срок и смена/i }).click();
+  await expect(page.locator('input[type=date]').nth(2)).toHaveValue('2026-10-01');
+});

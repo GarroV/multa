@@ -1,8 +1,9 @@
 import { fromMajor, repeatRuleCandidates, type RepeatRule } from '@multa/core';
 import type { TranslationKey } from '@multa/i18n';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { RecurringMore } from './RecurringMore.tsx';
 import {
   useCreateRecurring,
   useDeleteRecurring,
@@ -88,6 +89,8 @@ export function RecurringPayments({ base }: { base: string }) {
   const [firstOn, setFirstOn] = useState(todayISO());
   const [ruleIndex, setRuleIndex] = useState(0);
   const [invalid, setInvalid] = useState(false);
+  /* Срок и ступени нужны редко — прячем их за «…», чтобы строка осталась из сути. */
+  const [openMore, setOpenMore] = useState<string | null>(null);
 
   const rules = repeatRuleCandidates(firstOn);
 
@@ -233,41 +236,56 @@ export function RecurringPayments({ base }: { base: string }) {
         </div>
       )}
       {items.map((item) => (
-        <div className="prow" key={item.id}>
-          <span className="prow-day" aria-hidden />
-          <span className="prow-name">
-            <span>{item.name}</span>
-            <Tag>{savedLabel(item.schedule)}</Tag>
-            {item.endsOn && <Tag tone="quiet">{t('rec.cancelled', { date: item.endsOn })}</Tag>}
-            {item.currency !== base && <Tag tone="vio">{item.currency}</Tag>}
-          </span>
-          <span className="prow-num">
-            <b>
-              {formatMinor(item.amountMinor, item.currency, locale)} {item.currency}
-            </b>
-          </span>
-          <span className="row row-tight">
-            {/* Тумблер прячет метку на карте, но не событие: «что впереди» продолжает о нём знать. */}
-            <button
-              type="button"
-              className="act"
-              aria-pressed={item.showOnMap}
-              title={t('rec.onMap')}
-              onClick={() => patch.mutate({ id: item.id, showOnMap: !item.showOnMap })}
-            >
-              {item.showOnMap ? '◉' : '○'}
-            </button>
-            <button
-              type="button"
-              className="act"
-              title={t('common.delete')}
-              disabled={remove.isPending}
-              onClick={() => remove.mutate(item.id)}
-            >
-              ✕
-            </button>
-          </span>
-        </div>
+        <Fragment key={item.id}>
+          <div className="prow">
+            <span className="prow-day" aria-hidden />
+            <span className="prow-name">
+              <span>{item.name}</span>
+              <Tag>{savedLabel(item.schedule)}</Tag>
+              {item.endsOn && <Tag tone="quiet">{t('rec.cancelled', { date: item.endsOn })}</Tag>}
+              {item.currency !== base && <Tag tone="vio">{item.currency}</Tag>}
+            </span>
+            <span className="prow-num">
+              <b>
+                {formatMinor(item.amountMinor, item.currency, locale)} {item.currency}
+              </b>
+            </span>
+            <span className="row row-tight">
+              {/* Тумблер прячет метку на карте, но не событие: «что впереди» продолжает о нём знать. */}
+              <button
+                type="button"
+                className="act"
+                aria-pressed={item.showOnMap}
+                title={t('rec.onMap')}
+                onClick={() => patch.mutate({ id: item.id, showOnMap: !item.showOnMap })}
+              >
+                {item.showOnMap ? '◉' : '○'}
+              </button>
+              <button
+                type="button"
+                className="act"
+                aria-pressed={openMore === item.id}
+                /* Подпись обязана быть в aria-label: у кнопки есть текст «…», и он стал бы её
+                   именем для экранного читателя — «многоточие» вместо «срок и смена суммы». */
+                aria-label={t('rec.more')}
+                title={t('rec.more')}
+                onClick={() => setOpenMore(openMore === item.id ? null : item.id)}
+              >
+                …
+              </button>
+              <button
+                type="button"
+                className="act"
+                title={t('common.delete')}
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(item.id)}
+              >
+                ✕
+              </button>
+            </span>
+          </div>
+          {openMore === item.id && <RecurringMore item={item} onClose={() => setOpenMore(null)} />}
+        </Fragment>
       ))}
     </Panel>
   );
