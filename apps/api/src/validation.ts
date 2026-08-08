@@ -292,12 +292,26 @@ export const rateQuerySchema = z.object({
 
 // --- CRUD обязательств (Спринт 2). Деньги — minor units (см. `minor` выше). ---
 
+/**
+ * Ступени суммы: «с такой-то даты столько-то» (запрос владельца 06.08.2026, «интернет 2 500 до
+ * октября, потом 4 000»). Пустой список = сумма не меняется; правило чтения — `amountOn` в ядре.
+ *
+ * Ограничение сверху не бюрократия: список ступеней уходит в jsonb и читается на каждый период
+ * плана, а горизонт сетки — полгода. Сотня ступеней означала бы, что человек пытается вести здесь
+ * график, для которого нужна другая сущность.
+ */
+export const amountStepsSchema = z
+  .array(z.object({ from: isoDate, amountMinor: minor.transform((v) => v.toString()) }))
+  .max(24)
+  .optional();
+
 export const debtCreateSchema = z.object({
   name: z.string().min(1),
   currency: ccy,
   principalMinor: minor,
   remainingMinor: minor,
   paymentMinor: minor,
+  amountSteps: amountStepsSchema,
   dueDate: z.string().optional(),
   counterparty: z.string().optional(),
 });
@@ -494,6 +508,7 @@ export const recurringCreateSchema = z.object({
   startsOn: isoDate.optional(),
   endsOn: isoDate.optional(),
   showOnMap: z.boolean().optional(),
+  amountSteps: amountStepsSchema,
 });
 
 export const recurringPatchSchema = z.object({
@@ -506,6 +521,8 @@ export const recurringPatchSchema = z.object({
   startsOn: isoDate.nullable().optional(),
   endsOn: isoDate.nullable().optional(),
   showOnMap: z.boolean().optional(),
+  // null — снять все ступени разом; пустой массив означает то же, но через явную правку списка.
+  amountSteps: amountStepsSchema.nullable(),
 });
 
 // --- Чеки (Спринт 5). QR пробуется первым, он бесплатный. ---

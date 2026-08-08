@@ -12,11 +12,13 @@
  */
 
 import {
+  amountOn,
   assemblePlan,
   budgetAdvice,
   burnRate,
   categorySpending,
   convert,
+  normalizeSteps,
   executionOf,
   daysInPeriod,
   daysLeftInPeriod,
@@ -361,7 +363,15 @@ async function resolveObligations(
     });
   };
 
-  for (const d of debtRows) await push('debt', d.id, d.name, d.currency, d.paymentMinor);
+  for (const d of debtRows) {
+    /*
+     * Ступени суммы (запрос владельца 06.08.2026): текущий период берёт сумму на свою дату начала.
+     * Правило одно на всех — `amountOn` в ядре, — иначе план и мастер-сетка однажды показали бы по
+     * одной строке разные числа, и верить перестали бы обоим.
+     */
+    const payment = amountOn(d.paymentMinor, parseAmountSteps(d.amountSteps), on);
+    await push('debt', d.id, d.name, d.currency, payment);
+  }
   for (const b of bucketRows)
     await push('bucket', b.id, b.name, b.fromCurrency, b.amountMinor, { toCurrency: b.toCurrency });
   for (const e of envelopeRows) {
@@ -459,6 +469,22 @@ async function persistPlannedItems(
         },
       });
   });
+}
+
+/**
+ * Ступени суммы из jsonb: суммы там строками (bigint в JSON не живёт). Кривая запись отбрасывается
+ * поэлементно — падать пятисоткой на чтении плана из-за одной битой ступени нельзя.
+ */
+function parseAmountSteps(raw: unknown): { from: string; amountMinor: bigint }[] {
+  if (!Array.isArray(raw)) return [];
+  const out: { from: string; amountMinor: bigint }[] = [];
+  for (const item of raw) {
+    const step = item as { from?: unknown; amountMinor?: unknown };
+    if (typeof step?.from !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(step.from)) continue;
+    if (typeof step.amountMinor !== 'string' || !/^-?\d+$/.test(step.amountMinor)) continue;
+    out.push({ from: step.from, amountMinor: BigInt(step.amountMinor) });
+  }
+  return normalizeSteps(out);
 }
 
 export interface IncomeEventDto {

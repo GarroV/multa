@@ -281,3 +281,35 @@ describe('projectGrid', () => {
     expect(grid.footer.freeMinor).toEqual([]);
   });
 });
+
+describe('ступени суммы (issue: «интернет 2 500 до октября, потом 4 000»)', () => {
+  it('сумма строки может меняться по периодам: «до октября 2 500, потом 4 000»', () => {
+    /*
+     * Запрос владельца 06.08.2026. Матрица про ступени не знает — ей приходят уже посчитанные суммы
+     * по колонкам, а правило «какая сумма действует на дату» живёт в amountOn. Проверяем именно
+     * стык: если колонка берёт сумму не из своего индекса, счёт за интернет весь горизонт стоит
+     * одинаково, и человек не увидит подорожания там, где оно случится.
+     */
+    const grid = projectGrid({
+      periods: [
+        { startsOn: '2026-09-10', endsOn: '2026-09-25', daysInPeriod: 15 },
+        { startsOn: '2026-09-25', endsOn: '2026-10-10', daysInPeriod: 15 },
+        { startsOn: '2026-10-10', endsOn: '2026-10-25', daysInPeriod: 15 },
+      ],
+      incomeMinor: [10_000_00n, 10_000_00n, 10_000_00n],
+      rows: [
+        {
+          targetKind: 'category',
+          targetId: 'internet',
+          name: 'Интернет',
+          sourceCurrency: 'RUB',
+          perPeriodMinor: 2_500_00n,
+          perPeriodByIndex: [2_500_00n, 2_500_00n, 4_000_00n],
+        },
+      ],
+    });
+
+    const row = grid.rows.find((r) => r.targetId === 'internet')!;
+    expect(row.cells.map((c) => c.minor)).toEqual([2_500_00n, 2_500_00n, 4_000_00n]);
+  });
+});

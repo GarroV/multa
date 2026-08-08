@@ -38,6 +38,15 @@ export interface GridRowSpec {
   readonly sourceCurrency: string;
   /** План за период в базовой валюте. */
   readonly perPeriodMinor: bigint;
+  /**
+   * План по колонкам, когда сумма меняется во времени: «интернет 2 500 до октября, потом 4 000»
+   * (запрос владельца 06.08.2026). Индекс — номер периода в горизонте.
+   *
+   * Матрица про ступени ничего не знает и знать не должна: правило «какая сумма действует на дату»
+   * живёт в `amountOn`, а сюда приходят уже посчитанные суммы. Иначе тем же правилом пришлось бы
+   * обзавестись и плану, и прогнозу — и однажды они дали бы по строке разные числа.
+   */
+  readonly perPeriodByIndex?: readonly bigint[];
   /** Только для корзин: во что меняем — по этому полю «к размену» разбивается по валютам. */
   readonly toCurrency?: string;
   /** Только для категорий: защищённая не режется автоматически. */
@@ -168,7 +177,9 @@ export function projectGrid(input: GridInput): Grid {
       }
 
       const wanted =
-        row.percent !== undefined ? percentOfMinor(income, row.percent) : row.perPeriodMinor;
+        row.percent !== undefined
+          ? percentOfMinor(income, row.percent)
+          : (row.perPeriodByIndex?.[i] ?? row.perPeriodMinor);
       const remaining = left.get(key);
       const planned = remaining === undefined ? wanted : remaining < wanted ? remaining : wanted;
       if (remaining !== undefined && remaining <= 0n) {

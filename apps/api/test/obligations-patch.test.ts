@@ -147,3 +147,57 @@ test('участник не может править чужие обязате�
   const list = await expectOk<Row[]>(await owner.get('/v1/debts'));
   expect(list.find((r) => r.id === debt.id)?.name).toBe(SECTIONS[0].create.name);
 });
+
+test('ступени суммы: платёж меняется с даты, а не по всему горизонту', async () => {
+  /*
+   * Запрос владельца 06.08.2026: «интернет 2 500 до октября, потом 4 000; долгов тоже касается».
+   * Выразить это раньше можно было только двумя строками — и человек видел в списке два платежа
+   * вместо одного, а история рвалась пополам.
+   *
+   * Проверяем именно мастер-сетку: в ней каждая колонка — свой период, и если ступени читаются не
+   * на дату колонки, подорожание либо не появится вовсе, либо приедет сразу во все периоды.
+   */
+  const client = await onboarded({ payoutMinor: '30000000' });
+  const created = await expectOk<Row>(
+    await client.post('/v1/debts', {
+      name: 'Интернет',
+      currency: 'RUB',
+      principalMinor: '100000000',
+      remainingMinor: '100000000',
+      paymentMinor: '250000',
+      amountSteps: [{ from: '2099-01-01', amountMinor: '400000' }],
+    }),
+    201,
+  );
+  expect(created.id).toBeTruthy();
+
+  const grid = await expectOk<{
+    periods: { startsOn: string }[];
+    groups: { kind: string; rows: { targetId: string; cells: { minor: string }[] }[] }[];
+  }>(await client.get('/v1/plan/grid?periods=6'));
+
+  const row = grid.groups
+    .find((g) => g.kind === 'debt')
+    ?.rows.find((r) => r.targetId === created.id);
+  if (!row) throw new Error('строки долга нет в сетке');
+
+  // Ступень назначена на 2099 год — до неё во всех колонках держится базовая сумма.
+  expect(new Set(row.cells.map((c) => c.minor))).toEqual(new Set(['250000']));
+
+  // Теперь ступень с даты второго периода: первая колонка остаётся прежней, дальше — новая сумма.
+  const from = grid.periods[1]!.startsOn;
+  await expectOk<Row>(
+    await client.patch(`/v1/debts/${created.id}`, {
+      amountSteps: [{ from, amountMinor: '400000' }],
+    }),
+  );
+  const after = await expectOk<typeof grid>(await client.get('/v1/plan/grid?periods=6'));
+  const cells = after.groups
+    .find((g) => g.kind === 'debt')!
+    .rows.find((r) => r.targetId === created.id)!
+    .cells.map((c) => c.minor);
+
+  expect(cells[0]).toBe('250000');
+  expect(cells[1]).toBe('400000');
+  expect(cells[2]).toBe('400000');
+});

@@ -1,5 +1,8 @@
 import {
+  amountOn,
   convert,
+  normalizeSteps,
+  type AmountStep,
   daysInPeriod as daysOf,
   expectedIncomeForPeriod,
   generatePeriods,
@@ -20,6 +23,22 @@ import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { settingsOf } from '../settings/store.ts';
 import { getCurrentPlan } from './assemble.ts';
+
+/**
+ * Ступени из jsonb: суммы там строками (bigint в JSON не живёт). Кривая запись — не повод падать
+ * пятисоткой на чтении плана, поэтому мусорные элементы отбрасываются, а не роняют ответ.
+ */
+function parseAmountSteps(raw: unknown): AmountStep[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AmountStep[] = [];
+  for (const item of raw) {
+    const step = item as { from?: unknown; amountMinor?: unknown };
+    if (typeof step?.from !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(step.from)) continue;
+    if (typeof step.amountMinor !== 'string' || !/^-?\d+$/.test(step.amountMinor)) continue;
+    out.push({ from: step.from, amountMinor: BigInt(step.amountMinor) });
+  }
+  return normalizeSteps(out);
+}
 
 /**
  * Мастер-сетка «строки × периоды выплат» (issue #47) — взгляд из Excel основателя: полгода вперёд
@@ -163,8 +182,21 @@ export async function getPlanGrid(
 
   for (const d of debtRows) {
     const remaining = toBase(d.remainingMinor, d.currency);
+    /*
+     * Сумма платежа может меняться во времени (ступени). Каждая колонка — свой период, поэтому
+     * считаем её на дату начала периода: так «интернет 2 500 до октября» и стоит 2 500 в сентябре
+     * и 4 000 с октября, а не одним числом на весь горизонт.
+     */
+    const steps = parseAmountSteps(d.amountSteps);
+    const byIndex =
+      steps.length === 0
+        ? undefined
+        : periods.map(
+            (p: PayPeriod) => toBase(amountOn(d.paymentMinor, steps, p.startsOn), d.currency) ?? 0n,
+          );
     push('debt', d.id, d.name, d.currency, d.paymentMinor, {
       ...(remaining !== null ? { remainingMinor: remaining } : {}),
+      ...(byIndex ? { perPeriodByIndex: byIndex } : {}),
     });
   }
   for (const b of bucketRows) {

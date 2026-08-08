@@ -149,6 +149,12 @@ export const debts = pgTable('debts', {
   remainingMinor: bigint('remaining_minor', { mode: 'bigint' }).notNull(),
   paymentMinor: bigint('payment_minor', { mode: 'bigint' }).notNull(),
   dueDate: date('due_date'),
+  /**
+   * Ступени суммы платежа: «с такой-то даты столько-то» (запрос владельца 06.08.2026).
+   * Пустой список = сумма не меняется, поэтому старые строки остаются валидными.
+   * Правило «сколько действует на дату» — `amountOn` в @multa/core, один источник на всех.
+   */
+  amountSteps: jsonb('amount_steps'),
   counterparty: text('counterparty'),
   agreedRate: numeric('agreed_rate', { precision: 20, scale: 10 }),
   closedAt: timestamp('closed_at', { withTimezone: true }),
@@ -453,7 +459,13 @@ export const recurringItems = pgTable(
      */
     showOnMap: boolean('show_on_map').notNull().default(true),
     nextOn: date('next_on'),
-    escalation: jsonb('escalation'),
+    /**
+     * Ступени суммы: «интернет 2 500 до октября, потом 4 000». Раньше на этом месте стояла
+     * `escalation` — колонка, объявленная и не использованная ни строчкой кода за всё время.
+     * Расплывчатое имя под точный смысл хуже отсутствия поля: следующий читатель гадает, что оно
+     * делает, и не находит ответа в коде.
+     */
+    amountSteps: jsonb('amount_steps'),
     active: boolean('active').notNull().default(true),
   },
   // Доходы живут в income_sources — две правды об одном факте дали бы дрейф.
