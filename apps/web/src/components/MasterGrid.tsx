@@ -4,6 +4,7 @@ import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePlanGrid, type GridCellDto, type GridGroupDto } from '../lib/queries.ts';
 import { IconPlus } from './ui/icons.tsx';
+import { isSectionVisible } from '../lib/sections.ts';
 
 /**
  * Мастер-режим (issue #47) — та самая таблица, которую основатель вёл в Excel: строки статей
@@ -151,7 +152,9 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
           ))}
         </div>
 
-        {data.groups.map(group)}
+        {/* Скрытые разделы (lib/sections.ts) не выводим: пустая строка «ЦЕЛИ» с плюсом вела бы в
+            раздел, которого на экране больше нет. */}
+        {data.groups.filter((g) => isSectionVisible(g.kind)).map(group)}
 
         <div className="mgrid-group mgrid-foot">
           <div className="mgrid-row">

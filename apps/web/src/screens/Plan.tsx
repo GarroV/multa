@@ -14,6 +14,7 @@ import { PeriodMap } from '../components/ui/PeriodMap.tsx';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useIsMember } from '../lib/role.ts';
+import { isSectionVisible } from '../lib/sections.ts';
 import {
   isOnboardingIncomplete,
   useBalances,
@@ -347,7 +348,8 @@ function PlanBody({ plan }: { plan: PlanDto }) {
     select: (s) => (s.location.search as { view?: string }).view === 'table',
   });
   const cancelReceipt = useCancelIncomeReceipt();
-  const balances = useBalances(!isMember);
+  // Остатки по счетам не запрашиваем, пока раздел скрыт: лишний запрос на каждом открытии плана.
+  const balances = useBalances(!isMember && isSectionVisible('account'));
 
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
   const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
@@ -365,7 +367,10 @@ function PlanBody({ plan }: { plan: PlanDto }) {
     plan.sharing !== undefined &&
     (plan.sharing.sums.length > 0 || BigInt(plan.sharing.hiddenMinor) > 0n);
 
+  /* Скрытые разделы (см. lib/sections.ts) не рисуем и здесь: иначе цель исчезла бы из
+     «Обязательств», но осталась панелью на плане — экраны разошлись бы между собой. */
   const obligationGroups = (['debt', 'envelope', 'goal', 'bucket'] as const)
+    .filter((kind) => isSectionVisible(kind))
     .map((kind) => ({ kind, rows: plan.allocations.filter((a) => a.targetKind === kind) }))
     .filter((g) => g.rows.length > 0);
 
@@ -379,36 +384,38 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {!master && (
         <>
           <div className="kpi-strip">
-            {balances.data && balances.data.byCurrency.length > 0 && (
-              <Kpi label={t('acc.total')} slot="money">
-                <span className="kpi-value">
-                  {balances.data.totalMinor === null
-                    ? '—'
-                    : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
-                </span>
-                <div className="kpi-rows">
-                  {balances.data.byCurrency.map((b) => (
-                    <div key={b.currency}>
-                      <span>
-                        {formatMinor(b.minor, b.currency, locale)} {b.currency}
-                      </span>
-                      {b.baseMinor === null ? (
-                        <span className="st-warn">—</span>
-                      ) : (
-                        b.currency !== base && (
-                          <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {balances.data.unresolved.length > 0 && (
-                  <span className="kpi-sub st-warn">
-                    {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
+            {isSectionVisible('account') &&
+              balances.data &&
+              balances.data.byCurrency.length > 0 && (
+                <Kpi label={t('acc.total')} slot="money">
+                  <span className="kpi-value">
+                    {balances.data.totalMinor === null
+                      ? '—'
+                      : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
                   </span>
-                )}
-              </Kpi>
-            )}
+                  <div className="kpi-rows">
+                    {balances.data.byCurrency.map((b) => (
+                      <div key={b.currency}>
+                        <span>
+                          {formatMinor(b.minor, b.currency, locale)} {b.currency}
+                        </span>
+                        {b.baseMinor === null ? (
+                          <span className="st-warn">—</span>
+                        ) : (
+                          b.currency !== base && (
+                            <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
+                          )
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {balances.data.unresolved.length > 0 && (
+                    <span className="kpi-sub st-warn">
+                      {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
+                    </span>
+                  )}
+                </Kpi>
+              )}
             <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })} slot="left">
               <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
                 {withCcy(plan.remainingLivingMinor)}

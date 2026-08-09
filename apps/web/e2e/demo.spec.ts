@@ -20,11 +20,9 @@ test('вход в демо без регистрации открывает на
   await expect(canSpend).toBeVisible();
   await expect(canSpend.locator('.kpi-value')).toContainText(/\d/);
 
-  // «Сколько всего денег» — первый блок прототипа (issue #45): три валюты и общий итог.
-  const onHand = page.locator('.kpi', { hasText: /MONEY ON HAND|ВСЕГО ДЕНЕГ/ });
-  await expect(onHand).toBeVisible();
-  await expect(onHand.locator('.kpi-value')).toContainText(/\d/);
-  await expect(onHand.locator('.kpi-rows > div')).toHaveCount(3);
+  /* Блок «всего денег» проверять больше нечего: счета скрыты из интерфейса решением владельца
+     06.08.2026 (lib/sections.ts). Данные и ручка на месте, поэтому проверка удалена, а не
+     переписана на «его нет»: вернётся раздел — вернётся и она. */
 
   // Каскад: все пять групп раздачи, иначе показ демонстрирует пустой продукт.
   const legend = page.locator('.legend');

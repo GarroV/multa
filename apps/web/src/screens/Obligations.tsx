@@ -2,6 +2,7 @@ import { fromMajor } from '@multa/core';
 import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { useIsMember } from '../lib/role.ts';
+import { isSectionVisible } from '../lib/sections.ts';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { ObligationEdit } from '../components/ObligationEdit.tsx';
@@ -838,16 +839,20 @@ export function Obligations() {
   const isMember = useIsMember();
   return (
     <div className="dense">
-      {/* Четыре вида обязательств равнозначны: две колонки, ни один не главнее. */}
+      {/*
+        Счета, цели и корзины скрыты (решение владельца 06.08.2026, см. lib/sections.ts): владелец
+        заводит бюджет, а не отслеживает остатки по кошелькам, и три похожих раздела рядом мешают
+        заполнять. Компоненты оставлены в файле — возвращать их придётся целиком, а не писать заново.
+      */}
       <div className="panels">
         <div className="col">
-          {!isMember && <AccountsSection base={base} />}
+          {isSectionVisible('account') && !isMember && <AccountsSection base={base} />}
           <DebtsSection base={base} />
-          <GoalsSection base={base} />
+          {isSectionVisible('goal') && <GoalsSection base={base} />}
         </div>
         <div className="col">
           <EnvelopesSection base={base} />
-          <BucketsSection base={base} />
+          {isSectionVisible('bucket') && <BucketsSection base={base} />}
           {/* Регулярные платежи (issues #21, #55) — не обязательство каскада, но живут рядом с ними:
               это то же «что с меня спишется», просто вне раздачи. */}
           <RecurringPayments base={base} />
