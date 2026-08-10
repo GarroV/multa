@@ -588,6 +588,15 @@ export async function seedDemo(userId: string): Promise<string> {
   /** Целочисленно: деньги — minor units, float в них запрещён (правило 1). */
   const soFar = (minor: bigint): bigint => (minor * elapsedDays) / periodDays;
 
+  /*
+   * Дни трат прижимаем к началу периода. Сид ставит их как «сегодня минус 1..3 дня», и в первый же
+   * день нового периода все три уезжали в предыдущий: демо показывало период без единой траты, а
+   * «потрачено» — ноль (поймано инвариантом demo.test.ts 10.08.2026). Трата вне периода не только
+   * портит картинку, она искажает и темп: цифра дня считается по факту внутри периода.
+   */
+  const inPeriod = (day: string): string =>
+    day < current.period.startsOn ? current.period.startsOn : day;
+
   for (const f of currentFacts) {
     const snap = f.currency === 'RUB' ? null : f.currency === 'EUR' ? eurRate : rsdRate;
     /*
@@ -612,8 +621,8 @@ export async function seedDemo(userId: string): Promise<string> {
       baseAmountMinor,
       rate: snap ? snap.rate : '1',
       rateSource: snap ? snap.source : 'base',
-      rateDate: snap ? snap.date : f.day,
-      occurredOn: f.day,
+      rateDate: snap ? snap.date : inPeriod(f.day),
+      occurredOn: inPeriod(f.day),
       source: 'manual',
       ...(f.note ? { note: f.note } : {}),
     });

@@ -85,3 +85,40 @@ test('человек с ежедневным доходом проходит о�
   const perDay = Number((await hero.innerText()).replace(/[^\d]/g, ''));
   expect(perDay).toBeGreaterThan(0);
 });
+
+test('занятая почта объясняется по-человечески и предлагает вход', async ({ page }) => {
+  /*
+   * Жалоба живого пользователя 10.08.2026: «не могу зарегистрироваться». Регистрация работала, а
+   * вот отказ приходил текстом better-auth по-английски — «User already exists. Use another
+   * email.» — и человек с уже созданным аккаунтом читал это как «нельзя».
+   *
+   * Проверяем оба свойства: сообщение на языке интерфейса и выход из тупика — кнопку входа с той же
+   * почтой. Отказ без пути дальше и есть то, на что жалуются.
+   */
+  const email = `taken-${Date.now()}@multa.local`;
+
+  await page.goto('/');
+  await page.locator('form.card input').nth(0).fill('Первый');
+  await page.locator('form.card input').nth(1).fill(email);
+  await page.locator('form.card input').nth(2).fill('SmokeTest123!');
+  await page.locator('form.card button[type=submit]').click();
+  await expect(page.getByRole('button', { name: /^Next$|^Дальше$/ })).toBeVisible({
+    timeout: 20_000,
+  });
+
+  // Второй заход тем же адресом — из чистого контекста, как это делает другой человек.
+  await page.context().clearCookies();
+  await page.goto('/');
+  await page.locator('form.card input').nth(0).fill('Второй');
+  await page.locator('form.card input').nth(1).fill(email);
+  await page.locator('form.card input').nth(2).fill('SmokeTest123!');
+  await page.locator('form.card button[type=submit]').click();
+
+  const err = page.locator('.danger');
+  await expect(err).toBeVisible({ timeout: 20_000 });
+  // Ни слова из английского текста библиотеки: сообщение обязано быть нашим.
+  await expect(err).not.toContainText('User already exists');
+  await expect(
+    page.getByRole('button', { name: /Sign in with this email|Войти с этой почтой/ }),
+  ).toBeVisible();
+});

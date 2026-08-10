@@ -1,7 +1,26 @@
+import type { TranslationKey } from '@multa/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '../lib/authClient.ts';
 import { useI18n } from '../lib/i18n.tsx';
+
+/**
+ * Ответ better-auth на человеческий язык.
+ *
+ * Библиотека отдаёт свой текст по-английски, и мы показывали его как есть: русскоязычный человек,
+ * у которого аккаунт уже есть, видел «User already exists. Use another email.» и понимал это как
+ * «зарегистрироваться нельзя» (жалоба живого пользователя 10.08.2026). Код ответа стабильнее
+ * текста, поэтому переводим по коду, а сырое сообщение оставляем последним рубежом — молчать в
+ * незнакомом случае хуже, чем показать английскую строку.
+ */
+const AUTH_ERROR_KEYS: Record<string, TranslationKey> = {
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: 'auth.err.taken',
+  USER_ALREADY_EXISTS: 'auth.err.taken',
+  INVALID_EMAIL_OR_PASSWORD: 'auth.err.badCredentials',
+  PASSWORD_TOO_SHORT: 'auth.err.shortPassword',
+  INVALID_EMAIL: 'auth.err.badEmail',
+  TOO_MANY_REQUESTS: 'auth.err.tooMany',
+};
 
 export function Login() {
   const { t } = useI18n();
@@ -11,6 +30,8 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /* Почта занята: показываем не только текст, но и путь дальше — кнопку входа с той же почтой. */
+  const [taken, setTaken] = useState(false);
   const [busy, setBusy] = useState(false);
   /*
    * Шаг проверки TOTP (issue #19). better-auth на этом шаге уже удалил сессионную куку и выдал
@@ -26,13 +47,17 @@ export function Login() {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setTaken(false);
     const res =
       mode === 'up'
         ? await authClient.signUp.email({ email, password, name })
         : await authClient.signIn.email({ email, password });
     setBusy(false);
     if (res.error) {
-      setError(res.error.message ?? 'error');
+      const key = res.error.code ? AUTH_ERROR_KEYS[res.error.code] : undefined;
+      setError(key ? t(key) : (res.error.message ?? t('auth.err.unknown')));
+      // Занятая почта — не ошибка ввода, а развилка: человеку нужен вход, а не другая почта.
+      setTaken(res.error.code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
       return;
     }
     if ((res.data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
@@ -144,6 +169,21 @@ export function Login() {
           minLength={8}
         />
         {error && <div className="danger err-line">{error}</div>}
+        {/* Отказ без пути дальше и есть то, на что жалуются: почта занята — значит человеку нужен
+            вход, а не другая почта. */}
+        {taken && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setMode('in');
+              setTaken(false);
+              setError(null);
+            }}
+          >
+            {t('auth.toSignInFromError')}
+          </button>
+        )}
         <button className="btn" type="submit" disabled={busy}>
           {busy ? t('common.loading') : mode === 'up' ? t('auth.signUp') : t('auth.signIn')}
         </button>
