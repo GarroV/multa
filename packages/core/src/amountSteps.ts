@@ -72,3 +72,22 @@ export function normalizeSteps(steps: readonly AmountStep[], baseMinor?: bigint)
   }
   return out;
 }
+
+/**
+ * Взнос, которым долг закрывается за заданное число периодов (запрос владельца 10.08.2026:
+ * «остаток 300 000, хочу закрыть к маю — посчитай платёж»).
+ *
+ * Обратная сторона `periodsToCover` из прогноза: там из остатка и взноса выводится срок, здесь из
+ * остатка и срока — взнос. Формула одна, поэтому и живёт рядом: две реализации одного деления
+ * однажды разошлись бы на копейку, и «закрою к маю» превратилось бы в «закрою в июне».
+ *
+ * Округление ВВЕРХ и только вверх: взнос, посчитанный вниз, оставляет хвост, и долг закрывается
+ * периодом позже обещанного — то есть продукт соврал бы ровно в том, ради чего его спросили.
+ */
+export function paymentToClose(remainingMinor: bigint, periods: number): bigint | null {
+  if (!Number.isInteger(periods) || periods <= 0) return null;
+  if (remainingMinor <= 0n) return 0n;
+  const per = BigInt(periods);
+  const whole = remainingMinor / per;
+  return remainingMinor % per === 0n ? whole : whole + 1n;
+}

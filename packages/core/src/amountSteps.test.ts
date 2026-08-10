@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { amountOn, normalizeSteps, type AmountStep } from './amountSteps.ts';
+import { amountOn, normalizeSteps, paymentToClose, type AmountStep } from './amountSteps.ts';
 
 /**
  * Сумма, меняющаяся во времени (запрос владельца 2026-08-06).
@@ -89,5 +89,26 @@ describe('normalizeSteps', () => {
   test('первая ступень, равная базовой сумме, тоже лишняя', () => {
     const out = normalizeSteps([{ from: '2026-10-01', amountMinor: 250000n }], 250000n);
     expect(out).toEqual([]);
+  });
+});
+
+describe('paymentToClose', () => {
+  test('делит остаток на число периодов', () => {
+    expect(paymentToClose(120000n, 12)).toBe(10000n);
+  });
+
+  test('округляет вверх: иначе хвост уедет в лишний период', () => {
+    // 100 000 за 12 периодов — 8 333,33; вниз дало бы 8 333 и остаток 4 копейки в тринадцатом.
+    expect(paymentToClose(100000n, 12)).toBe(8334n);
+  });
+
+  test('ноль периодов и отрицательное число — не ответ, а отказ', () => {
+    expect(paymentToClose(100000n, 0)).toBe(null);
+    expect(paymentToClose(100000n, -3)).toBe(null);
+    expect(paymentToClose(100000n, 1.5)).toBe(null);
+  });
+
+  test('закрытый долг не требует взноса', () => {
+    expect(paymentToClose(0n, 6)).toBe(0n);
   });
 });

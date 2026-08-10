@@ -416,6 +416,13 @@ export const en = {
   'obl.buckets': 'Currency baskets',
   'obl.name': 'Name',
   'obl.payment': 'Payment / period',
+  'obl.mode.payment': 'I know the payment',
+  'obl.mode.deadline': 'I know the deadline',
+  'obl.closeBy': 'Close by',
+  'obl.computed': 'That is {amount} per period — {periods} payments',
+  'obl.tooBig':
+    'That is more than what is left after the obligatory ones ({free}). Debts are never trimmed, so everything else gets cut.',
+  'obl.badDeadline': 'The deadline must be later than the next payout.',
   'obl.target': 'Target',
   'obl.rule.fixed': 'fixed',
   'obl.rule.percent': 'percent',

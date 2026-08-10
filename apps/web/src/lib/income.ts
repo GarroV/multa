@@ -239,3 +239,29 @@ export function percentSum(payouts: readonly PayoutForm[]): number {
     return acc + (Number.isFinite(pct) ? pct : 0);
   }, 0);
 }
+
+/**
+ * Сколько выплат уложится между сегодня и сроком — столькими взносами и закрывается долг.
+ *
+ * Считается по ритму воркспейса теми же функциями ядра, что и план: иначе «шесть платежей» в форме
+ * и пять колонок в таблице разошлись бы, и человек не понял бы, какой цифре верить.
+ *
+ * Границы: сам срок включается (закрыть «к 10 мая» — значит последний взнос 10 мая уместен),
+ * а сегодняшняя выплата — нет, она уже прошла.
+ */
+export function periodsUntil(
+  rhythm: unknown,
+  weekendRule: WeekendRule,
+  from: string,
+  until: string,
+): number {
+  if (until <= from) return 0;
+  const config = { ...(rhythm as Record<string, unknown>), weekendRule } as PeriodConfig;
+  try {
+    // 60 периодов — пять лет полумесячного ритма: дальше горизонта планирования нет смысла.
+    const periods = generatePeriods(config, from, 60);
+    return periods.filter((p) => p.startsOn > from && p.startsOn <= until).length;
+  } catch {
+    return 0;
+  }
+}

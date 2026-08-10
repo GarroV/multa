@@ -329,3 +329,24 @@ test('платёж по долгу меняется с даты, и правка
   await row.getByRole('button', { name: /edit|править/i }).click();
   await expect(page.locator('input[type=date]').first()).toHaveValue('2026-11-01');
 });
+
+test('долг можно завести по сроку — взнос посчитает продукт', async ({ page }) => {
+  /*
+   * Запрос владельца: «остаток 300 000, хочу закрыть к маю — посчитай платёж». Раньше форма
+   * спрашивала только взнос, и человек делил в уме.
+   *
+   * Округление вверх намеренно: посчитанный вниз взнос оставляет хвост, и долг закрывается периодом
+   * позже обещанного — то есть продукт соврал бы ровно в том, ради чего его спросили.
+   */
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  await page.goto('/obligations');
+
+  const panel = page.locator('.panel', { hasText: /DEBTS|ДОЛГИ/i }).first();
+  await panel.getByRole('button', { name: /I know the deadline|Знаю срок/i }).click();
+  await panel.getByPlaceholder(/^Name$|^Название$/).fill('Кредитка');
+  await panel.getByPlaceholder(/^Amount$|^Сумма$/).fill('300000');
+  await panel.getByLabel(/Close by|Закрыть к дате/i).fill('2027-05-10');
+
+  // Считаем вслух: взнос виден до нажатия «добавить», а не после.
+  await expect(panel.locator('.sub.dim').last()).toContainText(/per period|за период/i);
+});

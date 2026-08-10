@@ -1,4 +1,5 @@
-import { fromMajor } from '@multa/core';
+import { fromMajor, paymentToClose, type WeekendRule } from '@multa/core';
+import { periodsUntil } from '../lib/income.ts';
 import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { useIsMember } from '../lib/role.ts';
@@ -8,6 +9,8 @@ import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { ObligationEdit } from '../components/ObligationEdit.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+
+const todayISO = (): string => new Date().toISOString().slice(0, 10);
 import {
   useAccounts,
   useCreateEntity,
@@ -235,14 +238,52 @@ function DebtsSection({ base }: SectionProps) {
   const [ccy, setCcy] = useState(base);
   const [amount, setAmount] = useState('');
   const [payment, setPayment] = useState('');
+  /*
+   * Два способа завести долг (разговор с владельцем 10.08.2026). «Знаю платёж» — как было. «Знаю
+   * срок» — человек называет дату, взнос считает продукт: остаток делится на число выплат до срока
+   * с округлением вверх. Вниз округлять нельзя — хвост уехал бы в лишний период, и «закрою к маю»
+   * стало бы «закрою в июне».
+   */
+  const [mode, setMode] = useState<'payment' | 'deadline'>('payment');
+  const [closeBy, setCloseBy] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  /*
+   * Взнос по сроку считается тем же ядром и тем же ритмом, что и план: иначе «шесть платежей» в
+   * форме и пять колонок в таблице разошлись бы, и человек не понял бы, какой цифре верить.
+   */
+  const { data: meForDebt } = useMe();
+  const remainingForCalc = toMinor(amount, ccy);
+  const periodsAhead =
+    closeBy && meForDebt?.workspace?.rhythm
+      ? periodsUntil(
+          meForDebt.workspace.rhythm,
+          (meForDebt.workspace.weekendRule ?? 'before') as WeekendRule,
+          todayISO(),
+          closeBy,
+        )
+      : 0;
+  const computed =
+    mode === 'deadline' && remainingForCalc && periodsAhead > 0
+      ? (() => {
+          const perPeriod = paymentToClose(BigInt(remainingForCalc), periodsAhead);
+          return perPeriod === null ? null : { perPeriod, periods: periodsAhead };
+        })()
+      : null;
 
   const add = () => {
     const principal = toMinor(amount, ccy);
-    const pay = payment.trim() === '' ? '0' : toMinor(payment, ccy);
     if (!name.trim()) return setError(t('obl.needName'));
     if (!isCurrency(ccy)) return setError(t('obl.badCurrency'));
-    if (principal === null || pay === null) return setError(t('spend.badAmount'));
+    if (principal === null) return setError(t('spend.badAmount'));
+    const pay =
+      mode === 'deadline'
+        ? (computed?.perPeriod.toString() ?? null)
+        : payment.trim() === ''
+          ? '0'
+          : toMinor(payment, ccy);
+    if (pay === null)
+      return setError(mode === 'deadline' ? t('obl.badDeadline') : t('spend.badAmount'));
     setError(null);
     create.mutate(
       {
@@ -257,6 +298,7 @@ function DebtsSection({ base }: SectionProps) {
           setName('');
           setAmount('');
           setPayment('');
+          setCloseBy('');
         },
       },
     );
@@ -365,6 +407,20 @@ function DebtsSection({ base }: SectionProps) {
               className="field mono field-ccy-wide"
             />
           </div>
+          {/* Долг заводят двумя способами: «знаю платёж» и «знаю срок». Второй считает взнос сам. */}
+          <div className="row row-8">
+            {(['payment', 'deadline'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                className="chip"
+                aria-pressed={mode === m}
+                onClick={() => setMode(m)}
+              >
+                {t(m === 'payment' ? 'obl.mode.payment' : 'obl.mode.deadline')}
+              </button>
+            ))}
+          </div>
           <div className="form-row">
             <input
               className="field mono field-sm"
@@ -373,17 +429,39 @@ function DebtsSection({ base }: SectionProps) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <input
-              className="field mono field-sm"
-              inputMode="decimal"
-              placeholder={t('obl.payment')}
-              value={payment}
-              onChange={(e) => setPayment(e.target.value)}
-            />
+            {mode === 'payment' ? (
+              <input
+                className="field mono field-sm"
+                inputMode="decimal"
+                placeholder={t('obl.payment')}
+                value={payment}
+                onChange={(e) => setPayment(e.target.value)}
+              />
+            ) : (
+              <input
+                className="field"
+                type="date"
+                aria-label={t('obl.closeBy')}
+                value={closeBy}
+                onChange={(e) => setCloseBy(e.target.value)}
+              />
+            )}
             <button type="button" className="btn" disabled={create.isPending} onClick={add}>
               {t('common.add')}
             </button>
           </div>
+          {/* Считаем вслух: человек должен увидеть взнос до того, как нажмёт «добавить». */}
+          {mode === 'deadline' && computed && (
+            <span className="sub dim">
+              {t('obl.computed', {
+                amount: `${formatMinor(computed.perPeriod.toString(), ccy, locale)} ${ccy}`,
+                periods: String(computed.periods),
+              })}
+            </span>
+          )}
+          {mode === 'deadline' && closeBy && !computed && (
+            <span className="sub danger">{t('obl.badDeadline')}</span>
+          )}
         </>
       }
     />
