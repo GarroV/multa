@@ -95,7 +95,7 @@ export const en = {
   // План периода — автосборка каскадом (Спринт 2)
   'plan.groups.debt': 'Debts',
   'plan.groups.bucket': 'To exchange',
-  'plan.groups.envelope': 'Envelopes',
+  'plan.groups.envelope': 'Savings',
   'plan.groups.category': 'Spending',
   'plan.groups.goal': 'Goals',
   'plan.groups.income': 'Income',
@@ -109,7 +109,7 @@ export const en = {
     'How much you can spend per day until the next payday. It comes from what is left, not from the plan: spend more today and the number drops today, not at the end of the month.',
   'tour.cascade.title': 'Where the payout went',
   'tour.cascade.body':
-    'Money goes in order: debts, exchange, envelopes, spending, goals. When it falls short, goals give way first, then envelopes, then spending. Debts and currency baskets are never trimmed.',
+    'Money goes in order: debts, exchange, savings, spending, goals. When it falls short, goals give way first, then savings, then spending. Debts and currency baskets are never trimmed.',
   'tour.map.title': 'What happens before payday',
   'tour.map.body': 'The axis from payday to payday: income, large payments and where today sits.',
   'tour.categories.title': 'Spending',
@@ -258,7 +258,7 @@ export const en = {
   'plan.summary.perDay': 'To live on, per day',
   'plan.summary.toExchange': 'To exchange',
   'plan.compressed.note':
-    'Not enough for everything — trimmed {amount} {ccy}. Goals give first, then envelopes, then spending; debts and baskets stay whole.',
+    'Not enough for everything — trimmed {amount} {ccy}. Goals give first, then savings, then spending; debts and baskets stay whole.',
   'plan.row.trimmed': 'trimmed {amount}',
   'plan.category.budgetHint': 'budget / period',
   'cat.protected.on': 'Protected — not auto-trimmed under a shortfall',
@@ -362,7 +362,7 @@ export const en = {
   'stats.signal.compressed': 'Plan is compressed: not enough for everything at once',
   'stats.signal.overspent': 'Some categories are overspent',
   'stats.locked': 'LOCKED IN',
-  'stats.locked.sub': 'debts, baskets, envelopes, goals · {amount}',
+  'stats.locked.sub': 'debts, baskets, savings, goals · {amount}',
   'stats.planVsFact': 'PLAN VS FACT',
   'stats.planVsFact.sub': 'spent {spent} of {plan}',
   'stats.spread': 'AVERAGE SPREAD',
@@ -406,7 +406,7 @@ export const en = {
   'acc.balance': 'Balance',
   'obl.title': 'Obligations',
   'obl.debts': 'Debts',
-  'obl.envelopes': 'Envelopes',
+  'obl.envelopes': 'Savings',
   'obl.goals': 'Goals',
   'obl.buckets': 'Currency baskets',
   'obl.name': 'Name',
@@ -433,7 +433,7 @@ export const en = {
   'set.compressHint':
     'Debts and currency baskets are never trimmed automatically, whatever the order.',
   'set.kind.goal': 'goals',
-  'set.kind.envelope': 'envelopes',
+  'set.kind.envelope': 'savings',
   'set.kind.category': 'categories',
   'set.medianPeriods': 'Periods in the median',
   'set.suggestRaises': 'Suggest raising underfunded lines',
