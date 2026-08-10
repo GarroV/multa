@@ -413,7 +413,11 @@ export const ru: Record<TranslationKey, string> = {
   'obl.goals': 'Цели',
   'obl.buckets': 'Валютные корзины',
   'obl.name': 'Название',
-  'obl.payment': 'Платёж / период',
+  'obl.payment': 'Платёж',
+  'obl.remaining': 'Осталось',
+  'obl.formHint':
+    '«Осталось» — сколько ещё выплатить целиком. «Платёж» — сколько уходит из каждой выплаты; поставь флажок, и продукт посчитает его сам по сроку.',
+  'obl.paymentPer': 'за период',
   'obl.closeBy': 'Закрыть к дате',
   'obl.computed': 'Выйдет {amount} за период — {periods} платежей',
   'obl.tooBig':

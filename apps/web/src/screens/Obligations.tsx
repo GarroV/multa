@@ -338,7 +338,7 @@ function DebtsSection({ base }: SectionProps) {
                     <b>
                       {formatMinor(d.paymentMinor, d.currency, locale)} {d.currency}
                     </b>
-                    <i>{t('obl.payment')}</i>
+                    <i>{t('obl.paymentPer')}</i>
                   </span>
                   <button
                     type="button"
@@ -423,7 +423,7 @@ function DebtsSection({ base }: SectionProps) {
             <input
               className="field mono field-sm"
               inputMode="decimal"
-              placeholder={t('common.amount')}
+              placeholder={t('obl.remaining')}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
@@ -460,6 +460,8 @@ function DebtsSection({ base }: SectionProps) {
           {mode === 'deadline' && closeBy && !computed && (
             <span className="sub danger">{t('obl.badDeadline')}</span>
           )}
+          {/* Что именно вносить: без этой строки «Осталось» и «Платёж» одинаково похожи на «сумму». */}
+          <span className="sub dim">{t('obl.formHint')}</span>
         </>
       }
     />

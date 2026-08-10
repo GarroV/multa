@@ -415,7 +415,11 @@ export const en = {
   'obl.goals': 'Goals',
   'obl.buckets': 'Currency baskets',
   'obl.name': 'Name',
-  'obl.payment': 'Payment / period',
+  'obl.payment': 'Payment',
+  'obl.remaining': 'Left to pay',
+  'obl.formHint':
+    '“Left to pay” is the whole remaining debt. “Payment” is what goes out of each payout; tick the box and the app works it out from the deadline.',
+  'obl.paymentPer': 'per period',
   'obl.closeBy': 'Close by',
   'obl.computed': 'That is {amount} per period — {periods} payments',
   'obl.tooBig':

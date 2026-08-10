@@ -65,7 +65,8 @@ test('невалидная сумма не создаёт обязательст
   const rowsBefore = await debts.locator('.prow').count();
 
   await debts.locator('input[placeholder="Name"]').fill('Bad debt');
-  await debts.locator('input[placeholder="Amount"]').fill('1 000');
+  // Плейсхолдер говорит, ЧТО вносить: «Left to pay», а не безличное «Amount» (правка 11.08.2026).
+  await debts.locator('input[placeholder="Left to pay"]').fill('1 000');
   await debts.getByRole('button', { name: 'Add' }).click();
 
   // Форма говорит, что не так, и ничего не создаёт — раньше молча появлялся долг на 0.
@@ -344,9 +345,10 @@ test('долг можно завести по сроку — взнос посч
   const panel = page.locator('.panel', { hasText: /DEBTS|ДОЛГИ/i }).first();
   await panel.getByRole('checkbox').first().check();
   await panel.getByPlaceholder(/^Name$|^Название$/).fill('Кредитка');
-  await panel.getByPlaceholder(/^Amount$|^Сумма$/).fill('300000');
+  await panel.getByPlaceholder(/Left to pay|Осталось/).fill('300000');
   await panel.locator('input[type=date]').first().fill('2027-05-10');
 
   // Считаем вслух: взнос виден до нажатия «добавить», а не после.
-  await expect(panel.locator('.sub.dim').last()).toContainText(/per period|за период/i);
+  // Ищем именно строку расчёта: под формой рядом живёт подсказка «что вносить».
+  await expect(panel.locator('.sub.dim', { hasText: /per period|за период/i })).toBeVisible();
 });
