@@ -168,6 +168,8 @@ export interface Debt {
   remainingMinor: string;
   paymentMinor: string;
   dueDate: string | null;
+  /** Ступени суммы платежа: «с такой-то даты столько-то» (issue про меняющийся платёж). */
+  amountSteps: { from: string; amountMinor: string }[] | null;
   counterparty: string | null;
 }
 export interface Envelope {

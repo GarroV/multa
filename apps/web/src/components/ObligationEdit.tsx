@@ -31,6 +31,7 @@ export function ObligationEdit({
   name,
   currency,
   fields,
+  steps: initialSteps,
   onDone,
 }: {
   entity: EntityName;
@@ -38,6 +39,11 @@ export function ObligationEdit({
   name: string;
   currency: string;
   fields: readonly EditField[];
+  /**
+   * Ступени суммы: «с такой-то даты платёж другой». Передаются только там, где имеют смысл — у
+   * долга платёж меняется (банк пересчитал, ставка сменилась), у корзины сумма задаётся заново.
+   */
+  steps?: readonly { from: string; amountMinor: string }[] | null;
   onDone: () => void;
 }) {
   const { t } = useI18n();
@@ -52,6 +58,12 @@ export function ObligationEdit({
     ),
   );
   const [error, setError] = useState<string | null>(null);
+  const [steps, setSteps] = useState(() =>
+    (initialSteps ?? []).map((step) => ({
+      from: step.from,
+      amount: toMajorString(money(BigInt(step.amountMinor), currency as Currency)),
+    })),
+  );
 
   const save = () => {
     if (!draftName.trim()) return setError(t('obl.needName'));
@@ -68,6 +80,26 @@ export function ObligationEdit({
         if (!/^\d+(\.\d+)?$/.test(raw)) return setError(t('spend.badAmount'));
         body[f.key] = raw;
       }
+    }
+    if (initialSteps !== undefined) {
+      const parsed: { from: string; amountMinor: string }[] = [];
+      for (const step of steps) {
+        // Пустую строку молча выбрасываем: человек мог добавить ступень и передумать.
+        if (!step.from && !step.amount.trim()) continue;
+        if (!step.from) return setError(t('spend.badAmount'));
+        try {
+          parsed.push({
+            from: step.from,
+            amountMinor: fromMajor(
+              step.amount.trim().replace(',', '.'),
+              currency as Currency,
+            ).minor.toString(),
+          });
+        } catch {
+          return setError(t('spend.badAmount'));
+        }
+      }
+      body.amountSteps = parsed;
     }
     setError(null);
     patch.mutate({ id, body }, { onSuccess: onDone });
@@ -105,6 +137,52 @@ export function ObligationEdit({
           </span>
           {/* Валюта показана, но не правится — см. комментарий к компоненту. */}
           <span className="sub dim">{currency}</span>
+          {initialSteps !== undefined && (
+            <>
+              <span className="sub dim">{t('rec.steps')}</span>
+              {steps.map((step, i) => (
+                <span className="form-row" key={i}>
+                  <input
+                    className="field"
+                    type="date"
+                    aria-label={t('rec.from')}
+                    value={step.from}
+                    onChange={(e) =>
+                      setSteps(steps.map((x, j) => (i === j ? { ...x, from: e.target.value } : x)))
+                    }
+                  />
+                  <input
+                    className="field num field-w-lg"
+                    inputMode="decimal"
+                    aria-label={t('rec.amount')}
+                    placeholder={t('rec.amount')}
+                    value={step.amount}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((x, j) => (i === j ? { ...x, amount: e.target.value } : x)),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="act"
+                    aria-label={t('common.delete')}
+                    onClick={() => setSteps(steps.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                className="act"
+                onClick={() => setSteps([...steps, { from: '', amount: '' }])}
+              >
+                + {t('rec.steps.add')}
+              </button>
+              <span className="sub dim">{t('rec.steps.hint')}</span>
+            </>
+          )}
           {error && <span className="sub danger">{error}</span>}
           {patch.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
         </span>

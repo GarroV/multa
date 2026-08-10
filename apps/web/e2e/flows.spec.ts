@@ -301,3 +301,31 @@ test('регулярный платёж виден в мастер-таблиц�
   await expect(head).toBeVisible();
   await expect(head).toContainText(/not counted in totals|не входит в итоги/i);
 });
+
+test('платёж по долгу меняется с даты, и правка переживает перезагрузку', async ({ page }) => {
+  /*
+   * «Платёж / период» задавался один раз на всю жизнь долга, а он меняется: банк пересчитал,
+   * ставка сменилась, договорились иначе. Ступени умел API, но задать их из интерфейса было
+   * нельзя — то есть для человека этой возможности не существовало.
+   */
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await page.goto('/obligations');
+  const row = page.locator('.prow', { hasText: 'Bank credit' }).first();
+  await row.getByRole('button', { name: /edit|править/i }).click();
+
+  const editor = page
+    .locator('.fx-form', { has: page.getByRole('button', { name: /^Save$|^Сохранить$/ }) })
+    .first();
+  await editor.getByRole('button', { name: /From a date|С даты/i }).click();
+  await editor.locator('input[type=date]').first().fill('2026-11-01');
+  await editor
+    .getByLabel(/^Amount$|^Сумма$/)
+    .last()
+    .fill('15000');
+  await editor.getByRole('button', { name: /^Save$|^Сохранить$/ }).click();
+  await expect(editor).toHaveCount(0, { timeout: 10_000 });
+
+  await page.reload();
+  await row.getByRole('button', { name: /edit|править/i }).click();
+  await expect(page.locator('input[type=date]').first()).toHaveValue('2026-11-01');
+});
