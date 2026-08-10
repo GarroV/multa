@@ -279,3 +279,25 @@ test('срок и смена суммы задаются из меню стро�
   await row.getByRole('button', { name: /Dates and amount|Срок и смена/i }).click();
   await expect(page.locator('input[type=date]').nth(2)).toHaveValue('2026-10-01');
 });
+
+test('регулярный платёж виден в мастер-таблице и помечен как не входящий в итоги (#80)', async ({
+  page,
+}) => {
+  /*
+   * Человек заводит счёт за интернет и открывает таблицу «что впереди». Раньше строки там не было
+   * вовсе, и отсутствие читалось как «платежа не будет».
+   *
+   * Складывать их в подытоги нельзя — большинство таких трат уже сидит внутри бюджета категории, и
+   * «свободный остаток» посчитал бы одни деньги дважды. Поэтому проверяем обе половины: строка
+   * есть И рядом стоит честная пометка.
+   */
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/plan?view=table');
+  await page.locator('.mgrid-row').first().waitFor();
+
+  const head = page.locator('.mgrid-row-head', {
+    hasText: /Recurring payments|Регулярные платежи/i,
+  });
+  await expect(head).toBeVisible();
+  await expect(head).toContainText(/not counted in totals|не входит в итоги/i);
+});

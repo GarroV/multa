@@ -34,6 +34,7 @@ const GROUP_LABEL = {
   envelope: 'plan.groups.envelope',
   category: 'plan.groups.category',
   goal: 'plan.groups.goal',
+  recurring: 'plan.groups.recurring',
 } as const;
 
 export function MasterGrid({ periods = 6 }: { periods?: number }) {
@@ -106,6 +107,10 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
               </button>
             ) : (
               <span className="mgrid-label">{label}</span>
+            )}
+            {/* Группа вне итогов обязана это сказать: иначе таблица врёт молча (issue #80). */}
+            {g.informational && (
+              <span className="dim mgrid-note-inline">{t('plan.master.notInTotals')}</span>
             )}
             {/* Пустой раздел — не украшение, а приглашение: строку заводят в своём разделе. */}
             {g.rows.length === 0 && SECTION_HREF[g.kind] && (

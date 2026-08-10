@@ -97,6 +97,8 @@ export const ru: Record<TranslationKey, string> = {
   'plan.groups.bucket': 'К размену',
   'plan.groups.envelope': 'Накопления',
   'plan.groups.category': 'Расходы',
+  'plan.groups.recurring': 'Регулярные платежи',
+  'plan.master.notInTotals': 'не входит в итоги',
   'plan.groups.goal': 'Цели',
   'plan.groups.income': 'Доход',
   'tour.next': 'Дальше',

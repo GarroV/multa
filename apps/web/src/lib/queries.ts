@@ -762,7 +762,9 @@ export interface GridRowDto {
 }
 
 export interface GridGroupDto {
-  kind: PlanTargetKind | 'income';
+  /** Группа вне итогов: показывается, но в подвал не входит (issue #80). */
+  informational?: true;
+  kind: PlanTargetKind | 'income' | 'recurring';
   rows: GridRowDto[];
   totals: string[];
   totalMinor: string;

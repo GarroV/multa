@@ -48,6 +48,12 @@ const grid = async (client: TestClient, query = ''): Promise<GridDto> =>
 const rowsOf = (dto: GridDto, kind: string): GridRow[] =>
   dto.groups.find((g) => g.kind === kind)?.rows ?? [];
 
+/** id воркспейса из /v1/me — тест не может знать его иначе, чем клиент. */
+async function meWorkspaceId(client: TestClient): Promise<string | null> {
+  const me = await expectOk<{ workspace: { id: string } | null }>(await client.get('/v1/me'));
+  return me.workspace?.id ?? null;
+}
+
 describe('мастер-сетка', () => {
   test('горизонт по умолчанию — шесть периодов, и его можно сузить', async () => {
     const client = await onboarded();
@@ -250,10 +256,38 @@ describe('мастер-сетка', () => {
     const client = await onboarded();
     expect((await client.get('/v1/plan/grid?periods=99')).status).toBe(400);
   });
-});
 
-/** id воркспейса из /v1/me — тест не может знать его иначе, чем клиент. */
-async function meWorkspaceId(client: TestClient): Promise<string | null> {
-  const me = await expectOk<{ workspace: { id: string } | null }>(await client.get('/v1/me'));
-  return me.workspace?.id ?? null;
-}
+  test('регулярные платежи видны отдельной группой и не входят в итоги (#80)', async () => {
+    /*
+     * Человек заводит счёт за интернет в «Регулярных платежах», открывает мастер-таблицу — и не
+     * находит его: в каскаде таких строк нет, они живут отдельно. Таблица при этом называется
+     * «всё, что впереди», и отсутствие платежа читается как «его не будет».
+     *
+     * Просто сложить их в подытоги нельзя: большинство таких трат уже сидит внутри бюджета
+     * категории, и в «свободном остатке» деньги посчитались бы дважды. Поэтому группа
+     * информационная — видно, но в подвал не идёт. Тест держит ровно эту границу: строка есть,
+     * итог не сдвинулся.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const before = await grid(client);
+
+    await expectOk(
+      await client.post('/v1/recurring-items', {
+        name: 'Интернет',
+        amountMinor: '250000',
+        currency: 'RUB',
+        schedule: { kind: 'monthly-days', days: [5] },
+      }),
+      201,
+    );
+
+    const after = await grid(client);
+    const group = after.groups.find((g) => g.kind === 'recurring');
+    if (!group) throw new Error('группы регулярных платежей нет');
+    expect(group.rows.some((r) => r.name === 'Интернет')).toBe(true);
+
+    // Подвал не должен шелохнуться: платёж показан, но в раздачу не входит.
+    expect(after.footer.freeMinor).toEqual(before.footer.freeMinor);
+    expect(after.footer.perDayMinor).toEqual(before.footer.perDayMinor);
+  });
+});

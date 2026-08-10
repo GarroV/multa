@@ -97,6 +97,8 @@ export const en = {
   'plan.groups.bucket': 'To exchange',
   'plan.groups.envelope': 'Savings',
   'plan.groups.category': 'Spending',
+  'plan.groups.recurring': 'Recurring payments',
+  'plan.master.notInTotals': 'not counted in totals',
   'plan.groups.goal': 'Goals',
   'plan.groups.income': 'Income',
   'tour.next': 'Next',

@@ -1,6 +1,7 @@
 import {
   amountOn,
   convert,
+  recurringDueIn,
   normalizeSteps,
   type AmountStep,
   daysInPeriod as daysOf,
@@ -17,7 +18,14 @@ import {
 } from '@multa/core';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
-import { categories, currencyBuckets, debts, envelopes, goals } from '../db/schema/domain.ts';
+import {
+  categories,
+  currencyBuckets,
+  debts,
+  envelopes,
+  goals,
+  recurringItems,
+} from '../db/schema/domain.ts';
 import { getRate } from '../fx/service.ts';
 import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
@@ -65,7 +73,7 @@ export interface GridCellDto {
 }
 
 export interface GridRowDto {
-  targetKind: TargetKind | 'income';
+  targetKind: TargetKind | 'income' | 'recurring';
   targetId: string;
   name: string;
   sourceCurrency: string;
@@ -76,7 +84,14 @@ export interface GridRowDto {
 }
 
 export interface GridGroupDto {
-  kind: TargetKind | 'income';
+  kind: TargetKind | 'income' | 'recurring';
+  /**
+   * Группа вне итогов: её суммы НЕ входят в подвал (issue #80). Большинство регулярных платежей
+   * уже сидит внутри бюджета категории, и сложить их в «свободный остаток» значило бы посчитать
+   * одни деньги дважды. Показываем, потому что «этого платежа тут нет» человек читает как «его не
+   * будет», но подпись обязана быть честной.
+   */
+  informational?: true;
   rows: GridRowDto[];
   totals: string[];
   totalMinor: string;
@@ -281,6 +296,76 @@ export async function getPlanGrid(
     saved,
   });
 
+  /*
+   * Регулярные платежи отдельной группой (issue #80). В каскаде их нет — они не делят доход, а
+   * списываются сами, — но человек, заведя счёт за интернет, ищет его именно здесь: таблица
+   * называется «что впереди», и отсутствие строки читается как «платежа не будет».
+   *
+   * Группа помечена `informational` и в подвал не идёт. Сложить её в итоги нельзя: большинство
+   * таких трат уже сидит внутри бюджета категории, и «свободный остаток» посчитал бы одни деньги
+   * дважды — ровно то, из-за чего группу и отложили при первой версии матрицы.
+   *
+   * Сумма по колонке — сколько списаний правило даёт в этом периоде: платёж 5-го числа при
+   * полумесячном ритме попадает не в каждый период, и рисовать его всюду значило бы врать.
+   */
+  const recurringRows = await db
+    .select()
+    .from(recurringItems)
+    .where(and(eq(recurringItems.workspaceId, ws.id), eq(recurringItems.active, true)));
+
+  const recurringGroup: GridGroupDto | null =
+    recurringRows.length === 0
+      ? null
+      : (() => {
+          const rows: GridRowDto[] = recurringRows.map((item) => {
+            const steps = parseAmountSteps(item.amountSteps);
+            const cells = periods.map((period: PayPeriod) => {
+              const due = recurringDueIn(
+                [
+                  {
+                    id: item.id,
+                    name: item.name,
+                    // Сумма на дату периода: ступени работают и здесь.
+                    amountMinor: amountOn(item.amountMinor, steps, period.startsOn),
+                    currency: item.currency,
+                    schedule: item.schedule as never,
+                    startsOn: item.startsOn,
+                    endsOn: item.endsOn,
+                  },
+                ],
+                period,
+              );
+              const minor = due.reduce(
+                (acc, d) => acc + (toBase(d.amountMinor, d.currency) ?? 0n),
+                0n,
+              );
+              return {
+                minor: minor.toString(),
+                state: (minor > 0n ? 'planned' : 'none') as 'planned' | 'none',
+              };
+            });
+            return {
+              targetKind: 'recurring' as const,
+              targetId: item.id,
+              name: item.name,
+              sourceCurrency: item.currency,
+              cells,
+              totalMinor: cells.reduce((acc, c) => acc + BigInt(c.minor), 0n).toString(),
+              endsAfterIndex: null,
+            };
+          });
+          const totals = periods.map((_: PayPeriod, i: number) =>
+            rows.reduce((acc, r) => acc + BigInt(r.cells[i]!.minor), 0n).toString(),
+          );
+          return {
+            kind: 'recurring',
+            informational: true,
+            rows,
+            totals,
+            totalMinor: totals.reduce((acc, v) => acc + BigInt(v), 0n).toString(),
+          };
+        })();
+
   const cellsToStrings = (cells: readonly bigint[]) => cells.map((v) => v.toString());
 
   /*
@@ -350,6 +435,7 @@ export async function getPlanGrid(
     })),
     groups: [
       incomeGroup,
+      ...(recurringGroup ? [recurringGroup] : []),
       ...grid.groups.map((g) => ({
         kind: g.kind,
         rows: g.rows.map((r) => ({
