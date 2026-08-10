@@ -416,8 +416,6 @@ export const en = {
   'obl.buckets': 'Currency baskets',
   'obl.name': 'Name',
   'obl.payment': 'Payment / period',
-  'obl.mode.payment': 'I know the payment',
-  'obl.mode.deadline': 'I know the deadline',
   'obl.closeBy': 'Close by',
   'obl.computed': 'That is {amount} per period — {periods} payments',
   'obl.tooBig':

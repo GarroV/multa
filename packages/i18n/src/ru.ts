@@ -414,8 +414,6 @@ export const ru: Record<TranslationKey, string> = {
   'obl.buckets': 'Валютные корзины',
   'obl.name': 'Название',
   'obl.payment': 'Платёж / период',
-  'obl.mode.payment': 'Знаю платёж',
-  'obl.mode.deadline': 'Знаю срок',
   'obl.closeBy': 'Закрыть к дате',
   'obl.computed': 'Выйдет {amount} за период — {periods} платежей',
   'obl.tooBig':

@@ -407,20 +407,18 @@ function DebtsSection({ base }: SectionProps) {
               className="field mono field-ccy-wide"
             />
           </div>
-          {/* Долг заводят двумя способами: «знаю платёж» и «знаю срок». Второй считает взнос сам. */}
-          <div className="row row-8">
-            {(['payment', 'deadline'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                className="chip"
-                aria-pressed={mode === m}
-                onClick={() => setMode(m)}
-              >
-                {t(m === 'payment' ? 'obl.mode.payment' : 'obl.mode.deadline')}
-              </button>
-            ))}
-          </div>
+          {/*
+            Один флажок вместо пары кнопок: это не выбор из двух равных вещей, а «обычно ввожу
+            платёж, иногда — срок». Две кнопки делали из редкого случая половину формы.
+          */}
+          <label className="row row-check">
+            <input
+              type="checkbox"
+              checked={mode === 'deadline'}
+              onChange={(e) => setMode(e.target.checked ? 'deadline' : 'payment')}
+            />
+            <span className="sub">{t('obl.closeBy')}</span>
+          </label>
           <div className="form-row">
             <input
               className="field mono field-sm"

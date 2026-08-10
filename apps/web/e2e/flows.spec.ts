@@ -342,10 +342,10 @@ test('долг можно завести по сроку — взнос посч
   await page.goto('/obligations');
 
   const panel = page.locator('.panel', { hasText: /DEBTS|ДОЛГИ/i }).first();
-  await panel.getByRole('button', { name: /I know the deadline|Знаю срок/i }).click();
+  await panel.getByRole('checkbox').first().check();
   await panel.getByPlaceholder(/^Name$|^Название$/).fill('Кредитка');
   await panel.getByPlaceholder(/^Amount$|^Сумма$/).fill('300000');
-  await panel.getByLabel(/Close by|Закрыть к дате/i).fill('2027-05-10');
+  await panel.locator('input[type=date]').first().fill('2027-05-10');
 
   // Считаем вслух: взнос виден до нажатия «добавить», а не после.
   await expect(panel.locator('.sub.dim').last()).toContainText(/per period|за период/i);
