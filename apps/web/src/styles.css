@@ -2062,6 +2062,16 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     order: 0;
   }
+  /*
+   * Ниже 360px две колонки не помещаются: клетка выходит 160px, а суммы в ней не сжимаются ниже
+   * 151px и вместе с отступами толкают страницу вбок на 5px (issue #92). Одна колонка вместо
+   * обрезанных чисел: сумма, которую не дочитать, хуже, чем сумма ниже.
+   */
+  @media (max-width: 360px) {
+    .dense-stats .kpi-strip {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
   .dense-stats .kpi {
     padding: 10px 14px 12px;
   }
