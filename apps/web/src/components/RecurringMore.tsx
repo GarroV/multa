@@ -27,6 +27,7 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
       amount: toMajorString(money(BigInt(s.amountMinor), ccy)),
     })),
   );
+  const [reserve, setReserve] = useState(item.reserve);
   const [error, setError] = useState<string | null>(null);
 
   const save = () => {
@@ -52,6 +53,7 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
         startsOn: from || null,
         endsOn: to || null,
         amountSteps: parsed,
+        reserve,
       },
       { onSuccess: onClose },
     );
@@ -84,6 +86,17 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
               onChange={(e) => setTo(e.target.value)}
             />
           </span>
+
+          <label className="row row-check">
+            <input
+              type="checkbox"
+              checked={reserve}
+              onChange={(e) => setReserve(e.target.checked)}
+            />
+            <span className="sub">{t('rec.reserve')}</span>
+          </label>
+          {/* Честно говорим, почему это не включено сразу: иначе деньги посчитаются дважды. */}
+          <span className="sub dim">{t('rec.reserve.hint')}</span>
 
           <span className="sub dim">{t('rec.steps')}</span>
           {steps.map((step, i) => (

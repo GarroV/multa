@@ -203,6 +203,9 @@ export const ru: Record<TranslationKey, string> = {
   'rec.more': 'Срок и смена суммы',
   'rec.from': 'С',
   'rec.to': 'По',
+  'rec.reserve': 'Откладывать на него из дохода',
+  'rec.reserve.hint':
+    'Иначе платёж считается частью бюджета «Расходы» — включай, если он туда не входит.',
   'rec.steps': 'Сумма меняется',
   'rec.steps.add': 'С даты — другая сумма',
   'rec.steps.hint': 'До первой даты действует сумма выше.',

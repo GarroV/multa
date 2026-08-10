@@ -242,7 +242,8 @@ export const plannedItems = pgTable(
     unique('planned_items_uq').on(t.periodId, t.targetKind, t.targetId),
     check(
       'planned_items_target_ck',
-      sql`${t.targetKind} in ('category','debt','envelope','goal','bucket')`,
+      /* 'recurring' — регулярный платёж, который откладывают отдельной строкой (флаг `reserve`). */
+      sql`${t.targetKind} in ('category','debt','envelope','goal','bucket','recurring')`,
     ),
     check(
       'planned_items_status_ck',
@@ -459,6 +460,14 @@ export const recurringItems = pgTable(
      */
     showOnMap: boolean('show_on_map').notNull().default(true),
     nextOn: date('next_on'),
+    /**
+     * Откладывать деньги на этот платёж отдельной строкой каскада.
+     *
+     * По умолчанию false, и это не осторожность, а единственный честный дефолт: большинство
+     * регулярных трат уже сидит внутри бюджета «Расходов», и включить их в раздачу молча значило бы
+     * посчитать одни деньги дважды. Знает об этом только человек, поэтому решение — его, построчно.
+     */
+    reserve: boolean('reserve').notNull().default(false),
     /**
      * Ступени суммы: «интернет 2 500 до октября, потом 4 000». Раньше на этом месте стояла
      * `escalation` — колонка, объявленная и не использованная ни строчкой кода за всё время.

@@ -686,6 +686,8 @@ export interface RecurringItemDto {
   showOnMap: boolean;
   /** Ступени суммы: «с такой-то даты столько-то» (запрос владельца 06.08.2026). */
   amountSteps: { from: string; amountMinor: string }[] | null;
+  /** Откладывать на него из дохода отдельной строкой каскада. */
+  reserve: boolean;
 }
 
 export interface RecurringInput {
@@ -700,6 +702,7 @@ export interface RecurringInput {
   showOnMap?: boolean;
   /** Ступени суммы: «с такой-то даты столько-то». Пустой список снимает все. */
   amountSteps?: { from: string; amountMinor: string }[];
+  reserve?: boolean;
 }
 
 export function useRecurringItems(enabled = true) {

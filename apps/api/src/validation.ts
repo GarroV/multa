@@ -528,6 +528,8 @@ export const recurringCreateSchema = z.object({
   endsOn: isoDate.optional(),
   showOnMap: z.boolean().optional(),
   amountSteps: amountStepsSchema,
+  /** Откладывать отдельной строкой каскада (иначе платёж считается частью бюджета «Расходов»). */
+  reserve: z.boolean().optional(),
 });
 
 export const recurringPatchSchema = z.object({
@@ -542,6 +544,7 @@ export const recurringPatchSchema = z.object({
   showOnMap: z.boolean().optional(),
   // null — снять все ступени разом; пустой массив означает то же, но через явную правку списка.
   amountSteps: amountStepsSchema.nullable(),
+  reserve: z.boolean().optional(),
 });
 
 // --- Чеки (Спринт 5). QR пробуется первым, он бесплатный. ---

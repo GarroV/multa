@@ -18,6 +18,7 @@ import {
   burnRate,
   categorySpending,
   convert,
+  recurringDueIn,
   normalizeSteps,
   executionOf,
   daysInPeriod,
@@ -50,6 +51,7 @@ import {
   planRevisions,
   plannedItems,
   transactions,
+  recurringItems,
 } from '../db/schema/domain.ts';
 import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
@@ -307,11 +309,13 @@ async function resolveObligations(
   ws: Workspace,
   incomeMinor: bigint,
   on: string,
+  /** Период раздачи: нужен, чтобы посчитать, сколько списаний даёт правило повтора именно в нём. */
+  period: { startsOn: string; endsOn: string },
   /** Цели с осознанным пропуском взноса в этом периоде (issue #54) — в каскад не попадают. */
   frozenGoals: ReadonlySet<string> = new Set(),
 ): Promise<{ resolved: ResolvedItem[]; unresolved: UnresolvedItem[] }> {
   const base = ws.baseCurrency;
-  const [debtRows, bucketRows, envelopeRows, goalRows] = await Promise.all([
+  const [debtRows, bucketRows, envelopeRows, goalRows, reservedRecurring] = await Promise.all([
     db
       .select()
       .from(debts)
@@ -325,6 +329,22 @@ async function resolveObligations(
       .select()
       .from(goals)
       .where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
+    /*
+     * Регулярные платежи, которые человек отметил «откладывать» (разговор 10.08.2026: бассейн
+     * оплачивается до 10-го, а деньги на него откладываются с выплаты 25-го). Поголовно включать
+     * их в раздачу нельзя — большинство уже сидит внутри бюджета «Расходов», — поэтому решение
+     * построчное и по умолчанию выключено.
+     */
+    db
+      .select()
+      .from(recurringItems)
+      .where(
+        and(
+          eq(recurringItems.workspaceId, ws.id),
+          eq(recurringItems.active, true),
+          eq(recurringItems.reserve, true),
+        ),
+      ),
   ]);
 
   const resolved: ResolvedItem[] = [];
@@ -362,6 +382,29 @@ async function resolveObligations(
       ...(extra?.toCurrency ? { toCurrency: extra.toCurrency } : {}),
     });
   };
+
+  for (const r of reservedRecurring) {
+    /*
+     * Сумма — сколько списаний правило даёт в этом периоде: платёж 5-го числа при полумесячном
+     * ритме попадает не в каждый период, и откладывать на него всегда значило бы завышать резерв.
+     */
+    const due = recurringDueIn(
+      [
+        {
+          id: r.id,
+          name: r.name,
+          amountMinor: amountOn(r.amountMinor, parseAmountSteps(r.amountSteps), on),
+          currency: r.currency,
+          schedule: r.schedule as never,
+          startsOn: r.startsOn,
+          endsOn: r.endsOn,
+        },
+      ],
+      { startsOn: period.startsOn, endsOn: period.endsOn },
+    );
+    const total = due.reduce((acc, d) => acc + d.amountMinor, 0n);
+    if (total > 0n) await push('recurring', r.id, r.name, r.currency, total);
+  }
 
   for (const d of debtRows) {
     /*
@@ -772,7 +815,13 @@ async function assembleForPeriod(
   // План — проекция «на момент сборки»: конвертируем по курсу на asOf (сегодня), а не на
   // дату старта периода. Иммутабельный снапшот курса важен для транзакций-фактов, не для плана.
   const frozenGoals = await frozenGoalIds(periodId);
-  const { resolved, unresolved } = await resolveObligations(ws, incomeMinor, asOf, frozenGoals);
+  const { resolved, unresolved } = await resolveObligations(
+    ws,
+    incomeMinor,
+    asOf,
+    period,
+    frozenGoals,
+  );
   const cats = await loadCategoryBudgets(periodId);
   // Правки человека по обязательствам этого периода: пересборка списала часть взноса с цели.
   const overrides = await loadOverrides(periodId);

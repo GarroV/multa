@@ -29,6 +29,7 @@ function serialize(row: typeof recurringItems.$inferSelect) {
     showOnMap: row.showOnMap,
     /* Ступени наружу как есть: суммы в них строками — bigint в JSON не живёт. */
     amountSteps: row.amountSteps ?? null,
+    reserve: row.reserve,
   };
 }
 
@@ -53,6 +54,7 @@ recurringRoute.post('/recurring-items', async (c) => {
       name: body.name,
       amountMinor: body.amountMinor,
       ...(body.amountSteps ? { amountSteps: body.amountSteps } : {}),
+      ...(body.reserve !== undefined ? { reserve: body.reserve } : {}),
       currency: body.currency,
       schedule: body.schedule,
       ...(body.targetId ? { targetId: body.targetId } : {}),
@@ -75,6 +77,7 @@ recurringRoute.patch('/recurring-items/:id', async (c) => {
       ...(body.amountMinor !== undefined ? { amountMinor: body.amountMinor } : {}),
       // null снимает все ступени; пустой массив делает то же явной правкой списка.
       ...(body.amountSteps !== undefined ? { amountSteps: body.amountSteps } : {}),
+      ...(body.reserve !== undefined ? { reserve: body.reserve } : {}),
       ...(body.currency !== undefined ? { currency: body.currency } : {}),
       ...(body.schedule !== undefined ? { schedule: body.schedule } : {}),
       ...(body.active !== undefined ? { active: body.active } : {}),

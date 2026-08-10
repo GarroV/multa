@@ -184,3 +184,41 @@ test('срок и ступени суммы сохраняются и снима
   );
   expect(cleared.amountSteps).toEqual([]);
 });
+
+test('отмеченный «откладывать» платёж забирает деньги, обычный — нет', async () => {
+  /*
+   * Разговор с владельцем 10.08.2026: бассейн надо оплатить до 10-го, а откладывает он с выплаты
+   * 25-го. Сегодня под такой платёж не откладывается НИЧЕГО: регулярные в каскаде не участвуют.
+   *
+   * Включать их в раздачу поголовно нельзя — большинство таких трат уже сидит внутри бюджета
+   * «Расходов», и это посчитало бы одни деньги дважды. Знает об этом только человек, поэтому
+   * решение построчное: флаг `reserve`. Тест держит обе половины границы.
+   */
+  const client = await onboarded({ payoutMinor: '30000000' });
+  const before = await getPlan(client);
+
+  const plain = await expectOk<{ id: string }>(
+    await client.post('/v1/recurring-items', {
+      name: 'Интернет',
+      amountMinor: '250000',
+      currency: 'RUB',
+      // «Каждую выплату»: правило по числу месяца попало бы не в каждый период, и тест зависел бы
+      // от того, в какой день его запустили.
+      schedule: { kind: 'each-payout' },
+    }),
+    201,
+  );
+  const afterPlain = await getPlan(client);
+  // Без флага ничего не изменилось: платёж виден, но денег не занимает.
+  expect(afterPlain.freeMinor).toBe(before.freeMinor);
+
+  await expectOk(await client.patch(`/v1/recurring-items/${plain.id}`, { reserve: true }));
+  const afterReserve = await getPlan(client);
+
+  const row = afterReserve.allocations.find((a) => a.targetId === plain.id);
+  if (!row) throw new Error('отложенный платёж не попал в раздачу');
+  expect(row.targetKind).toBe('recurring');
+  expect(BigInt(row.allocatedMinor)).toBe(250000n);
+  // Свободный остаток уменьшился ровно на отложенное, а не «примерно».
+  expect(BigInt(afterReserve.freeMinor)).toBe(BigInt(before.freeMinor) - 250000n);
+});

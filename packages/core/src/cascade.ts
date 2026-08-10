@@ -14,7 +14,13 @@
  * Все суммы — base-валюта, integer minor units (bigint).
  */
 
-export type TargetKind = 'debt' | 'bucket' | 'envelope' | 'category' | 'goal';
+/**
+ * Виды строк раздачи. `recurring` — регулярный платёж, который человек отметил «откладывать»
+ * (разговор с владельцем 10.08.2026: бассейн оплачивают до 10-го, а деньги на него откладывают с
+ * выплаты 25-го). Он обязателен так же, как долг: срок назначил не бюджет, а тот, кому платят,
+ * поэтому в COMPRESSIBLE его нет и автоматика его не режет.
+ */
+export type TargetKind = 'debt' | 'recurring' | 'bucket' | 'envelope' | 'category' | 'goal';
 
 export interface PlanItem {
   readonly targetKind: TargetKind;

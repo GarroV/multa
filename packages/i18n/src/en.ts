@@ -204,6 +204,9 @@ export const en = {
   'rec.more': 'Dates and amount changes',
   'rec.from': 'From',
   'rec.to': 'Until',
+  'rec.reserve': 'Set money aside for it',
+  'rec.reserve.hint':
+    'Otherwise the payment counts as part of the Spending budget — turn on if it does not.',
   'rec.steps': 'Amount changes',
   'rec.steps.add': 'From a date — another amount',
   'rec.steps.hint': 'Before the first date the amount above applies.',
