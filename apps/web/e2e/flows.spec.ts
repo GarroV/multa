@@ -152,14 +152,14 @@ test('на телефоне сначала цифра дня и диаграмм
   const hero = await topOf('.kpi-hero');
   const donut = await topOf('.kpi-cascade');
   const map = await topOf('.pmap');
+  const secondary = await topOf('.kpi-money');
   const panels = await topOf('.panels .panel');
 
   expect(hero).toBeLessThan(donut);
   expect(donut).toBeLessThan(map);
-  /* Ведомости — после обоих графиков. Блок «всего денег» из проверки убран: счета скрыты из
-     интерфейса решением владельца 06.08.2026 (lib/sections.ts), и ждать его здесь значит
-     проверять то, чего продукт больше не показывает. */
-  expect(map).toBeLessThan(panels);
+  // Второстепенные суммы и ведомости — после обоих графиков.
+  expect(map).toBeLessThan(secondary);
+  expect(secondary).toBeLessThan(panels);
   // Оба графика помещаются в два экрана: ради этого перекладка и делалась.
   expect(map).toBeLessThan(812 * 2);
 });
@@ -181,13 +181,11 @@ test('на широком экране порядок прежний: полос
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/plan');
 
+  const money = (await page.locator('.kpi-money').boundingBox())!;
   const hero = (await page.locator('.kpi-hero').boundingBox())!;
-  const donut = (await page.locator('.kpi-cascade').boundingBox())!;
-  /* Клетки стоят в одну строку: разница по вертикали нулевая, порядок — слева направо. Раньше
-     сравнивали с блоком «всего денег», но счета скрыты (lib/sections.ts), поэтому парой герою
-     служит диаграмма каскада — она и была вторым элементом полосы. */
-  expect(Math.abs(donut.y - hero.y)).toBeLessThan(2);
-  expect(hero.x).toBeLessThan(donut.x);
+  // Клетки стоят в одну строку: разница по вертикали нулевая, порядок — слева направо.
+  expect(Math.abs(money.y - hero.y)).toBeLessThan(2);
+  expect(money.x).toBeLessThan(hero.x);
 });
 
 test('подписи на карте периода не встают вплотную на телефоне (#87)', async ({ page }) => {
