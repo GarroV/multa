@@ -5,6 +5,7 @@ import { useI18n } from '../lib/i18n.tsx';
 import { draftToSource, type SourceDraft } from '../lib/income.ts';
 import { useCreateIncomeSource, useDeleteIncomeSource, useIncomeSources } from '../lib/queries.ts';
 import { Tag } from './ui/Panel.tsx';
+import { Hint } from './ui/Hint.tsx';
 
 /**
  * Редактор источников дохода (перенесён из «Настроек» по решению владельца 2026-08-05).
@@ -147,8 +148,8 @@ export function IncomeEditor({ base, locale }: { base: string; locale: string })
         )}
         {addSource.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
         {removeSource.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
-        <span className="sub dim">
-          {t('income.editor.rhythmHint')}{' '}
+        <span className="row row-6">
+          <Hint text={t('income.editor.rhythmHint')} />
           <Link className="act" to="/settings">
             {t('settings.rhythm')}
           </Link>

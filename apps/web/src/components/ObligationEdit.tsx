@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { fromMajor, toMajorString, money, type Currency } from '@multa/core';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePatchEntity, type EntityName } from '../lib/queries.ts';
+import { Hint } from './ui/Hint.tsx';
 
 /**
  * Правка строки обязательства на месте (issue #91).
@@ -139,7 +140,10 @@ export function ObligationEdit({
           <span className="sub dim">{currency}</span>
           {initialSteps !== undefined && (
             <>
-              <span className="sub dim">{t('rec.steps')}</span>
+              <span className="row row-6">
+                <span className="sub dim">{t('rec.steps')}</span>
+                <Hint text={t('rec.steps.hint')} />
+              </span>
               {steps.map((step, i) => (
                 <span className="form-row" key={i}>
                   <input
@@ -180,7 +184,6 @@ export function ObligationEdit({
               >
                 + {t('rec.steps.add')}
               </button>
-              <span className="sub dim">{t('rec.steps.hint')}</span>
             </>
           )}
           {error && <span className="sub danger">{error}</span>}

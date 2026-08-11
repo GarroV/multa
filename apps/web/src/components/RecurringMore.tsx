@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fromMajor, toMajorString, money, type Currency } from '@multa/core';
 import { useI18n } from '../lib/i18n.tsx';
+import { Hint } from './ui/Hint.tsx';
 import { usePatchRecurring, type RecurringItemDto } from '../lib/queries.ts';
 
 /**
@@ -94,11 +95,14 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
               onChange={(e) => setReserve(e.target.checked)}
             />
             <span className="sub">{t('rec.reserve')}</span>
+            {/* Почему не включено сразу — под знаком: иначе деньги посчитались бы дважды. */}
+            <Hint text={t('rec.reserve.hint')} />
           </label>
-          {/* Честно говорим, почему это не включено сразу: иначе деньги посчитаются дважды. */}
-          <span className="sub dim">{t('rec.reserve.hint')}</span>
 
-          <span className="sub dim">{t('rec.steps')}</span>
+          <span className="row row-6">
+            <span className="sub dim">{t('rec.steps')}</span>
+            <Hint text={t('rec.steps.hint')} />
+          </span>
           {steps.map((step, i) => (
             <span className="form-row" key={i}>
               <input
@@ -146,7 +150,6 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
               {t('common.cancel')}
             </button>
           </span>
-          <span className="sub dim">{t('rec.steps.hint')}</span>
           {error && <span className="sub danger">{error}</span>}
           {patch.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
         </span>

@@ -6,6 +6,7 @@ import { useIsMember } from '../lib/role.ts';
 import { isSectionVisible } from '../lib/sections.ts';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
+import { Hint } from '../components/ui/Hint.tsx';
 import { ObligationEdit } from '../components/ObligationEdit.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -418,6 +419,8 @@ function DebtsSection({ base }: SectionProps) {
               onChange={(e) => setMode(e.target.checked ? 'deadline' : 'payment')}
             />
             <span className="sub">{t('obl.closeBy')}</span>
+            {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз, а место занимало всегда. */}
+            <Hint text={t('obl.formHint')} />
           </label>
           <div className="form-row">
             <input
@@ -460,8 +463,6 @@ function DebtsSection({ base }: SectionProps) {
           {mode === 'deadline' && closeBy && !computed && (
             <span className="sub danger">{t('obl.badDeadline')}</span>
           )}
-          {/* Что именно вносить: без этой строки «Осталось» и «Платёж» одинаково похожи на «сумму». */}
-          <span className="sub dim">{t('obl.formHint')}</span>
         </>
       }
     />

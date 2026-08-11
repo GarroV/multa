@@ -1849,6 +1849,31 @@ a {
   text-overflow: ellipsis;
 }
 
+/**
+ * Знак справки: круг с вопросом рядом с подписью. Тише текста вокруг — он не сообщение, а дверь к
+ * нему; заметен ровно настолько, чтобы его нашли, когда понадобится.
+ */
+.hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  flex: 0 0 auto;
+  user-select: none;
+}
+.hint:hover,
+.hint:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Разворот раздела: кликается вся подпись, а не только треугольник. */
 .mgrid-toggle {
   /* Не сжимается: подпись раздела и кнопка разворота — суть строки, они уступают место последними. */
