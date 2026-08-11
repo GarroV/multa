@@ -408,20 +408,6 @@ function DebtsSection({ base }: SectionProps) {
               className="field mono field-ccy-wide"
             />
           </div>
-          {/*
-            Один флажок вместо пары кнопок: это не выбор из двух равных вещей, а «обычно ввожу
-            платёж, иногда — срок». Две кнопки делали из редкого случая половину формы.
-          */}
-          <label className="row row-check">
-            <input
-              type="checkbox"
-              checked={mode === 'deadline'}
-              onChange={(e) => setMode(e.target.checked ? 'deadline' : 'payment')}
-            />
-            <span className="sub">{t('obl.closeBy')}</span>
-            {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз, а место занимало всегда. */}
-            <Hint text={t('obl.formHint')} />
-          </label>
           <div className="form-row">
             <input
               className="field mono field-sm"
@@ -447,6 +433,20 @@ function DebtsSection({ base }: SectionProps) {
                 onChange={(e) => setCloseBy(e.target.value)}
               />
             )}
+            {/*
+              Флажок стоит в строке с полями, а не над ней: он переключает соседнее поле, и целая
+              строка под один переключатель — половина формы ради редкого случая.
+            */}
+            <label className="row row-check">
+              <input
+                type="checkbox"
+                checked={mode === 'deadline'}
+                onChange={(e) => setMode(e.target.checked ? 'deadline' : 'payment')}
+              />
+              <span className="sub">{t('obl.closeBy')}</span>
+              {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
+              <Hint text={t('obl.formHint')} />
+            </label>
             <button type="button" className="btn" disabled={create.isPending} onClick={add}>
               {t('common.add')}
             </button>

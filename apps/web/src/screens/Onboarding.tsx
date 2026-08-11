@@ -17,6 +17,7 @@ import {
   type PayoutForm,
   type RhythmForm,
   type SourcePayload,
+  seedPayouts,
 } from '../lib/income.ts';
 import {
   useCreateEntity,
@@ -42,15 +43,6 @@ function toMinor(value: string, ccy: string): string | null {
 // --- Шаг 2: ритм планирования + источники дохода ---
 
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
-
-/**
- * Сид меток выплат — ДАННЫЕ пользователя, не строки интерфейса, поэтому i18n-ключей у них нет:
- * подставляем на языке локали и даём переписать.
- */
-const SEED_LABELS: Record<'ru' | 'en', [string, string]> = {
-  ru: ['Аванс', 'Зарплата'],
-  en: ['Advance', 'Salary'],
-};
 
 /** Payload источников → доменный вид для проверки рассинхрона (суммы для неё не важны). */
 function toProbeSources(sources: readonly SourcePayload[]): IncomeSource[] {
@@ -82,13 +74,7 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
     anchorDate: today,
     weekendRule: 'before',
   });
-  const [payouts, setPayouts] = useState<PayoutForm[]>(() => {
-    const [first, second] = SEED_LABELS[locale];
-    return [
-      { label: first, day: 10, amount: '', percent: '' },
-      { label: second, day: 25, amount: '', percent: '' },
-    ];
-  });
+  const [payouts, setPayouts] = useState<PayoutForm[]>(() => seedPayouts(locale));
   const [usePercent, setUsePercent] = useState(false);
   const [gross, setGross] = useState('');
   const save = useSaveOnboardingIncome();
