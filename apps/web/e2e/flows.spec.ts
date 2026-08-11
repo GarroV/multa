@@ -352,3 +352,38 @@ test('долг можно завести по сроку — взнос посч
   // Ищем именно строку расчёта: под формой рядом живёт подсказка «что вносить».
   await expect(panel.locator('.sub.dim', { hasText: /per period|за период/i })).toBeVisible();
 });
+
+test('источник дохода можно переименовать, а не только завести и удалить', async ({ page }) => {
+  /*
+   * Владелец 11.08.2026 увидел на своём экране «Аванс» на 10 числе и «Зарплату» на 25 — метки-сид
+   * стояли наоборот. Поправить их из интерфейса было нечем: панель дохода умела только «добавить» и
+   * «✕». Единственный путь — удалить строку и завести заново, но вместе с источником уходят
+   * подтверждённые поступления, которые на него ссылаются.
+   *
+   * Проверяем путь целиком, включая перезагрузку: «сохранено» только на экране — обычный способ
+   * проглядеть, что PATCH не долетел.
+   */
+  await page.goto('/plan');
+  const panel = page.locator('.panel', { hasText: /INCOME|ДОХОД/ }).first();
+  await panel.getByRole('button', { name: /^edit$|^править$/i }).click();
+
+  const row = panel.locator('.prow', { hasText: 'Salary · main' }).first();
+  await row.getByRole('button', { name: /edit|править/i }).click();
+
+  const editor = panel
+    .locator('.fx-form', { has: page.getByRole('button', { name: /^Save$|^Сохранить$/ }) })
+    .first();
+  await editor.getByLabel(/^Label$|^Метка$/).fill('Salary · renamed');
+  await editor.getByRole('button', { name: /^Save$|^Сохранить$/ }).click();
+
+  await expect(panel.locator('.prow', { hasText: 'Salary · renamed' }).first()).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.reload();
+  await page
+    .locator('.panel', { hasText: /INCOME|ДОХОД/ })
+    .first()
+    .getByRole('button', { name: /^edit$|^править$/i })
+    .click();
+  await expect(page.locator('.prow', { hasText: 'Salary · renamed' }).first()).toBeVisible();
+});

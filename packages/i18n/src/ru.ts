@@ -52,6 +52,8 @@ export const ru: Record<TranslationKey, string> = {
   'income.extra.irregular': 'Приходит когда как',
   'income.extra.irregularNote': 'Нерегулярный доход в план не идёт — только в факт.',
   'income.variable': 'плавает',
+  'income.editNameOnly':
+    'У этого источника правится только название: сумма задана процентом или ритм сложнее, чем поля этой формы. Остальное — новой строкой.',
   'income.kind.legend': 'Ритм дохода',
   'income.editor.rhythmHint': 'Границы периодов задаёт ритм выплат —',
   'onboarding.income.how': 'Как приходят деньги',

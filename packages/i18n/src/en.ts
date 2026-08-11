@@ -53,6 +53,8 @@ export const en = {
   'income.extra.irregular': 'Comes irregularly',
   'income.extra.irregularNote': 'Irregular income stays out of the plan — only recorded as fact.',
   'income.variable': 'floats',
+  'income.editNameOnly':
+    'Only the name is editable here: the amount is a percentage, or the rhythm is more than these fields can hold. Change the rest by adding a new source.',
   'income.kind.legend': 'Income rhythm',
   'income.editor.rhythmHint': 'Period boundaries come from the payout rhythm —',
   'onboarding.income.how': 'How the money arrives',

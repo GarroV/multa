@@ -4,7 +4,15 @@
  * теми же функциями, что и сервер, поэтому превью не может разойтись с планом.
  */
 
-import { fromMajor, generatePeriods, type PeriodConfig, type WeekendRule } from '@multa/core';
+import {
+  fromMajor,
+  generatePeriods,
+  money,
+  toMajorString,
+  type Currency,
+  type PeriodConfig,
+  type WeekendRule,
+} from '@multa/core';
 
 export type RhythmKind = 'twiceMonthly' | 'monthly' | 'everyWeeks';
 
@@ -287,4 +295,54 @@ export function seedPayouts(locale: 'ru' | 'en'): PayoutForm[] {
     { label: tenth, day: 10, amount: '', percent: '' },
     { label: twentyFifth, day: 25, amount: '', percent: '' },
   ];
+}
+
+/** Дефолт дня недели в черновике: пятница — самый частый день недельных выплат. */
+const DEFAULT_WEEKDAY = 5;
+
+/**
+ * Существующий источник → черновик формы правки.
+ *
+ * `null` означает «эта форма такой источник не выражает» — и это ответ, а не сбой. Форма знает три
+ * ритма (число месяца, день недели, каждый день) и одну абсолютную сумму. Источник с процентом от
+ * оклада, с двумя числами в одной строке или с ритмом «раз в N недель» через неё не проходит:
+ * сохранение молча переписало бы модель суммы или потеряло вторую выплату. Такие строки правятся
+ * только по названию — см. `IncomeEditor`.
+ */
+export function sourceToDraft(
+  source: { label: string; schedule: unknown; amount: unknown },
+  currency: string,
+): SourceDraft | null {
+  const amount = source.amount as { kind?: string; amountMinor?: string };
+  if (amount?.kind !== 'absolute' || !amount.amountMinor) return null;
+
+  const schedule = source.schedule as { kind?: string; days?: number[]; weekday?: number };
+  const base = {
+    label: source.label,
+    day: 25,
+    weekday: DEFAULT_WEEKDAY,
+    amount: toMajorString(money(BigInt(amount.amountMinor), currency as Currency)),
+  };
+
+  if (schedule?.kind === 'daily') return { ...base, kind: 'daily' };
+  if (schedule?.kind === 'weekly')
+    return { ...base, kind: 'weekly', weekday: schedule.weekday ?? DEFAULT_WEEKDAY };
+  if (schedule?.kind === 'monthly-days' && schedule.days?.length === 1)
+    return { ...base, kind: 'monthly', day: schedule.days[0]! };
+  return null;
+}
+
+/**
+ * Черновик → тело PATCH: только те поля, которые форма показывает.
+ *
+ * `stability`, `active` и `sort` намеренно не отправляются: их в форме нет, и перезаписывать
+ * невидимое пользователю значение при правке названия — тихая подмена его решения.
+ */
+export function draftToPatch(
+  draft: SourceDraft,
+  currency: string,
+): { label: string; schedule: unknown; amount: unknown } | null {
+  const source = draftToSource(draft, { currency });
+  if (!source) return null;
+  return { label: source.label, schedule: source.schedule, amount: source.amount };
 }

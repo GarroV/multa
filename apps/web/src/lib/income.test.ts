@@ -11,6 +11,8 @@ import {
   onboardingIncome,
   type RhythmForm,
   seedPayouts,
+  sourceToDraft,
+  draftToPatch,
 } from './income.ts';
 
 const twiceMonthly: RhythmForm = {
@@ -307,5 +309,112 @@ describe('seedPayouts', () => {
 
   it('суммы пустые: подставлять человеку чужие цифры нельзя', () => {
     expect(seedPayouts('ru').every((p) => p.amount === '' && p.percent === '')).toBe(true);
+  });
+});
+
+describe('sourceToDraft', () => {
+  /*
+   * Правка источника дохода (владелец, 11.08.2026: «а править ты не собираешься?»).
+   *
+   * До этого источник можно было только завести и удалить. Опечатка в названии чинилась удалением
+   * строки — а вместе с источником уходили подтверждённые поступления, которые на него ссылаются.
+   * Ручка PATCH в API была с самого начала, не было формы.
+   *
+   * Черновик — тот же, что у формы добавления: одна форма для «завести» и «поправить» не даёт им
+   * разъехаться. Но выразить она может не всякий источник, и там, где не может, обязана честно
+   * сказать «нет» — молча переписать процент в абсолютную сумму значит подменить человеку доход.
+   */
+  const absolute = { kind: 'absolute', amountMinor: '13398000' };
+
+  it('месячный источник: число месяца и сумма в major', () => {
+    const draft = sourceToDraft(
+      { label: 'Зарплата', schedule: { kind: 'monthly-days', days: [10] }, amount: absolute },
+      'RUB',
+    );
+    expect(draft).toEqual({
+      label: 'Зарплата',
+      kind: 'monthly',
+      day: 10,
+      weekday: 5,
+      amount: '133980.00',
+    });
+  });
+
+  it('ежедневный источник: числа месяца у него нет', () => {
+    const draft = sourceToDraft(
+      { label: 'Смены', schedule: { kind: 'daily' }, amount: absolute },
+      'RUB',
+    );
+    expect(draft?.kind).toBe('daily');
+  });
+
+  it('недельный источник сохраняет день недели', () => {
+    const draft = sourceToDraft(
+      { label: 'Такси', schedule: { kind: 'weekly', weekday: 3 }, amount: absolute },
+      'RUB',
+    );
+    expect(draft?.kind).toBe('weekly');
+    expect(draft?.weekday).toBe(3);
+  });
+
+  it('процент от суммы форма не выражает — отказ, а не пересчёт в рубли', () => {
+    const draft = sourceToDraft(
+      {
+        label: 'Аванс',
+        schedule: { kind: 'monthly-days', days: [25] },
+        amount: { kind: 'percent', percent: '40', ofMinor: '20000000' },
+      },
+      'RUB',
+    );
+    expect(draft).toBe(null);
+  });
+
+  it('две выплаты в одном источнике: одно поле «число» их не выразит', () => {
+    const draft = sourceToDraft(
+      { label: 'Оклад', schedule: { kind: 'monthly-days', days: [10, 25] }, amount: absolute },
+      'RUB',
+    );
+    expect(draft).toBe(null);
+  });
+
+  it('ритм «раз в N недель» формой не правится', () => {
+    const draft = sourceToDraft(
+      { label: 'Гонорар', schedule: { kind: 'every-weeks', weeks: 2 }, amount: absolute },
+      'RUB',
+    );
+    expect(draft).toBe(null);
+  });
+
+  it('черновик едет обратно в источник без потерь', () => {
+    const source = {
+      label: 'Зарплата',
+      schedule: { kind: 'monthly-days', days: [10] },
+      amount: absolute,
+    };
+    const draft = sourceToDraft(source, 'RUB');
+    const back = draftToSource(draft!, { currency: 'RUB' });
+    expect(back?.schedule).toEqual(source.schedule);
+    expect(back?.amount).toEqual(absolute);
+  });
+});
+
+describe('draftToPatch', () => {
+  /*
+   * Правка меняет ровно то, что показывает: название, ритм, сумму. `stability`, `active` и `sort`
+   * в форме не выведены, и трогать их она не имеет права — иначе смена ритма молча снимала бы с
+   * дохода пометку «плавает», которую человек поставил сам.
+   */
+  it('отдаёт только показанные поля', () => {
+    const patch = draftToPatch(
+      { label: 'Зарплата', kind: 'monthly', day: 10, weekday: 5, amount: '133980' },
+      'RUB',
+    );
+    expect(Object.keys(patch!).sort()).toEqual(['amount', 'label', 'schedule']);
+  });
+
+  it('пустая сумма — не патч: молча обнулять доход нельзя', () => {
+    expect(
+      draftToPatch({ label: 'Зарплата', kind: 'monthly', day: 10, weekday: 5, amount: '' }, 'RUB'),
+    ).toBe(null);
   });
 });

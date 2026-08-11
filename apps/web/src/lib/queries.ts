@@ -1006,6 +1006,26 @@ function useTransactionMutation<TVars>(mutationFn: (vars: TVars) => Promise<unkn
   });
 }
 
+/**
+ * Правка источника дохода. Ручка PATCH была в API с самого начала, формы не было: опечатка в
+ * названии чинилась удалением строки, а вместе с источником уходили подтверждённые поступления,
+ * которые на него ссылаются.
+ */
+export function usePatchIncomeSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: unknown }) =>
+      api<IncomeSourceDto>(`/v1/income-sources/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['income-sources'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}
+
 export function useDeleteIncomeSource() {
   const qc = useQueryClient();
   return useMutation({

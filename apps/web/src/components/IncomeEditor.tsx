@@ -4,6 +4,7 @@ import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { draftToSource, type SourceDraft } from '../lib/income.ts';
 import { useCreateIncomeSource, useDeleteIncomeSource, useIncomeSources } from '../lib/queries.ts';
+import { IncomeSourceEdit } from './IncomeSourceEdit.tsx';
 import { Tag } from './ui/Panel.tsx';
 import { Hint } from './ui/Hint.tsx';
 
@@ -24,6 +25,7 @@ export function IncomeEditor({ base, locale }: { base: string; locale: string })
   const addSource = useCreateIncomeSource();
   const removeSource = useDeleteIncomeSource();
 
+  const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<SourceDraft>({
     label: '',
     kind: 'monthly',
@@ -49,30 +51,42 @@ export function IncomeEditor({ base, locale }: { base: string; locale: string })
         </div>
       )}
 
-      {sources.map((s) => (
-        <div className="prow" key={s.id}>
-          <span className="prow-day">{scheduleLabel(s.schedule, locale, t)}</span>
-          <span className="prow-name">
-            <span>{s.label}</span>
-            {s.stability === 'variable' && <Tag tone="amber">{t('income.variable')}</Tag>}
-            {s.currency !== base && <Tag tone="vio">{s.currency}</Tag>}
-          </span>
-          <span className="prow-num">
-            <b>
-              {amountLabel(s.amount, s.currency, locale)} {s.currency}
-            </b>
-          </span>
-          <button
-            type="button"
-            className="act"
-            aria-label={t('common.delete')}
-            disabled={removeSource.isPending}
-            onClick={() => removeSource.mutate(s.id)}
-          >
-            ✕
-          </button>
-        </div>
-      ))}
+      {sources.map((s) =>
+        editing === s.id ? (
+          <IncomeSourceEdit key={s.id} source={s} locale={locale} onDone={() => setEditing(null)} />
+        ) : (
+          <div className="prow" key={s.id}>
+            <span className="prow-day">{scheduleLabel(s.schedule, locale, t)}</span>
+            <span className="prow-name">
+              <span>{s.label}</span>
+              {s.stability === 'variable' && <Tag tone="amber">{t('income.variable')}</Tag>}
+              {s.currency !== base && <Tag tone="vio">{s.currency}</Tag>}
+            </span>
+            <span className="prow-num">
+              <b>
+                {amountLabel(s.amount, s.currency, locale)} {s.currency}
+              </b>
+            </span>
+            <button
+              type="button"
+              className="act"
+              aria-label={t('plan.act.edit')}
+              onClick={() => setEditing(s.id)}
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              className="act"
+              aria-label={t('common.delete')}
+              disabled={removeSource.isPending}
+              onClick={() => removeSource.mutate(s.id)}
+            >
+              ✕
+            </button>
+          </div>
+        ),
+      )}
 
       <div className="fx-form">
         <div className="form-row">
