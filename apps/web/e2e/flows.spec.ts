@@ -259,7 +259,7 @@ test('срок и смена суммы задаются из меню стро�
   await page.goto('/obligations');
   const rows = page.locator('.panel', { hasText: /RECURRING|РЕГУЛЯРНЫЕ/i }).locator('.prow');
   const row = rows.first();
-  await row.getByRole('button', { name: /Dates and amount|Срок и смена/i }).click();
+  await row.getByRole('button', { name: /Edit payment|Править платёж/i }).click();
 
   const panel = page
     .locator('.fx-form', { has: page.getByRole('button', { name: /^Save$|^Сохранить$/ }) })
@@ -277,7 +277,7 @@ test('срок и смена суммы задаются из меню стро�
   await expect(panel).toHaveCount(0, { timeout: 10_000 });
 
   await page.reload();
-  await row.getByRole('button', { name: /Dates and amount|Срок и смена/i }).click();
+  await row.getByRole('button', { name: /Edit payment|Править платёж/i }).click();
   await expect(page.locator('input[type=date]').nth(2)).toHaveValue('2026-10-01');
 });
 
@@ -386,4 +386,30 @@ test('источник дохода можно переименовать, а н
     .getByRole('button', { name: /^edit$|^править$/i })
     .click();
   await expect(page.locator('.prow', { hasText: 'Salary · renamed' }).first()).toBeVisible();
+});
+
+test('регулярный платёж можно переименовать и поправить сумму', async ({ page }) => {
+  /*
+   * Та же дыра, что была у дохода (11.08.2026): у строки регулярного платежа были только «на
+   * карте», «…» и «✕». Панель «…» правила срок, ступени и «откладывать», но название и сумму —
+   * нет, хотя PATCH их принимает. Единственный путь был удалить строку и завести заново.
+   *
+   * Поля добавлены в ту же панель, а не под вторую кнопку: две кнопки правки у одной строки без
+   * понятной границы — способ гарантированно нажать не ту.
+   */
+  await page.goto('/obligations');
+  const row = page.locator('.prow', { hasText: 'Internet' }).first();
+  await row.getByRole('button', { name: /Edit payment|Править платёж/i }).click();
+
+  const editor = page
+    .locator('.fx-form', { has: page.getByRole('button', { name: /^Save$|^Сохранить$/ }) })
+    .first();
+  await editor.getByLabel(/^Name$|^Название$/).fill('Internet renamed');
+  await editor.getByRole('button', { name: /^Save$|^Сохранить$/ }).click();
+
+  await expect(page.locator('.prow', { hasText: 'Internet renamed' }).first()).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.reload();
+  await expect(page.locator('.prow', { hasText: 'Internet renamed' }).first()).toBeVisible();
 });

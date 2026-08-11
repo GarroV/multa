@@ -20,6 +20,8 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
   const patch = usePatchRecurring();
   const ccy = item.currency as Currency;
 
+  const [name, setName] = useState(item.name);
+  const [amount, setAmount] = useState(() => toMajorString(money(BigInt(item.amountMinor), ccy)));
   const [from, setFrom] = useState(item.startsOn ?? '');
   const [to, setTo] = useState(item.endsOn ?? '');
   const [steps, setSteps] = useState(() =>
@@ -46,10 +48,20 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
         return setError(t('spend.badAmount'));
       }
     }
+    const trimmed = name.trim();
+    if (!trimmed) return setError(t('obl.needName'));
+    let amountMinor: string;
+    try {
+      amountMinor = fromMajor(amount.trim().replace(',', '.'), ccy).minor.toString();
+    } catch {
+      return setError(t('spend.badAmount'));
+    }
     setError(null);
     patch.mutate(
       {
         id: item.id,
+        name: trimmed,
+        amountMinor,
         // null снимает ограничение; пустая строка из поля даты означает именно это.
         startsOn: from || null,
         endsOn: to || null,
@@ -65,6 +77,29 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
       <span className="prow-day" aria-hidden />
       <span className="prow-bar prow-bar-full">
         <span className="fx-form">
+          {/*
+            Название и сумма живут здесь же, а не за отдельной кнопкой: у строки уже есть «…», и
+            вторая кнопка «править» рядом с ней означала бы, что правка разложена по двум местам без
+            понятной границы. Раньше их нельзя было поправить вовсе — только удалить строку.
+          */}
+          <span className="form-row">
+            <input
+              className="field grow"
+              aria-label={t('rec.name')}
+              placeholder={t('rec.name')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              className="field num field-sm"
+              inputMode="decimal"
+              aria-label={`${t('rec.amount')} · ${ccy}`}
+              placeholder={t('rec.amount')}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
+            />
+          </span>
+
           <span className="form-row">
             <label className="sub dim" htmlFor={`from-${item.id}`}>
               {t('rec.from')}

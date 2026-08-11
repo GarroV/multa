@@ -202,7 +202,7 @@ export const ru: Record<TranslationKey, string> = {
   'rec.add': 'Добавить',
   'rec.empty': 'Регулярных платежей пока нет',
   'rec.onMap': 'Показывать на карте периода',
-  'rec.more': 'Срок и смена суммы',
+  'rec.more': 'Править платёж',
   'rec.from': 'С',
   'rec.to': 'По',
   'rec.reserve': 'Откладывать на него из дохода',

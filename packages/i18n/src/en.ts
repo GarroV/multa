@@ -203,7 +203,7 @@ export const en = {
   'rec.add': 'Add',
   'rec.empty': 'No recurring payments yet',
   'rec.onMap': 'Show on the period map',
-  'rec.more': 'Dates and amount changes',
+  'rec.more': 'Edit payment',
   'rec.from': 'From',
   'rec.to': 'Until',
   'rec.reserve': 'Set money aside for it',
