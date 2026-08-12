@@ -8,7 +8,7 @@ import { useAcceptInvite } from '../lib/queries.ts';
 const POPULAR = ['RUB', 'EUR', 'USD', 'RSD'];
 
 export function OnboardingCurrency() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const qc = useQueryClient();
   const [currency, setCurrency] = useState('RUB');
   const [search, setSearch] = useState('');
@@ -25,7 +25,13 @@ export function OnboardingCurrency() {
     mutationFn: () =>
       api('/v1/workspace', {
         method: 'POST',
-        body: JSON.stringify({ baseCurrency: chosen.slice(0, 3) }),
+        /*
+         * Язык обязан уехать вместе с валютой (#104). Без него воркспейс создавался с локалью по
+         * умолчанию, а App подхватывал её как стартовую — и интерфейс человека с английским
+         * браузером перекидывало на русский сразу после этого шага, вместе со стартовыми
+         * категориями. Первый экран после регистрации — не то место, где можно так ошибаться.
+         */
+        body: JSON.stringify({ baseCurrency: chosen.slice(0, 3), locale }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
   });
