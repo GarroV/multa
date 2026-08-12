@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { formatMinor } from '../lib/format.ts';
 import { useSheet } from '../lib/useSheet.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { useQrScanner } from '../lib/useQrScanner.ts';
 import {
   useCategories,
   useConfirmReceipt,
@@ -42,6 +43,27 @@ export function ReceiptEntry({
   const confirm = useConfirmReceipt();
 
   const [payload, setPayload] = useState('');
+  const scanner = useQrScanner();
+  /** Код не нашёлся в снимке — это ответ, а не молчание: иначе кнопка выглядит сломанной. */
+  const [noCode, setNoCode] = useState(false);
+
+  /** Найденный код сразу уходит на разбор: лишнее подтверждение здесь — только шаг между. */
+  const useCode = (code: string) => {
+    setNoCode(false);
+    setPayload(code);
+    qr.mutate(code, { onSuccess: setParsed });
+  };
+
+  const scanQr = async () => {
+    setNoCode(false);
+    await scanner.start(useCode);
+  };
+
+  const scanFile = async (file: File) => {
+    const code = await scanner.fromFile(file);
+    if (code) useCode(code);
+    else setNoCode(true);
+  };
   const [parsed, setParsed] = useState<ReceiptParsed | null>(null);
 
   const failed = qr.isError || photo.isError;
@@ -66,6 +88,45 @@ export function ReceiptEntry({
           <>
             <div className="stack-xs">
               <span className="micro">{t('receipt.parseQr')}</span>
+              {/*
+                Камера — главный путь (#107). Раньше содержимое QR перепечатывали руками с бумажки,
+                хотя смысл этого пути ровно в одном движении телефоном. Поле ввода осталось ниже:
+                оно нужно, когда код пришёл текстом (чек по почте, скриншот из банка).
+              */}
+              <video
+                ref={scanner.videoRef}
+                className={scanner.state === 'scanning' ? 'qr-view' : 'qr-view is-off'}
+                muted
+                playsInline
+              />
+              <div className="form-row">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => (scanner.state === 'scanning' ? scanner.stop() : void scanQr())}
+                >
+                  {scanner.state === 'scanning' ? t('receipt.scanStop') : t('receipt.scan')}
+                </button>
+                <label className="act">
+                  {t('receipt.scanFile')}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="visually-hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void scanFile(file);
+                    }}
+                  />
+                </label>
+              </div>
+              {scanner.state === 'denied' && (
+                <span className="sub danger">{t('receipt.scanDenied')}</span>
+              )}
+              {scanner.state === 'unsupported' && (
+                <span className="sub dim">{t('receipt.scanNo')}</span>
+              )}
+              {noCode && <span className="sub danger">{t('receipt.scanNoCode')}</span>}
               <input
                 className="field mono"
                 placeholder={t('receipt.qrPlaceholder')}

@@ -2225,3 +2225,33 @@ a {
     transition: none;
   }
 }
+
+/*
+ * Видоискатель QR (#107). Пока камера не включена, элемент не занимает места: пустой чёрный
+ * прямоугольник над формой выглядел бы поломкой, а не выключенным сканером.
+ */
+.qr-view {
+  width: 100%;
+  max-height: 240px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tab);
+  object-fit: cover;
+}
+
+.qr-view.is-off {
+  display: none;
+}
+
+/* Поле выбора файла спрятано за подписью-кнопкой: системный input нельзя оформить, но он нужен. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
