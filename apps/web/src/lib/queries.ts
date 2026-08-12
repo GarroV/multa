@@ -1194,6 +1194,8 @@ export interface ForecastEvent {
   kind: 'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk' | 'recurring_due';
   targetId: string;
   name: string;
+  /** Валюта суммы события: долг или цель могут быть не в базовой (#99). */
+  currency: string;
   on: string;
   periodsAway: number;
   amountMinor: string | null;

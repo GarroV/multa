@@ -194,6 +194,7 @@ describe('buildSignals', () => {
         forecast: [
           {
             kind: 'freed_money',
+            currency: 'RUB',
             targetId: 'd1',
             name: 'Рассрочка',
             on: '2026-08-18',
@@ -201,6 +202,7 @@ describe('buildSignals', () => {
           },
           {
             kind: 'goal_at_risk',
+            currency: 'RUB',
             targetId: 'g1',
             name: 'Мотоцикл',
             on: '2027-02-21',

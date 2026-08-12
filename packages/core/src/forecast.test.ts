@@ -10,7 +10,15 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       asOf,
       periodsAhead: 6,
       periodLengthDays: 15,
-      debts: [{ id: 'ozon', name: 'Озон', remainingMinor: 9000000n, paymentMinor: 4500000n }],
+      debts: [
+        {
+          id: 'ozon',
+          name: 'Озон',
+          currency: 'RUB',
+          remainingMinor: 9000000n,
+          paymentMinor: 4500000n,
+        },
+      ],
       goals: [],
     });
 
@@ -24,7 +32,15 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       asOf,
       periodsAhead: 6,
       periodLengthDays: 15,
-      debts: [{ id: 'ozon', name: 'Озон', remainingMinor: 9000000n, paymentMinor: 4500000n }],
+      debts: [
+        {
+          id: 'ozon',
+          name: 'Озон',
+          currency: 'RUB',
+          remainingMinor: 9000000n,
+          paymentMinor: 4500000n,
+        },
+      ],
       goals: [],
     });
 
@@ -44,6 +60,7 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
         {
           id: 'moto',
           name: 'Мотоцикл',
+          currency: 'RUB',
           targetMinor: 30000n,
           savedMinor: 10000n,
           perPeriodMinor: 5000n,
@@ -67,6 +84,7 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
         {
           id: 'moto',
           name: 'Мотоцикл',
+          currency: 'RUB',
           targetMinor: 300000n,
           savedMinor: 0n,
           perPeriodMinor: 5000n,
@@ -85,7 +103,14 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       periodLengthDays: 15,
       debts: [],
       goals: [
-        { id: 'moto', name: 'Мотоцикл', targetMinor: 30000n, savedMinor: 0n, perPeriodMinor: 0n },
+        {
+          id: 'moto',
+          name: 'Мотоцикл',
+          currency: 'RUB',
+          targetMinor: 30000n,
+          savedMinor: 0n,
+          perPeriodMinor: 0n,
+        },
       ],
     });
 
@@ -102,6 +127,7 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
         {
           id: 'moto',
           name: 'Мотоцикл',
+          currency: 'RUB',
           targetMinor: 30000n,
           savedMinor: 30000n,
           perPeriodMinor: 5000n,
@@ -117,7 +143,9 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       asOf,
       periodsAhead: 6,
       periodLengthDays: 15,
-      debts: [{ id: 'ozon', name: 'Озон', remainingMinor: 9000000n, paymentMinor: 0n }],
+      debts: [
+        { id: 'ozon', name: 'Озон', currency: 'RUB', remainingMinor: 9000000n, paymentMinor: 0n },
+      ],
       goals: [],
     });
 
@@ -129,9 +157,18 @@ describe('forecastTimeline — лента cash-flow вперёд (Спринт 4
       asOf,
       periodsAhead: 12,
       periodLengthDays: 15,
-      debts: [{ id: 'd1', name: 'Долг', remainingMinor: 900000n, paymentMinor: 450000n }],
+      debts: [
+        { id: 'd1', name: 'Долг', currency: 'RUB', remainingMinor: 900000n, paymentMinor: 450000n },
+      ],
       goals: [
-        { id: 'g1', name: 'Цель', targetMinor: 30000n, savedMinor: 10000n, perPeriodMinor: 5000n },
+        {
+          id: 'g1',
+          name: 'Цель',
+          currency: 'RUB',
+          targetMinor: 30000n,
+          savedMinor: 10000n,
+          perPeriodMinor: 5000n,
+        },
       ],
     });
 
@@ -156,6 +193,7 @@ describe('прогноз считается по платежу, который 
         {
           id: 'd1',
           name: 'Кредит',
+          currency: 'RUB',
           remainingMinor: 3_000_000n,
           paymentMinor: 100_000n,
           // Со второго периода платёж впятеро больше: 100 000 + 6 × 500 000 = 3 100 000.
@@ -175,7 +213,15 @@ describe('прогноз считается по платежу, который 
       asOf: '2026-08-01',
       periodsAhead: 12,
       periodLengthDays: 15,
-      debts: [{ id: 'd1', name: 'Кредит', remainingMinor: 300_000n, paymentMinor: 100_000n }],
+      debts: [
+        {
+          id: 'd1',
+          name: 'Кредит',
+          currency: 'RUB',
+          remainingMinor: 300_000n,
+          paymentMinor: 100_000n,
+        },
+      ],
       goals: [],
     });
     expect(events.find((e) => e.kind === 'debt_closed')!.periodsAway).toBe(3);
@@ -191,9 +237,9 @@ describe('регулярные платежи попадают на горизо
       debts: [],
       goals: [],
       recurring: [
-        { id: 'r1', name: 'Страховка', on: '2026-12-20', amountMinor: 4_500_000n },
+        { id: 'r1', name: 'Страховка', currency: 'RUB', on: '2026-12-20', amountMinor: 4_500_000n },
         // За горизонтом (12 периодов по 15 дней ≈ 180 дней) — не показываем, чтобы не врать точностью.
-        { id: 'r2', name: 'Домен', on: '2027-06-01', amountMinor: 120_000n },
+        { id: 'r2', name: 'Домен', currency: 'RUB', on: '2027-06-01', amountMinor: 120_000n },
       ],
     });
     const due = events.filter((e) => e.kind === 'recurring_due');
@@ -206,11 +252,50 @@ describe('регулярные платежи попадают на горизо
       asOf: '2026-08-01',
       periodsAhead: 12,
       periodLengthDays: 15,
-      debts: [{ id: 'd1', name: 'Кредит', remainingMinor: 300_000n, paymentMinor: 100_000n }],
+      debts: [
+        {
+          id: 'd1',
+          name: 'Кредит',
+          currency: 'RUB',
+          remainingMinor: 300_000n,
+          paymentMinor: 100_000n,
+        },
+      ],
       goals: [],
-      recurring: [{ id: 'r1', name: 'Страховка', on: '2026-08-10', amountMinor: 4_500_000n }],
+      recurring: [
+        { id: 'r1', name: 'Страховка', currency: 'RUB', on: '2026-08-10', amountMinor: 4_500_000n },
+      ],
     });
     const dates = events.map((e) => e.on);
     expect([...dates].sort()).toEqual(dates);
+  });
+});
+
+describe('валюта события не теряется (#99)', () => {
+  /*
+   * Долги и цели заводятся в любой валюте — селектор есть в интерфейсе. Событие уезжало без неё, и
+   * панель печатала сумму базовой: «освободится 200 ₽» вместо 200 €. При базовой валюте с другим
+   * exponent (JPY, KRW) ломался бы ещё и разряд.
+   *
+   * Конвертировать здесь нечем и незачем: курса на будущую дату не существует, а выдумывать его
+   * ради красивой цифры — то же самое враньё, только незаметнее. Показываем валюту события.
+   */
+  it('событие несёт валюту своей строки', () => {
+    const events = forecastTimeline({
+      asOf: '2026-08-01',
+      periodsAhead: 12,
+      periodLengthDays: 15,
+      debts: [
+        {
+          id: 'd1',
+          name: 'Кредит',
+          currency: 'EUR',
+          remainingMinor: 60_000n,
+          paymentMinor: 20_000n,
+        },
+      ],
+      goals: [],
+    });
+    expect(events.every((e) => e.currency === 'EUR')).toBe(true);
   });
 });

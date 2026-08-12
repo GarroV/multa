@@ -86,6 +86,11 @@ export interface SignalForecastEvent {
   readonly kind: 'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk';
   readonly targetId: string;
   readonly name: string;
+  /**
+   * Валюта суммы события: долг или цель могут быть заведены не в базовой (#99). Раньше движок
+   * штамповал базовую на несконвертированную сумму, и «освободится 200 €» превращалось в 200 ₽.
+   */
+  readonly currency: string;
   readonly on: string;
   readonly amountMinor?: bigint;
 }
@@ -269,7 +274,7 @@ export function buildSignals(input: SignalsInput, thresholds: SignalThresholds):
         id: `freed_money:${event.targetId}`,
         rule: 'freed_money',
         severity: 'opportunity',
-        metric: { kind: 'money', minor: event.amountMinor ?? 0n, currency },
+        metric: { kind: 'money', minor: event.amountMinor ?? 0n, currency: event.currency },
         params: {
           name: event.name,
           date: event.on,
@@ -285,7 +290,7 @@ export function buildSignals(input: SignalsInput, thresholds: SignalThresholds):
         id: `goal_at_risk:${event.targetId}`,
         rule: 'goal_at_risk',
         severity: 'attention',
-        metric: { kind: 'money', minor: event.amountMinor ?? 0n, currency },
+        metric: { kind: 'money', minor: event.amountMinor ?? 0n, currency: event.currency },
         params: {
           name: event.name,
           date: event.on,

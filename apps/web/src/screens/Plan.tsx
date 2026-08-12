@@ -203,7 +203,14 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
   const nothingAhead = data.dueSoon.length === 0 && data.events.length === 0;
 
   const label = (e: ForecastEvent): string => {
-    const amount = e.amountMinor ? `${formatMinor(e.amountMinor, base, locale)} ${base}` : '';
+    /*
+     * Валюта события, а не базовая (#99): долг в евро печатался как «освободится 200 ₽», а при
+     * базовой валюте с другим exponent (JPY) ломался бы и разряд. Конвертировать нечем — курса на
+     * будущую дату не существует.
+     */
+    const amount = e.amountMinor
+      ? `${formatMinor(e.amountMinor, e.currency, locale)} ${e.currency}`
+      : '';
     if (e.kind === 'debt_closed') return t('forecast.debtClosed', { name: e.name });
     if (e.kind === 'freed_money') return t('forecast.freed', { amount });
     if (e.kind === 'goal_reached') return t('forecast.goalReached', { name: e.name });

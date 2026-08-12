@@ -93,7 +93,13 @@ export async function forecastOf(ws: Workspace, asMember = false) {
         endsOn: r.endsOn,
       })),
       period,
-    ).map((due) => ({ id: due.id, name: due.name, on: due.on, amountMinor: due.amountMinor })),
+    ).map((due) => ({
+      id: due.id,
+      name: due.name,
+      currency: due.currency,
+      on: due.on,
+      amountMinor: due.amountMinor,
+    })),
   );
   // Скрытые с карты платежи остаются в списке «что впереди»: тумблер прячет метку, а не событие.
   const showOnMap = new Map(recurringRows.map((r) => [r.id, r.showOnMap]));
@@ -106,6 +112,7 @@ export async function forecastOf(ws: Workspace, asMember = false) {
     debts: debtRows.map((d) => ({
       id: d.id,
       name: d.name,
+      currency: d.currency,
       remainingMinor: d.remainingMinor,
       paymentMinor: d.paymentMinor,
       /*
@@ -119,6 +126,7 @@ export async function forecastOf(ws: Workspace, asMember = false) {
     goals: goalRows.map((g) => ({
       id: g.id,
       name: g.name,
+      currency: g.currency,
       targetMinor: g.targetMinor,
       savedMinor: g.savedMinor,
       perPeriodMinor: g.plannedPerPeriodMinor,
@@ -155,6 +163,8 @@ export async function forecastOf(ws: Workspace, asMember = false) {
       kind: e.kind,
       targetId: e.targetId,
       name: e.name,
+      // Валюта строки, а не базовая: конвертировать будущее нечем, а печатать чужую цифру нельзя.
+      currency: e.currency,
       on: e.on,
       periodsAway: e.periodsAway,
       amountMinor: e.amountMinor != null ? e.amountMinor.toString() : null,

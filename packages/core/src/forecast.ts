@@ -12,6 +12,12 @@ import { addDays, daysBetween } from './periods.ts';
 export interface ForecastDebt {
   readonly id: string;
   readonly name: string;
+  /**
+   * Валюта строки. Конвертировать прогноз нечем и незачем: курса на будущую дату не существует, а
+   * выдуманный ради красивой цифры — то же враньё, только незаметнее. Событие несёт свою валюту,
+   * интерфейс её и показывает (#99).
+   */
+  readonly currency: string;
   readonly remainingMinor: bigint;
   /** Платёж за период (0 — платежа нет, долг не закроется). */
   readonly paymentMinor: bigint;
@@ -30,6 +36,7 @@ export interface ForecastDebt {
 export interface ForecastRecurring {
   readonly id: string;
   readonly name: string;
+  readonly currency: string;
   readonly on: string;
   readonly amountMinor: bigint;
 }
@@ -37,6 +44,7 @@ export interface ForecastRecurring {
 export interface ForecastGoal {
   readonly id: string;
   readonly name: string;
+  readonly currency: string;
   readonly targetMinor: bigint;
   readonly savedMinor: bigint;
   /** Взнос за период (0 — цель не наступит). */
@@ -50,6 +58,8 @@ export interface ForecastEvent {
   readonly kind: ForecastKind;
   readonly targetId: string;
   readonly name: string;
+  /** Валюта суммы события — та же, что у строки, из которой оно выросло. */
+  readonly currency: string;
   /** Дата события; для риска — конец горизонта, к которому цель так и не собралась. */
   readonly on: string;
   readonly periodsAway: number;
@@ -114,6 +124,7 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       kind: 'debt_closed',
       targetId: debt.id,
       name: debt.name,
+      currency: debt.currency,
       on,
       periodsAway: periods,
     });
@@ -122,6 +133,7 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       kind: 'freed_money',
       targetId: debt.id,
       name: debt.name,
+      currency: debt.currency,
       on,
       periodsAway: periods,
       amountMinor: debt.paymentMinor,
@@ -137,6 +149,7 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
         kind: 'goal_at_risk',
         targetId: goal.id,
         name: goal.name,
+        currency: goal.currency,
         on: dateOf(periodsAhead),
         periodsAway: periodsAhead,
         amountMinor: left,
@@ -147,6 +160,7 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       kind: 'goal_reached',
       targetId: goal.id,
       name: goal.name,
+      currency: goal.currency,
       on: dateOf(periods),
       periodsAway: periods,
     });
@@ -160,6 +174,7 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       kind: 'recurring_due',
       targetId: item.id,
       name: item.name,
+      currency: item.currency,
       on: item.on,
       periodsAway: Math.max(0, Math.round(daysBetween(asOf, item.on) / periodLengthDays)),
       amountMinor: item.amountMinor,

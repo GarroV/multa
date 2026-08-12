@@ -102,6 +102,7 @@ signalsRoute.get('/signals', async (c) => {
         kind: e.kind as Exclude<typeof e.kind, 'recurring_due'>,
         targetId: e.targetId,
         name: e.name,
+        currency: e.currency,
         on: e.on,
         ...(e.amountMinor !== null ? { amountMinor: BigInt(e.amountMinor) } : {}),
       })),
