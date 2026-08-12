@@ -39,7 +39,7 @@ import {
   type TargetKind,
   type WeekendRule,
 } from '@multa/core';
-import { and, desc, eq, gte, inArray, lt, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, ne, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
 import {
   categories,
@@ -1567,10 +1567,16 @@ export async function undoRevision(
       .set({ accepted: false })
       .where(eq(planRevisions.id, revision.id));
     // Сам откат — тоже ревизия: история дописывается, а не переписывается.
+    /*
+     * Причина 'undo', а не 'manual' (#102): компенсирующая ревизия несёт перевёрнутые концы, и в
+     * выборке для ранжирования она делала ПОЛУЧАТЕЛЯ отменённого переноса «источником, из
+     * которого обычно берут». Система советовала брать оттуда, куда человек только что положил и
+     * передумал. Отличать откат от настоящей правки нужно самой строке — по ней учится ранжирование.
+     */
     await tx.insert(planRevisions).values({
       workspaceId: ws.id,
       periodId: revision.periodId,
-      reason: 'manual',
+      reason: 'undo',
       moves: moves.map((m) => ({
         fromKind: m.toKind,
         fromId: m.toId,
@@ -1589,7 +1595,14 @@ async function loadRebalanceHistory(workspaceId: string): Promise<Map<string, nu
   const rows = await db
     .select({ moves: planRevisions.moves })
     .from(planRevisions)
-    .where(and(eq(planRevisions.workspaceId, workspaceId), eq(planRevisions.accepted, true)))
+    .where(
+      and(
+        eq(planRevisions.workspaceId, workspaceId),
+        eq(planRevisions.accepted, true),
+        // Откаты в привычку не складываются: человек от этого переноса отказался (#102).
+        ne(planRevisions.reason, 'undo'),
+      ),
+    )
     .orderBy(desc(planRevisions.createdAt))
     .limit(50);
   const counts = new Map<string, number>();

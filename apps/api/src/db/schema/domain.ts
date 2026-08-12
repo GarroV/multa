@@ -270,7 +270,7 @@ export const planRevisions = pgTable(
   (t) => [
     check(
       'plan_revisions_reason_ck',
-      sql`${t.reason} in ('overspend','manual','income_change','auto_suggest')`,
+      sql`${t.reason} in ('overspend','manual','income_change','auto_suggest','undo')`,
     ),
   ],
 );

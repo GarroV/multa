@@ -102,7 +102,8 @@ describe('история ревизий', () => {
     const list = await expectOk<RevisionDto[]>(await client.get('/v1/plan/current/revisions'));
     expect(list).toHaveLength(2);
     expect(list.find((r) => r.id === revision!.id)?.undone).toBe(true);
-    expect(list.some((r) => r.reason === 'manual' && r.moves[0]?.toId === from)).toBe(true);
+    // Причина у отката своя: по ней ранжирование отличает его от настоящей правки (#102).
+    expect(list.some((r) => r.reason === 'undo' && r.moves[0]?.toId === from)).toBe(true);
   });
 
   test('повторный откат той же ревизии отклоняется', async () => {
@@ -324,5 +325,53 @@ describe('пересборка из обязательства (находка �
     // строк, чтобы сумма долей точно совпала с дефицитом.
     const diff = a2 > b2 ? a2 - b2 : b2 - a2;
     expect(diff).toBeLessThanOrEqual(1n);
+  });
+});
+
+describe('чему учится «как обычно»', () => {
+  /*
+   * Ранжирование вариантов пересборки считает, откуда человек обычно берёт деньги. Откат правки
+   * пишется как ещё одна ревизия с перевёрнутыми концами (история не переписывается) — и попадал в
+   * ту же выборку. В итоге ПОЛУЧАТЕЛЬ отменённого переноса становился «источником, из которого
+   * обычно берут»: система советовала брать оттуда, куда человек только что положил и передумал.
+   *
+   * Откат — обычное действие, так что промах был не редким. Найдено сверкой беклога 12.08.2026.
+   */
+  test('откат не делает получателя привычным источником (#102)', async () => {
+    const client = await onboarded();
+    const { from, to } = await withBudgets(client);
+    const third = await categoryId(client, 'Кафе');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${third}`, { plannedMinor: '1000000' }),
+    );
+
+    await move(client, from, to, '500000');
+    const list = await expectOk<RevisionDto[]>(await client.get('/v1/plan/current/revisions'));
+    await expectOk(await client.post(`/v1/plan/current/revisions/${list[0]!.id}/undo`));
+
+    const options = await expectOk<{ targetId: string; usual: boolean }[]>(
+      await client.get(`/v1/plan/current/rebalance?targetId=${third}&needMinor=100000`),
+    );
+    const byId = new Map(options.map((o) => [o.targetId, o.usual]));
+    // Получатель отменённого переноса привычным источником не стал.
+    expect(byId.get(to)).toBe(false);
+    // И сам отменённый перенос тоже не считается привычкой: человек от него отказался.
+    expect(byId.get(from)).toBe(false);
+  });
+
+  test('не отменённая пересборка привычку задаёт', async () => {
+    const client = await onboarded();
+    const { from, to } = await withBudgets(client);
+    const third = await categoryId(client, 'Кафе');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${third}`, { plannedMinor: '1000000' }),
+    );
+
+    await move(client, from, to, '500000');
+
+    const options = await expectOk<{ targetId: string; usual: boolean }[]>(
+      await client.get(`/v1/plan/current/rebalance?targetId=${third}&needMinor=100000`),
+    );
+    expect(new Map(options.map((o) => [o.targetId, o.usual])).get(from)).toBe(true);
   });
 });
