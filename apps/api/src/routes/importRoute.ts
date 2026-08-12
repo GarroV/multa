@@ -6,6 +6,7 @@ import { db } from '../db/client.ts';
 import { categories, importBatches, transactions } from '../db/schema/domain.ts';
 import { isUuid } from '../http/ids.ts';
 import { readXlsx, type XlsxBook } from '../import/xlsx.ts';
+import { ensurePeriodForDate } from '../plan/assemble.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
 import { importCommitSchema, importPreviewSchema } from '../validation.ts';
 
@@ -201,6 +202,33 @@ importRoute.post('/import/commit', async (c) => {
   const fresh = pairs.filter((pair) => !seen.has(pair.key));
   const duplicated = pairs.length - fresh.length;
 
+  /*
+   * Период каждой строки — до транзакции и по одному разу на период, а не на строку (#101).
+   *
+   * Раньше period_id не проставлялся вовсе, и импортированная история молча выпадала из
+   * отчётности: категорийная аналитика джойнится ИМЕННО по period_id (routes/analytics.ts),
+   * то есть человек переносил четыре года из таблицы и не видел их в статистике — ровно то,
+   * ради чего перенос и делается.
+   *
+   * По уникальным периодам, а не по датам: год ежедневных трат — это 365 дат, но всего два
+   * десятка периодов, а ensurePeriodForDate на каждый вызов читает источники дохода и считает
+   * приход. На строку это превратило бы импорт в сотни лишних запросов.
+   */
+  const known: { startsOn: string; endsOn: string; periodId: string }[] = [];
+  const periodOf = async (on: string): Promise<string> => {
+    const hit = known.find((k) => on >= k.startsOn && on < k.endsOn);
+    if (hit) return hit.periodId;
+    const { periodId, period } = await ensurePeriodForDate(ws, on);
+    known.push({ startsOn: period.startsOn, endsOn: period.endsOn, periodId });
+    return periodId;
+  };
+
+  const periodByDate = new Map<string, string>();
+  for (const { row } of fresh) {
+    if (periodByDate.has(row.occurredOn)) continue;
+    periodByDate.set(row.occurredOn, await periodOf(row.occurredOn));
+  }
+
   const batchId = await db.transaction(async (tx) => {
     const batch = await tx
       .insert(importBatches)
@@ -235,6 +263,7 @@ importRoute.post('/import/commit', async (c) => {
             occurredOn: row.occurredOn,
             source: 'import' as const,
             note: row.note ?? row.item,
+            periodId: periodByDate.get(row.occurredOn) ?? null,
             importBatchId: id,
             importKey: key,
           };

@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../src/db/client.ts';
+import { transactions } from '../src/db/schema/domain.ts';
 import { expectOk, onboarded, type TestClient } from './client.ts';
 
 /**
@@ -89,6 +92,28 @@ describe('импорт журнала из Excel', () => {
       await client.get('/v1/transactions?from=2022-01-01&to=2027-01-01'),
     );
     expect(txs.transactions).toHaveLength(3);
+  });
+
+  test('импортированные строки попадают в свой период, а не выпадают из аналитики (#101)', async () => {
+    /*
+     * Импорт вставлял транзакции без period_id, а аналитика джойнится именно по нему
+     * (routes/analytics.ts:64, innerJoin). Строки молча выпадали: импорт рапортовал об успехе,
+     * категорийная статистика их не видела и не объясняла почему. Ровно ради этой статистики
+     * историю и переносят.
+     */
+    const client = await onboarded();
+    const me = await expectOk<{ workspace: { id: string } | null }>(await client.get('/v1/me'));
+    const wsId = me.workspace?.id;
+    await expectOk<CommitDto>(await upload(client, '/v1/import/commit', { sheet: 'Журнал' }), 201);
+
+    // Смотрим в базу: period_id наружу не отдаётся, а проверять надо именно его — по нему джойн.
+    const rows = await db
+      .select({ periodId: transactions.periodId, occurredOn: transactions.occurredOn })
+      .from(transactions)
+      .where(and(eq(transactions.workspaceId, wsId!), eq(transactions.source, 'import')));
+    expect(rows).toHaveLength(3);
+    // Ни одной строки без периода: одна такая — и она невидима для всей отчётности.
+    expect(rows.filter((r) => !r.periodId)).toHaveLength(0);
   });
 
   test('повторная загрузка того же файла не удваивает историю', async () => {

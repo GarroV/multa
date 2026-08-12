@@ -120,6 +120,13 @@
       "when": 1786355502681,
       "tag": "0016_recurring_reserve",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786600000000,
+      "tag": "0017_backfill_transaction_period",
+      "breakpoints": true
     }
   ]
 }
