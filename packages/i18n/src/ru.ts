@@ -494,6 +494,7 @@ export const ru: Record<TranslationKey, string> = {
   'spend.empty': 'В этом периоде трат пока нет',
   'spend.rateUnavailable': 'Курса на эту дату нет — возьми другую дату или валюту.',
   'spend.badAmount': 'Сумма — числом, например 1250 или 12,50',
+  'spend.currency': 'Валюта',
   'spend.smart.placeholder': 'например «250 продукты» или «кофе 4.5 eur вчера»',
   'spend.smart.hint':
     'Пиши как сказал бы: сколько, куда, когда. Что не распозналось — поправишь ниже.',

@@ -413,3 +413,37 @@ test('регулярный платёж можно переименовать и
   await page.reload();
   await expect(page.locator('.prow', { hasText: 'Internet renamed' }).first()).toBeVisible();
 });
+
+test('валюта из умного поля доезжает до записи, а не подменяется базовой (#100)', async ({
+  page,
+}) => {
+  /*
+   * Парсер валюту распознавал, а форма её теряла: submit жёстко слал базовую валюту воркспейса.
+   * «coffee 4.5 eur» — пример из docs/04-web-ux.md — записывался как 4,50 RUB молча, без единого
+   * признака подмены. Для продукта про жизнь между валютами это попадание в самый центр.
+   *
+   * Проверяем по списку записей внутри листа: там валюта видна глазом, как и у человека.
+   */
+  await page.locator('.act-primary').click();
+  const sheet = page.locator('.sheet');
+  await expect(sheet).toBeVisible();
+
+  const smart = sheet.locator('input[placeholder*="4.5 eur"]');
+  await smart.fill('flatwhite 7.25 eur');
+  await smart.blur();
+
+  // Разбор раскладывает поля формы — валюта обязана встать вместе с суммой.
+  await expect(sheet.locator('select').filter({ hasText: 'EUR' }).first()).toHaveValue('EUR', {
+    timeout: 10_000,
+  });
+
+  await sheet.getByRole('button', { name: 'Log it' }).click();
+  /*
+   * Слово в фразе намеренно не встречается в демо-сиде: первая версия теста говорила «coffee», а
+   * в сиде лежит ровно такая запись (450 EUR, note 'coffee') — проверка проходила и на сломанном
+   * коде, цепляя чужую строку. Проверено возвратом бага: с 'coffee' зелено, с 'flatwhite' красно.
+   */
+  await expect(
+    sheet.locator('.list-item').filter({ hasText: 'flatwhite' }).filter({ hasText: 'EUR' }),
+  ).toHaveCount(1, { timeout: 15_000 });
+});

@@ -2,6 +2,7 @@ import { fromMajor, parseEntry, toMajorString, money } from '@multa/core';
 import { useState } from 'react';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useSheet } from '../lib/useSheet.ts';
+import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import { ApiError } from '../lib/api.ts';
 import {
@@ -90,6 +91,12 @@ export function SpendEntry({
 
   const [kind, setKind] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
+  /*
+   * Валюта траты — своё состояние, а не всегда базовая (#100). Человек, живущий между валютами,
+   * платит в той, что под рукой, и парсер это распознаёт: «coffee 4.5 eur». Раньше submit слал
+   * базовую жёстко, и распознанная валюта молча подменялась — 4,50 EUR превращались в 4,50 RUB.
+   */
+  const [currency, setCurrency] = useState(base);
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState('');
@@ -115,6 +122,7 @@ export function SpendEntry({
           setBadAmount(false);
           setKind(remote.kind);
           setAmount(toMajorString(money(BigInt(remote.amountMinor), remote.currency)));
+          setCurrency(remote.currency);
           setOccurredOn(remote.occurredOn);
           setNote(remote.note ?? '');
           setCategoryId(remote.kind === 'income' ? undefined : (remote.categoryId ?? undefined));
@@ -126,6 +134,7 @@ export function SpendEntry({
     setBadAmount(false);
     setKind(parsed.kind);
     setAmount(toMajorString(money(parsed.amountMinor, parsed.currency)));
+    setCurrency(parsed.currency);
     setOccurredOn(parsed.occurredOn);
     setNote(parsed.note ?? '');
     const hit = parsed.categoryName
@@ -135,7 +144,7 @@ export function SpendEntry({
   };
 
   const submit = () => {
-    const minor = parseMinor(amount, base);
+    const minor = parseMinor(amount, currency);
     if (minor === null) {
       setBadAmount(true);
       return;
@@ -145,7 +154,7 @@ export function SpendEntry({
       {
         kind,
         amountMinor: minor,
-        currency: base,
+        currency,
         ...(kind === 'expense' && categoryId ? { categoryId } : {}),
         occurredOn,
         ...(note.trim() ? { note: note.trim() } : {}),
@@ -226,7 +235,12 @@ export function SpendEntry({
               onChange={(e) => setAmount(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
             />
-            <span className="sub num">{base}</span>
+            <CurrencySelect
+              value={currency}
+              onChange={setCurrency}
+              label={t('spend.currency')}
+              className="field field-ccy-wide"
+            />
           </div>
           {badAmount && <span className="sub danger">{t('spend.badAmount')}</span>}
         </div>

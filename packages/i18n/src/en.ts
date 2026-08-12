@@ -497,6 +497,7 @@ export const en = {
   'spend.empty': 'No spends in this period yet',
   'spend.rateUnavailable': 'No rate for that date — pick another date or currency.',
   'spend.badAmount': 'Amount as a number, e.g. 1250 or 12.50',
+  'spend.currency': 'Currency',
   'spend.smart.placeholder': 'e.g. “250 groceries” or “coffee 4.5 eur yesterday”',
   'spend.smart.hint':
     'Type it as you would say it — amount, where, when. Anything unclear stays editable below.',
