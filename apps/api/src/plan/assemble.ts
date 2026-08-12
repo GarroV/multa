@@ -908,8 +908,14 @@ async function assembleForPeriod(
       ...(a.targetKind === 'category'
         ? { protectedCategory: cats.find((c) => c.targetId === a.targetId)?.isProtected === true }
         : {}),
+      /*
+       * Совет учится на ПЛАНЕ, а не на сжатой сумме (#97). Сжатие — это «в этом периоде не
+       * хватило», а не «столько тебе и надо»: от allocated медиана сравнивалась с урезанной
+       * цифрой, и на категории с планом ровно по медиане появлялся ложный совет «поднять».
+       * Применить его было нельзя — он предлагал то же число и приходил снова каждый сжатый период.
+       */
       ...(settings.periods.suggestRaises
-        ? adviceFields(a.targetKind, a.allocatedMinor, history.get(a.targetId))
+        ? adviceFields(a.targetKind, a.plannedMinor, history.get(a.targetId))
         : {}),
       ...(a.targetKind === 'goal' ? { frozen: false } : {}),
     };

@@ -240,3 +240,44 @@ test('список валют настраивается и по умолчан�
   const empty = await client.patch('/v1/workspace/settings', { currency: { list: [] } });
   expect(empty.status).toBe(400);
 });
+
+describe('совет считается от плана, а не от урезанного каскадом (#97)', () => {
+  /*
+   * `adviceFields` вызывался с `allocatedMinor` — суммой ПОСЛЕ сжатия. В периоде, где денег не
+   * хватило, медиана факта сравнивалась с урезанной цифрой, и получался совет «поднять» до суммы
+   * МЕНЬШЕ текущего плана: кнопка «Поставить N» под ярлыком raise фактически опускала бюджет.
+   * Совет к тому же не сходился — применил, в следующем сжатом периоде он появляется снова.
+   *
+   * Сжатие — это «в этом периоде не хватило», а не «столько тебе и надо». Учиться нужно на плане.
+   */
+  test('план уже равен медиане — совета нет, даже если каскад урезал строку', async () => {
+    const client = await onboarded({ payoutMinor: '3000000' });
+    const food = await categoryId(client, 'Продукты');
+    // План ровно на медиану факта: поднимать нечего, совет обязан молчать.
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '2600000' }),
+    );
+    // Вторая крупная строка забирает деньги: каскаду нечем закрыть обе, начинается сжатие.
+    const fun = await categoryId(client, 'Развлечения');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${fun}`, { plannedMinor: '2500000' }),
+    );
+    for (const day of PAST_DAYS.slice(0, 3)) {
+      await expectOk(
+        await client.post('/v1/transactions', {
+          amountMinor: '2600000',
+          currency: 'RUB',
+          categoryId: food,
+          occurredOn: day,
+        }),
+        201,
+      );
+    }
+
+    const plan = await getPlan(client);
+    const row = plan.allocations.find((a) => a.targetId === food)!;
+    // Сжатие действительно случилось — иначе тест ничего не проверяет.
+    expect(BigInt(row.allocatedMinor)).toBeLessThan(BigInt(row.plannedMinor));
+    expect(row.advice).toBeUndefined();
+  });
+});

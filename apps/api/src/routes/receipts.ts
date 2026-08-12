@@ -1,8 +1,9 @@
-import { parseReceiptQr, splitReceipt, type ReceiptItem } from '@multa/core';
+import { convert, money, parseReceiptQr, splitReceipt, type ReceiptItem } from '@multa/core';
 import { isUuid } from '../http/ids.ts';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
+import { getRate } from '../fx/service.ts';
 import { db } from '../db/client.ts';
 import { categories, receipts, transactions } from '../db/schema/domain.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
@@ -128,6 +129,18 @@ receiptsRoute.post('/receipts/:id/confirm', async (c) => {
     : today(ws.timezone);
   const { periodId } = await ensurePeriodForDate(ws, occurredOn);
 
+  /*
+   * Снапшот курса на дату чека (#98). Раньше путь чека писал `rate: '1'` и base-сумму, равную
+   * сумме чека, независимо от валюты: сербский чек на 2 500 RSD ложился в факт как 2 500 ₽ — почти
+   * втридцатеро дороже. Правило то же, что у ручного ввода: нет курса — отказ, а не выдуманная
+   * единица (правило 2 — курс живёт снапшотом в транзакции).
+   */
+  const needsRate = receipt.currency !== ws.baseCurrency;
+  const snap = needsRate
+    ? await getRate(receipt.currency!, ws.baseCurrency, occurredOn, ws.id)
+    : null;
+  if (needsRate && !snap) return c.json({ error: 'rate_unavailable' }, 404);
+
   // Категории проверяем ДО удаления прежних трат: иначе отклонённая правка раскладки
   // стирала бы уже записанный факт (проверял — стирала).
   const owned = await db
@@ -153,10 +166,12 @@ receiptsRoute.post('/receipts/:id/confirm', async (c) => {
         targetId: s.categoryId,
         amountMinor: s.amountMinor,
         currency: receipt.currency!,
-        baseAmountMinor: s.amountMinor,
-        rate: '1',
-        rateSource: 'base',
-        rateDate: occurredOn,
+        baseAmountMinor: snap
+          ? convert(money(BigInt(s.amountMinor), receipt.currency!), snap).minor
+          : s.amountMinor,
+        rate: snap ? snap.rate : '1',
+        rateSource: snap ? snap.source : 'base',
+        rateDate: snap ? snap.date : occurredOn,
         occurredOn,
         source: 'receipt',
         receiptId: receipt.id,

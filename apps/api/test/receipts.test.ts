@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest';
-import { categoryId, expectOk, getPlan, listCategories, onboarded } from './client.ts';
+import {
+  categoryId,
+  expectOk,
+  forgetRate,
+  getPlan,
+  listCategories,
+  onboarded,
+  seedRate,
+} from './client.ts';
 
 /**
  * Чеки (Спринт 5). QR — бесплатный путь и пробуется первым; разбор сам ничего не записывает,
@@ -186,5 +194,65 @@ describe('чеки по QR', () => {
 
     const after = await getPlan(client);
     expect(BigInt(after.spentLivingMinor)).toBe(30_000n);
+  });
+});
+
+describe('чек в чужой валюте (#98)', () => {
+  /*
+   * Подтверждение чека писало `baseAmountMinor` равным сумме чека и `rate: '1'` независимо от
+   * валюты. Сербский чек на 2 500 RSD ложился в факт периода как 2 500 ₽ — почти в тридцать раз
+   * дороже, — и это ровно тот сценарий, ради которого продукт существует: человек живёт между
+   * валютами и платит там, где находится.
+   *
+   * Ручной ввод траты давно делает правильно (routes/transactions.ts): снимает снапшот курса на
+   * дату и падает с `rate_unavailable`, если курса нет. Путь чека шёл мимо этого правила.
+   */
+  const rsdQr = 'https://suf.purs.gov.rs/v/?vl=A0ZLN1ZaTjdY';
+
+  test('курс снимается снапшотом, а не подставляется единицей', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const parsed = await expectOk<QrResponse>(
+      await client.post('/v1/receipts/qr', { payload: rsdQr, totalMinor: '250000' }),
+      201,
+    );
+    const on = parsed.receipt.purchasedAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+    await seedRate('RSD', 'RUB', '0.7700', on);
+
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.post(`/v1/receipts/${parsed.receipt.id}/confirm`, {
+        split: [{ categoryId: food, amountMinor: '250000' }],
+      }),
+    );
+
+    const list = await expectOk<{
+      transactions: {
+        amountMinor: string;
+        currency: string;
+        baseAmountMinor: string;
+        rate: string;
+      }[];
+    }>(await client.get('/v1/transactions?from=2020-01-01&to=2030-01-01'));
+    const tx = list.transactions.find((t) => t.currency === 'RSD');
+    expect(tx).toBeDefined();
+    // 2 500 RSD по 0,77 — это 1 925 ₽, а не 2 500 ₽.
+    expect(tx!.baseAmountMinor).toBe('192500');
+    expect(tx!.rate).not.toBe('1');
+  });
+
+  test('без курса подтверждение отказывает, а не пишет 1:1', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const parsed = await expectOk<QrResponse>(
+      await client.post('/v1/receipts/qr', { payload: rsdQr, totalMinor: '250000' }),
+      201,
+    );
+    await forgetRate('RSD', 'RUB');
+
+    const food = await categoryId(client, 'Продукты');
+    const res = await client.post(`/v1/receipts/${parsed.receipt.id}/confirm`, {
+      split: [{ categoryId: food, amountMinor: '250000' }],
+    });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: 'rate_unavailable' });
   });
 });
