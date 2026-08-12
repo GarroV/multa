@@ -7,7 +7,7 @@
  * не превращаются в молчание — это событие риска, иначе цель тихо не наступит никогда.
  */
 
-import { addDays } from './periods.ts';
+import { addDays, daysBetween } from './periods.ts';
 
 export interface ForecastDebt {
   readonly id: string;
@@ -15,6 +15,23 @@ export interface ForecastDebt {
   readonly remainingMinor: bigint;
   /** Платёж за период (0 — платежа нет, долг не закроется). */
   readonly paymentMinor: bigint;
+  /**
+   * Платёж по периодам, если он меняется во времени (#103). Индекс — смещение от текущего периода;
+   * чего нет в списке, берётся из `paymentMinor`.
+   *
+   * Ступени человек заводит из интерфейса («с ноября плачу по 5 000»), и весь остальной код ходит
+   * через `amountOn`. Прогноз, считающий по сегодняшнему платежу, отвечает на «когда я вылезу»
+   * цифрой, которой не будет.
+   */
+  readonly paymentsByPeriod?: readonly bigint[];
+}
+
+/** Разовое списание на горизонте: регулярный платёж, попавший в будущий период. */
+export interface ForecastRecurring {
+  readonly id: string;
+  readonly name: string;
+  readonly on: string;
+  readonly amountMinor: bigint;
 }
 
 export interface ForecastGoal {
@@ -26,7 +43,8 @@ export interface ForecastGoal {
   readonly perPeriodMinor: bigint;
 }
 
-export type ForecastKind = 'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk';
+export type ForecastKind =
+  'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk' | 'recurring_due';
 
 export interface ForecastEvent {
   readonly kind: ForecastKind;
@@ -47,6 +65,11 @@ export interface ForecastInput {
   readonly periodLengthDays: number;
   readonly debts: readonly ForecastDebt[];
   readonly goals: readonly ForecastGoal[];
+  /**
+   * Списания регулярных платежей на горизонте. Раньше лента знала только текущий период и потому
+   * дублировала карту периода вместо ответа «что ждёт впереди» (#103).
+   */
+  readonly recurring?: readonly ForecastRecurring[];
 }
 
 /** Сколько периодов нужно, чтобы выбрать сумму взносами (округление вверх). */
@@ -56,6 +79,27 @@ const periodsToCover = (amount: bigint, perPeriod: bigint): number | null => {
   return Number(amount % perPeriod === 0n ? whole : whole + 1n);
 };
 
+/**
+ * За сколько периодов закроется долг с учётом меняющегося платежа.
+ *
+ * Идём по периодам, а не делим нацело: при ступенях деления нет — платёж в каждом периоде свой.
+ * `null` — не закроется в пределах горизонта (в том числе при нулевом платеже).
+ */
+function periodsToClose(debt: ForecastDebt, periodsAhead: number): number | null {
+  if (!debt.paymentsByPeriod?.length) {
+    const periods = periodsToCover(debt.remainingMinor, debt.paymentMinor);
+    return periods === null || periods > periodsAhead ? null : periods;
+  }
+  let left = debt.remainingMinor;
+  for (let i = 0; i < periodsAhead; i++) {
+    const payment = debt.paymentsByPeriod[i] ?? debt.paymentMinor;
+    if (payment <= 0n) continue;
+    left -= payment;
+    if (left <= 0n) return i + 1;
+  }
+  return null;
+}
+
 export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
   const { asOf, periodsAhead, periodLengthDays } = input;
   const dateOf = (periods: number) => addDays(asOf, periods * periodLengthDays);
@@ -63,8 +107,8 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
 
   for (const debt of input.debts) {
     if (debt.remainingMinor <= 0n) continue;
-    const periods = periodsToCover(debt.remainingMinor, debt.paymentMinor);
-    if (periods === null || periods > periodsAhead) continue;
+    const periods = periodsToClose(debt, periodsAhead);
+    if (periods === null) continue;
     const on = dateOf(periods);
     events.push({
       kind: 'debt_closed',
@@ -105,6 +149,20 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       name: goal.name,
       on: dateOf(periods),
       periodsAway: periods,
+    });
+  }
+
+  // Горизонт один на всю ленту: событие за его пределами обещало бы точность, которой нет.
+  const horizonEnd = dateOf(periodsAhead);
+  for (const item of input.recurring ?? []) {
+    if (item.on < asOf || item.on > horizonEnd) continue;
+    events.push({
+      kind: 'recurring_due',
+      targetId: item.id,
+      name: item.name,
+      on: item.on,
+      periodsAway: Math.max(0, Math.round(daysBetween(asOf, item.on) / periodLengthDays)),
+      amountMinor: item.amountMinor,
     });
   }
 

@@ -201,6 +201,8 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
     if (e.kind === 'debt_closed') return t('forecast.debtClosed', { name: e.name });
     if (e.kind === 'freed_money') return t('forecast.freed', { amount });
     if (e.kind === 'goal_reached') return t('forecast.goalReached', { name: e.name });
+    // Регулярный платёж на горизонте: раньше лента знала только текущий период (#103).
+    if (e.kind === 'recurring_due') return t('forecast.recurringDue', { name: e.name, amount });
     return t('forecast.goalRisk', { name: e.name, amount });
   };
 

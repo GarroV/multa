@@ -16,6 +16,7 @@
  */
 
 import type { BurnRate } from './signals.ts';
+import { daysBetween } from './periods.ts';
 import type { PayPeriod } from './periods.ts';
 
 export type SignalSeverity = 'risk' | 'attention' | 'opportunity';
@@ -111,9 +112,6 @@ export interface SignalThresholds {
   /** Сколько сигналов показывать: длинный список перестают читать. */
   readonly maxSignals: number;
 }
-
-const daysBetween = (fromIso: string, toIso: string): number =>
-  Math.round((Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86_400_000);
 
 /** Вес severity для сортировки: риск читают первым. */
 const SEVERITY_ORDER: Record<SignalSeverity, number> = { risk: 0, attention: 1, opportunity: 2 };

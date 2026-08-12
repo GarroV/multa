@@ -541,6 +541,7 @@ export const en = {
   'forecast.freed': 'frees {amount} per period',
   'forecast.goalReached': '{name} is funded',
   'forecast.goalRisk': '{name}: {amount} short at this pace',
+  'forecast.recurringDue': '{name} — {amount} due',
   'forecast.empty': 'Nothing on the horizon yet',
   'forecast.dueSoon': 'Coming up this period',
   'receipt.open': 'Receipt',

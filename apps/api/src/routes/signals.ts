@@ -91,13 +91,20 @@ signalsRoute.get('/signals', async (c) => {
       verdict: row.verdict,
       deltaPct: row.deltaPct,
     })),
-    forecast: forecast.events.map((e) => ({
-      kind: e.kind,
-      targetId: e.targetId,
-      name: e.name,
-      on: e.on,
-      ...(e.amountMinor !== null ? { amountMinor: BigInt(e.amountMinor) } : {}),
-    })),
+    /*
+     * Списания регулярных платежей в сигналы не идут (#103): движок реагирует на закрытие долга и
+     * риск цели, а «в декабре страховка» — это лента, а не повод для баннера. Отфильтровано явно,
+     * чтобы расширение ленты не начало молча порождать сигналы, которых никто не проектировал.
+     */
+    forecast: forecast.events
+      .filter((e) => e.kind !== 'recurring_due')
+      .map((e) => ({
+        kind: e.kind as Exclude<typeof e.kind, 'recurring_due'>,
+        targetId: e.targetId,
+        name: e.name,
+        on: e.on,
+        ...(e.amountMinor !== null ? { amountMinor: BigInt(e.amountMinor) } : {}),
+      })),
   };
 
   const signals = buildSignals(input, {

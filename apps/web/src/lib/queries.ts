@@ -1191,7 +1191,7 @@ export function useApplyRebalance() {
 // --- Прогноз-таймлайн (Спринт 4) ---
 
 export interface ForecastEvent {
-  kind: 'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk';
+  kind: 'debt_closed' | 'freed_money' | 'goal_reached' | 'goal_at_risk' | 'recurring_due';
   targetId: string;
   name: string;
   on: string;

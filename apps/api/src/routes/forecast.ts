@@ -1,4 +1,5 @@
 import {
+  amountOn,
   daysInPeriod,
   forecastTimeline,
   generatePeriods,
@@ -12,6 +13,7 @@ import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import { debts, goals, recurringItems } from '../db/schema/domain.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
+import { parseAmountSteps } from '../plan/assemble.ts';
 import { sectionVisible } from '../plan/sharing.ts';
 import { settingsOf } from '../settings/store.ts';
 
@@ -38,7 +40,8 @@ export async function forecastOf(ws: Workspace, asMember = false) {
   const asOf = today(ws.timezone);
   const sharing = settingsOf(ws).sharing;
 
-  const [current] = generatePeriods(ws.periodAnchors as PeriodConfig, asOf, 2);
+  const horizon = generatePeriods(ws.periodAnchors as PeriodConfig, asOf, HORIZON_PERIODS);
+  const [current] = horizon;
   // Период не определяется — это сбой ритма, а не пустой прогноз: молчать здесь нельзя.
   if (!current) throw new Error('period_undeterminable');
 
@@ -63,13 +66,34 @@ export async function forecastOf(ws: Workspace, asMember = false) {
     recurringRows.map((r) => ({
       id: r.id,
       name: r.name,
-      amountMinor: r.amountMinor,
+      amountMinor: amountOn(r.amountMinor, parseAmountSteps(r.amountSteps), current.startsOn),
       currency: r.currency,
       schedule: r.schedule as RecurringSchedule,
       startsOn: r.startsOn,
       endsOn: r.endsOn,
     })),
     current,
+  );
+
+  /*
+   * Регулярные платежи на весь горизонт, а не только в текущем периоде (#103). Раньше лента
+   * «Что впереди» знала один период и потому дублировала карту периода: ежегодная страховка через
+   * пять месяцев в ней не появлялась вовсе, хотя ради таких предупреждений прогноз и существует.
+   */
+  const ahead = horizon.slice(1).flatMap((period) =>
+    recurringDueIn(
+      recurringRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        // Сумма на дату периода: ступени человек заводит из интерфейса, правило одно на всех.
+        amountMinor: amountOn(r.amountMinor, parseAmountSteps(r.amountSteps), period.startsOn),
+        currency: r.currency,
+        schedule: r.schedule as RecurringSchedule,
+        startsOn: r.startsOn,
+        endsOn: r.endsOn,
+      })),
+      period,
+    ).map((due) => ({ id: due.id, name: due.name, on: due.on, amountMinor: due.amountMinor })),
   );
   // Скрытые с карты платежи остаются в списке «что впереди»: тумблер прячет метку, а не событие.
   const showOnMap = new Map(recurringRows.map((r) => [r.id, r.showOnMap]));
@@ -78,11 +102,19 @@ export async function forecastOf(ws: Workspace, asMember = false) {
     asOf,
     periodsAhead: HORIZON_PERIODS,
     periodLengthDays: daysInPeriod(current),
+    recurring: ahead,
     debts: debtRows.map((d) => ({
       id: d.id,
       name: d.name,
       remainingMinor: d.remainingMinor,
       paymentMinor: d.paymentMinor,
+      /*
+       * Платёж по периодам, а не сегодняшний (#103): весь остальной код ходит через `amountOn`,
+       * а прогноз считал по плоской сумме и обещал закрытие в разы позже или раньше, чем есть.
+       */
+      paymentsByPeriod: horizon.map((period) =>
+        amountOn(d.paymentMinor, parseAmountSteps(d.amountSteps), period.startsOn),
+      ),
     })),
     goals: goalRows.map((g) => ({
       id: g.id,
@@ -97,14 +129,17 @@ export async function forecastOf(ws: Workspace, asMember = false) {
    * Матрица видимости (issue #84): события называют долг и цель по имени, а `dueSoon` — регулярный
    * платёж. Закрытый раздел не должен протекать через ленту «Что впереди».
    */
-  const visibleEvents = events.filter((e) =>
-    sectionVisible(
-      e.kind === 'goal_at_risk' || e.kind === 'goal_reached' ? 'goal' : 'debt',
-      sharing,
-      asMember,
-    ),
-  );
   const recurringVisible = !asMember || sharing.recurring === 'open';
+  const visibleEvents = events.filter((e) => {
+    /*
+     * Регулярные платежи не входят в матрицу `sectionVisible` (там строки плана) — у них свой
+     * флаг. Без этой ветки список событий проверялся против раздела долгов, и закрытые
+     * «Регулярные платежи» протекали участнику именами через ленту (поймано тестом sharing).
+     */
+    if (e.kind === 'recurring_due') return recurringVisible;
+    const section = e.kind === 'goal_at_risk' || e.kind === 'goal_reached' ? 'goal' : 'debt';
+    return sectionVisible(section, sharing, asMember);
+  });
 
   return {
     horizonPeriods: HORIZON_PERIODS,

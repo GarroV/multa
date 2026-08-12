@@ -540,6 +540,7 @@ export const ru: Record<TranslationKey, string> = {
   'forecast.freed': 'освободится {amount} за период',
   'forecast.goalReached': '{name} собрана',
   'forecast.goalRisk': '{name}: при таком темпе не хватит {amount}',
+  'forecast.recurringDue': '{name} — списание {amount}',
   'forecast.empty': 'На горизонте пока пусто',
   'forecast.dueSoon': 'Списания в этом периоде',
   'receipt.open': 'Чек',

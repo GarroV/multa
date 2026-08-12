@@ -518,7 +518,7 @@ async function persistPlannedItems(
  * Ступени суммы из jsonb: суммы там строками (bigint в JSON не живёт). Кривая запись отбрасывается
  * поэлементно — падать пятисоткой на чтении плана из-за одной битой ступени нельзя.
  */
-function parseAmountSteps(raw: unknown): { from: string; amountMinor: bigint }[] {
+export function parseAmountSteps(raw: unknown): { from: string; amountMinor: bigint }[] {
   if (!Array.isArray(raw)) return [];
   const out: { from: string; amountMinor: bigint }[] = [];
   for (const item of raw) {

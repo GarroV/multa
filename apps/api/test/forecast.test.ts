@@ -141,3 +141,56 @@ describe('регулярные платежи', () => {
     expect(rest).toHaveLength(0);
   });
 });
+
+describe('горизонт прогноза (#103)', () => {
+  test('редкий платёж за пределами текущего периода виден заранее', async () => {
+    /*
+     * Лента звала recurringDueIn на ОДИН период при горизонте в 12 и потому дублировала карту
+     * периода: ежегодная страховка через несколько месяцев не появлялась вовсе. Ради таких
+     * предупреждений — «в декабре списание, готовься» — прогноз и существует.
+     */
+    const client = await onboarded();
+    const on = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+    await expectOk(
+      await client.post('/v1/recurring-items', {
+        name: 'Страховка',
+        amountMinor: '4500000',
+        currency: 'RUB',
+        schedule: { kind: 'yearly', month: Number(on.slice(5, 7)), day: Number(on.slice(8, 10)) },
+      }),
+      201,
+    );
+
+    const forecast = await expectOk<ForecastDto>(await client.get('/v1/forecast'));
+    expect(forecast.events.some((e) => e.kind === 'recurring_due' && e.name === 'Страховка')).toBe(
+      true,
+    );
+  });
+
+  test('ступень платежа сдвигает дату закрытия долга', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const debt = await expectOk<{ id: string }>(
+      await client.post('/v1/debts', {
+        name: 'Кредит',
+        currency: 'RUB',
+        principalMinor: '3000000',
+        remainingMinor: '3000000',
+        paymentMinor: '100000',
+      }),
+      201,
+    );
+    // По сегодняшнему платежу 3 000 000 / 100 000 = 30 периодов — за горизонтом, события нет.
+    const before = await expectOk<ForecastDto>(await client.get('/v1/forecast'));
+    expect(before.events.some((e) => e.targetId === debt.id)).toBe(false);
+
+    const from = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
+    await expectOk(
+      await client.patch(`/v1/debts/${debt.id}`, {
+        amountSteps: [{ from, amountMinor: '900000' }],
+      }),
+    );
+
+    const after = await expectOk<ForecastDto>(await client.get('/v1/forecast'));
+    expect(after.events.some((e) => e.kind === 'debt_closed' && e.targetId === debt.id)).toBe(true);
+  });
+});

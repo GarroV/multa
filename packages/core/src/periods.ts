@@ -54,6 +54,13 @@ function diffDays(fromIso: string, toIso: string): number {
 }
 
 /** Сдвиг ISO-даты на n дней (n может быть отрицательным). */
+/** Календарных дней между датами (обе в UTC, ISO): «через сколько дней» без часовых поясов. */
+export function daysBetween(fromIso: string, toIso: string): number {
+  return Math.round(
+    (Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86_400_000,
+  );
+}
+
 export function addDays(iso: string, n: number): string {
   return fromUTC(toUTC(iso) + n * MS_PER_DAY);
 }
