@@ -2,6 +2,7 @@ import { fromMajor, parseEntry, toMajorString, money } from '@multa/core';
 import { useState } from 'react';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useSheet } from '../lib/useSheet.ts';
+import { useVoiceCapture } from '../lib/useVoiceCapture.ts';
 import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import { ApiError } from '../lib/api.ts';
@@ -9,6 +10,7 @@ import {
   useCategories,
   useCreateSpend,
   useParseEntry,
+  useParseVoice,
   useDeleteSpend,
   useTransactions,
   type Transaction,
@@ -97,6 +99,8 @@ export function SpendEntry({
    * базовую жёстко, и распознанная валюта молча подменялась — 4,50 EUR превращались в 4,50 RUB.
    */
   const [currency, setCurrency] = useState(base);
+  const voice = useVoiceCapture();
+  const parseVoice = useParseVoice();
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState('');
@@ -107,6 +111,30 @@ export function SpendEntry({
    * Умное поле (04-web-ux §Ввод): разбираем строку в ядре и раскладываем по полям формы,
    * а не отправляем сразу — пользователь видит, как его поняли, и может поправить.
    */
+  /**
+   * Кнопка микрофона: первое нажатие пишет, второе отправляет запись на разбор.
+   *
+   * Результат раскладывается по тем же полям, что и текстовая фраза, а сама расшифровка кладётся
+   * в умное поле — человек видит, КАК его услышали, и может поправить словом, а не заново диктовать.
+   */
+  const toggleVoice = async () => {
+    if (voice.state !== 'recording') return await voice.start();
+    const audioUrl = await voice.stop();
+    if (!audioUrl) return;
+    parseVoice.mutate(audioUrl, {
+      onSuccess: (parsed) => {
+        setBadAmount(false);
+        setSmart(parsed.transcript);
+        setKind(parsed.kind);
+        setAmount(toMajorString(money(BigInt(parsed.amountMinor), parsed.currency)));
+        setCurrency(parsed.currency);
+        setOccurredOn(parsed.occurredOn);
+        setNote(parsed.note ?? '');
+        setCategoryId(parsed.kind === 'income' ? undefined : (parsed.categoryId ?? undefined));
+      },
+    });
+  };
+
   const applySmart = () => {
     const line = smart.trim();
     if (!line) return;
@@ -207,20 +235,42 @@ export function SpendEntry({
         </div>
 
         <div className="stack-xs">
-          <input
-            className="field"
-            placeholder={t('spend.smart.placeholder')}
-            value={smart}
-            onChange={(e) => setSmart(e.target.value)}
-            onBlur={applySmart}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                applySmart();
-              }
-            }}
-          />
+          <div className="form-row">
+            <input
+              className="field grow"
+              placeholder={t('spend.smart.placeholder')}
+              value={smart}
+              onChange={(e) => setSmart(e.target.value)}
+              onBlur={applySmart}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  applySmart();
+                }
+              }}
+            />
+            {/*
+              Диктовка кладёт результат в то же поле, что и напечатанная фраза (#107): дальше он
+              идёт общим путём разбора, поэтому «понял так» у голоса и у текста не разъедется.
+            */}
+            <button
+              type="button"
+              className="act"
+              aria-pressed={voice.state === 'recording'}
+              aria-label={t('spend.voice')}
+              title={t('spend.voice')}
+              disabled={voice.state === 'encoding' || parseVoice.isPending}
+              onClick={() => void toggleVoice()}
+            >
+              {voice.state === 'recording' ? '■' : '🎙'}
+            </button>
+          </div>
           <span className="sub">{t('spend.smart.hint')}</span>
+          {voice.state === 'denied' && (
+            <span className="sub danger">{t('spend.voice.denied')}</span>
+          )}
+          {voice.state === 'unsupported' && <span className="sub dim">{t('spend.voice.no')}</span>}
+          {parseVoice.isError && <span className="sub danger">{t('spend.voice.failed')}</span>}
         </div>
 
         <div className="stack-sm">

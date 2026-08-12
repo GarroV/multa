@@ -1285,6 +1285,23 @@ export interface ParsedEntryDto {
   note: string | null;
 }
 
+/**
+ * Разбор надиктованной фразы (#107). Ручка `/transactions/voice` жила с самого начала и была
+ * покрыта тестами, но кнопки к ней не было — то есть ручка оплачивалась и не приносила пользы.
+ *
+ * Аудио уезжает data-URL: файл диктовки — секунды, отдельное хранилище ради него разводить незачем,
+ * а лимит в схеме сервера (14 МБ) заведомо выше любой такой записи.
+ */
+export function useParseVoice() {
+  return useMutation({
+    mutationFn: (audioUrl: string) =>
+      api<ParsedEntryDto & { transcript: string }>('/v1/transactions/voice', {
+        method: 'POST',
+        body: JSON.stringify({ audioUrl }),
+      }),
+  });
+}
+
 export function useParseEntry() {
   return useMutation({
     mutationFn: (text: string) =>
