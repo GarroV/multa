@@ -41,7 +41,11 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
   const setBudget = useSetCategoryBudget();
   const freeze = useGoalFreeze();
   /** Пересборка открывается поверх: сигнал знает категорию, а откуда взять деньги — решает человек. */
-  const [rebalanceFor, setRebalanceFor] = useState<{ id: string; name: string } | null>(null);
+  const [rebalanceFor, setRebalanceFor] = useState<{
+    id: string;
+    name: string;
+    needMinor: string;
+  } | null>(null);
 
   const metricText = (metric: SignalMetricDto): string => {
     switch (metric.kind) {
@@ -79,7 +83,11 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
         freeze.mutate({ goalId: action.targetId, frozen: true });
         return;
       case 'rebalance':
-        setRebalanceFor({ id: action.targetId, name: signal.targetName ?? '' });
+        setRebalanceFor({
+          id: action.targetId,
+          name: signal.targetName ?? '',
+          needMinor: action.needMinor,
+        });
         return;
       case 'open':
         void navigate({ to: `/${action.screen}` });
@@ -113,7 +121,7 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
         <Rebalance
           categoryId={rebalanceFor.id}
           categoryName={rebalanceFor.name}
-          needMinor="0"
+          needMinor={rebalanceFor.needMinor}
           base={base}
           locale={locale}
           onClose={() => setRebalanceFor(null)}

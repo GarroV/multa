@@ -136,9 +136,12 @@ signalsRoute.get('/signals', async (c) => {
       params: s.params,
       targetId: s.targetId ?? null,
       targetName: s.targetName ?? null,
-      actions: s.actions.map((a) =>
-        a.kind === 'set_budget' ? { ...a, amountMinor: a.amountMinor.toString() } : a,
-      ),
+      // bigint наружу не отдаётся: у каждого действия со суммой она уезжает строкой.
+      actions: s.actions.map((a) => {
+        if (a.kind === 'set_budget') return { ...a, amountMinor: a.amountMinor.toString() };
+        if (a.kind === 'rebalance') return { ...a, needMinor: a.needMinor.toString() };
+        return a;
+      }),
     })),
   });
 });

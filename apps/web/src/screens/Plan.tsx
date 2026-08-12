@@ -194,7 +194,13 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
   // Прогноз научен матрице (issue #84): имена закрытых разделов в него не попадают.
   const { data } = useForecast();
-  if (!data || (data.dueSoon.length === 0 && data.events.length === 0)) return null;
+  if (!data) return null;
+  /*
+   * Пустая лента — тоже ответ (#105). Раньше панель исчезала целиком, и человек не знал ни что
+   * раздел есть, ни что впереди действительно чисто: текст `forecast.empty` был написан и лежал
+   * мёртвым. Пропадает панель только пока прогноз не загрузился.
+   */
+  const nothingAhead = data.dueSoon.length === 0 && data.events.length === 0;
 
   const label = (e: ForecastEvent): string => {
     const amount = e.amountMinor ? `${formatMinor(e.amountMinor, base, locale)} ${base}` : '';
@@ -208,6 +214,12 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
 
   return (
     <Panel label={t('forecast.title')} accent="amber">
+      {nothingAhead && (
+        <div className="prow">
+          <span />
+          <span className="dim">{t('forecast.empty')}</span>
+        </div>
+      )}
       {/* Списания периода: они и так учтены в условии показа панели, значит должны быть видны. */}
       {data.dueSoon.slice(0, 4).map((d) => (
         <div className="prow" key={`due:${d.id}:${d.on}`}>
@@ -248,7 +260,8 @@ function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
   const { t } = useI18n();
   const { data = [] } = useRevisions(!useIsMember());
   const undo = useUndoRevision();
-  if (data.length === 0) return null;
+  // Пустая история — «правок не было», а не «раздела нет»: текст для этого написан (#105).
+  const noRevisions = data.length === 0;
 
   return (
     <Panel
@@ -256,6 +269,12 @@ function RevisionsPanel({ base, locale }: { base: string; locale: string }) {
       accent="amber"
       foot={undo.isError ? <span className="sub danger">{t('rev.cantUndo')}</span> : undefined}
     >
+      {noRevisions && (
+        <div className="prow">
+          <span />
+          <span className="dim">{t('rev.empty')}</span>
+        </div>
+      )}
       {data.map((rev) => {
         const first = rev.moves[0];
         return (
@@ -386,38 +405,44 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {!master && (
         <>
           <div className="kpi-strip">
-            {isSectionVisible('account') &&
-              balances.data &&
-              balances.data.byCurrency.length > 0 && (
-                <Kpi label={t('acc.total')} slot="money">
-                  <span className="kpi-value">
-                    {balances.data.totalMinor === null
-                      ? '—'
-                      : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
-                  </span>
-                  <div className="kpi-rows">
-                    {balances.data.byCurrency.map((b) => (
-                      <div key={b.currency}>
-                        <span>
-                          {formatMinor(b.minor, b.currency, locale)} {b.currency}
-                        </span>
-                        {b.baseMinor === null ? (
-                          <span className="st-warn">—</span>
-                        ) : (
-                          b.currency !== base && (
-                            <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
-                          )
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {balances.data.unresolved.length > 0 && (
-                    <span className="kpi-sub st-warn">
-                      {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
-                    </span>
+            {/*
+              Счета без остатков раньше просто убирали KPI из полосы (#105): человек не понимал,
+              пусто у него или раздел не существует. Текст для этого случая написан, показываем его
+              на месте цифры — прочерк вместо суммы честнее пустоты.
+            */}
+            {isSectionVisible('account') && balances.data && (
+              <Kpi label={t('acc.total')} slot="money">
+                <span className="kpi-value">
+                  {balances.data.totalMinor === null
+                    ? '—'
+                    : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
+                </span>
+                <div className="kpi-rows">
+                  {balances.data.byCurrency.length === 0 && (
+                    <div className="dim">{t('acc.empty')}</div>
                   )}
-                </Kpi>
-              )}
+                  {balances.data.byCurrency.map((b) => (
+                    <div key={b.currency}>
+                      <span>
+                        {formatMinor(b.minor, b.currency, locale)} {b.currency}
+                      </span>
+                      {b.baseMinor === null ? (
+                        <span className="st-warn">—</span>
+                      ) : (
+                        b.currency !== base && (
+                          <span className="dim">≈ {formatMinor(b.baseMinor, base, locale)}</span>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {balances.data.unresolved.length > 0 && (
+                  <span className="kpi-sub st-warn">
+                    {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
+                  </span>
+                )}
+              </Kpi>
+            )}
             <Kpi label={t('plan.kpi.left', { days: plan.daysLeft })} slot="left">
               <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
                 {withCcy(plan.remainingLivingMinor)}

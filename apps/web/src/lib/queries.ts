@@ -638,7 +638,7 @@ export type SignalMetricDto =
   | { kind: 'date'; on: string };
 
 export type SignalActionDto =
-  | { kind: 'rebalance'; targetId: string }
+  | { kind: 'rebalance'; targetId: string; needMinor: string }
   | { kind: 'set_budget'; targetId: string; amountMinor: string }
   | { kind: 'freeze_goal'; targetId: string }
   | { kind: 'open'; screen: 'plan' | 'statistics' | 'obligations' };

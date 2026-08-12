@@ -47,7 +47,12 @@ export type SignalMetric =
  */
 export type SignalAction =
   /** Открыть пересборку плана для категории: «откуда добавим». */
-  | { readonly kind: 'rebalance'; readonly targetId: string }
+  /**
+   * «Взять недостающее из другой строки». `needMinor` — сколько именно не хватает: без суммы
+   * интерфейс открывал модал пересборки с нулём, запрос вариантов не уходил, и человек видел
+   * пустое окно вместо предложений (#106).
+   */
+  | { readonly kind: 'rebalance'; readonly targetId: string; readonly needMinor: bigint }
   /** Поставить категории конкретный бюджет (медиану факта). */
   | { readonly kind: 'set_budget'; readonly targetId: string; readonly amountMinor: bigint }
   /** Пропустить взнос в цель в этом периоде (issue #54). */
@@ -217,7 +222,11 @@ export function buildSignals(input: SignalsInput, thresholds: SignalThresholds):
         // Два действия: принять медиану как бюджет или взять недостающее из другой строки.
         actions: [
           { kind: 'set_budget', targetId: category.id, amountMinor: category.medianMinor },
-          { kind: 'rebalance', targetId: category.id },
+          {
+            kind: 'rebalance',
+            targetId: category.id,
+            needMinor: category.medianMinor - category.plannedMinor,
+          },
         ],
       });
     }
