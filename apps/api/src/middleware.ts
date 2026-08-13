@@ -110,6 +110,8 @@ const SHARING_AWARE = [
 
 /** Списки разделов: у них свой сторож `requireSection`, который знает режим раздела. */
 const SECTION_GUARDED = [
+  /** Категорийная аналитика: смысл ручки — сравнение по именам, поэтому только `open` (#84). */
+  '/v1/analytics/categories',
   '/v1/recurring-items',
   '/v1/debts',
   '/v1/envelopes',

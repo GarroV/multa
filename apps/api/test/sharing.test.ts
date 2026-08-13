@@ -215,7 +215,6 @@ describe('совместный доступ', () => {
     await setMode(owner, 'goals', 'hidden');
 
     for (const path of [
-      '/v1/analytics/categories',
       '/v1/analytics/spread',
       '/v1/exchange-ops',
       '/v1/accounts',
@@ -308,6 +307,24 @@ describe('совместный доступ', () => {
     const priv = asMember.groups.find((g) => g.kind === 'private')!;
     expect(priv).toBeDefined();
     expect(priv.totals[0]).toBe(hidden.totals[0]);
+  });
+
+  test('категорийная аналитика открыта ровно тогда, когда открыт раздел категорий (#84)', async () => {
+    /*
+     * Промежуточного режима у этой ручки нет: её смысл — сравнение ПО ИМЕНАМ, и «суммой» от неё
+     * остаётся пустая таблица. Отдавать её при `sum` значило бы делать вид, что раздел доступен.
+     */
+    const { owner, member } = await pair();
+    expect((await member.get('/v1/analytics/categories')).status).toBe(200);
+
+    await setMode(owner, 'categories', 'sum');
+    expect((await member.get('/v1/analytics/categories')).status).toBe(403);
+
+    await setMode(owner, 'categories', 'hidden');
+    expect((await member.get('/v1/analytics/categories')).status).toBe(403);
+
+    // У владельца режим ничего не меняет: матрица — про участника.
+    expect((await owner.get('/v1/analytics/categories')).status).toBe(200);
   });
 
   test('владельца новый сторож не трогает', async () => {

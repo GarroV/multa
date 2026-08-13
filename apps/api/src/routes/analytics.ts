@@ -10,7 +10,12 @@ import {
   plannedItems,
   transactions,
 } from '../db/schema/domain.ts';
-import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
+import {
+  requireSection,
+  requireWorkspace,
+  type AppVariables,
+  type Workspace,
+} from '../middleware.ts';
 import { currentPeriodFor } from '../plan/assemble.ts';
 import { settingsOf } from '../settings/store.ts';
 import { analyticsQuerySchema, spreadQuerySchema } from '../validation.ts';
@@ -32,7 +37,14 @@ interface SeriesPoint {
   spentMinor: string;
 }
 
-analyticsRoute.get('/analytics/categories', async (c) => {
+/*
+ * Категорийная аналитика открыта участнику ровно тогда, когда открыт раздел категорий (issue #84).
+ *
+ * Промежуточного режима здесь нет намеренно: смысл этой ручки — сравнение ПО ИМЕНАМ категорий, и
+ * «суммой» от неё остаётся пустая таблица. Отдавать её при `sum` значило бы делать вид, что раздел
+ * доступен, а показывать нечего.
+ */
+analyticsRoute.get('/analytics/categories', requireSection('categories'), async (c) => {
   const ws = c.get('workspace')!;
   // Горизонт: параметр запроса важнее настройки (экран может попросить другой), настройка —
   // значение по умолчанию для этого воркспейса (issue #49).
