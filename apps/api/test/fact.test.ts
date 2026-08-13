@@ -215,3 +215,58 @@ describe('разбор фразы', () => {
     expect(await res.json()).toMatchObject({ error: 'not_understood' });
   });
 });
+
+describe('офлайн-очередь: повтор попытки (Спринт 6)', () => {
+  /*
+   * Трата, записанная без сети, лежит в очереди клиента и отправляется повторно при появлении
+   * связи. Клиент не может знать, дошла ли первая попытка: ответ мог не вернуться при уже
+   * записанной трате. Без ключа попытки повтор создавал бы вторую такую же трату — человек увидел
+   * бы двойной расход и не понял бы, откуда он.
+   */
+  const attempt = '11111111-2222-3333-4444-555555555555';
+
+  test('вторая отправка с тем же ключом отдаёт ту же трату, а не создаёт новую', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const body = {
+      amountMinor: '125000',
+      currency: 'RUB',
+      occurredOn: '2026-08-01',
+      clientKey: attempt,
+    };
+
+    const first = await expectOk<{ id: string }>(await client.post('/v1/transactions', body), 201);
+    // 200, а не 201: это не ошибка и не новая запись, а «уже сделано».
+    const second = await expectOk<{ id: string }>(await client.post('/v1/transactions', body), 200);
+    expect(second.id).toBe(first.id);
+
+    const list = await expectOk<{ transactions: unknown[] }>(
+      await client.get('/v1/transactions?from=2026-01-01&to=2027-01-01'),
+    );
+    expect(list.transactions).toHaveLength(1);
+  });
+
+  test('без ключа две одинаковые траты остаются двумя: человек мог купить кофе дважды', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const body = { amountMinor: '125000', currency: 'RUB', occurredOn: '2026-08-01' };
+    await expectOk(await client.post('/v1/transactions', body), 201);
+    await expectOk(await client.post('/v1/transactions', body), 201);
+
+    const list = await expectOk<{ transactions: unknown[] }>(
+      await client.get('/v1/transactions?from=2026-01-01&to=2027-01-01'),
+    );
+    expect(list.transactions).toHaveLength(2);
+  });
+
+  test('ключ чужого воркспейса не мешает: он уникален внутри своего', async () => {
+    const alice = await onboarded({ payoutMinor: '30000000' });
+    const bob = await onboarded({ payoutMinor: '30000000' });
+    const body = {
+      amountMinor: '125000',
+      currency: 'RUB',
+      occurredOn: '2026-08-01',
+      clientKey: attempt,
+    };
+    await expectOk(await alice.post('/v1/transactions', body), 201);
+    await expectOk(await bob.post('/v1/transactions', body), 201);
+  });
+});

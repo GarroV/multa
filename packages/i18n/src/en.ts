@@ -19,6 +19,7 @@ export const en = {
     'Removes the workspace with every transaction, plan and obligation. This cannot be undone — download your data first.',
   'account.delete.action': 'Delete',
   'account.delete.confirm': 'Type {email} to confirm',
+  'common.offline': 'Offline — showing cached data, changes will not save',
   'common.cancel': 'Cancel',
 
   // Онбординг — шаг 1: базовая валюта

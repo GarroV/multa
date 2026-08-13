@@ -1,12 +1,14 @@
 import type { TranslationKey } from '@multa/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ReceiptEntry } from './components/ReceiptEntry.tsx';
 import { SpendEntry } from './components/SpendEntry.tsx';
 import { authClient } from './lib/authClient.ts';
 import { useI18n } from './lib/i18n.tsx';
-import { useMe, useMembers } from './lib/queries.ts';
+import { useFlushOutbox, useMe, useMembers } from './lib/queries.ts';
+import { queueSize } from './lib/outbox.ts';
+import { useOnline } from './lib/useOnline.ts';
 import { IconEye, IconPanels, IconTable } from './components/ui/icons.tsx';
 import { useTheme } from './lib/theme.ts';
 
@@ -102,6 +104,17 @@ function PlanTools({ hasMembers }: { hasMembers: boolean }) {
 
 export function AppShell() {
   const { t, locale, setLocale } = useI18n();
+  const online = useOnline();
+  /*
+   * Отложенные траты уходят при появлении сети и при запуске (Спринт 6). Эффект, а не кнопка:
+   * человек не должен помнить, что у него что-то не доехало, — иначе очередь бесполезна.
+   */
+  const flushOutbox = useFlushOutbox();
+  useEffect(() => {
+    if (online && queueSize() > 0) flushOutbox.mutate();
+    // flushOutbox в зависимостях не нужен: он стабилен, а его добавление зациклило бы эффект.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
   const qc = useQueryClient();
   const { data: me } = useMe();
   const { theme, setTheme } = useTheme();
@@ -126,6 +139,12 @@ export function AppShell() {
 
   return (
     <div className="app-frame">
+      {/*
+        Полоса «нет сети» (Спринт 6). Приложение теперь открывается из кэша, и без этой полосы
+        человек видел бы пустой план, решив, что данные потерялись. Полоса в потоке, а не поверх
+        содержимого: перекрывать цифры сообщением о сети — плохой обмен.
+      */}
+      {!online && <div className="offline-bar">{t('common.offline')}</div>}
       <header className="topbar">
         <span className="topbar-brand">multa</span>
         <nav className="tabs" aria-label={t('nav.plan')}>

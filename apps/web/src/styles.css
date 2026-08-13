@@ -2269,3 +2269,15 @@ a {
   background: var(--over);
   color: var(--bg);
 }
+
+/*
+ * Полоса «нет сети». В потоке, а не поверх содержимого: перекрывать цифры сообщением о сети —
+ * плохой обмен. Цвет — предупреждающий, не тревожный: человек не сделал ничего плохого.
+ */
+.offline-bar {
+  padding: 6px 12px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--bg);
+  background: var(--amber);
+}

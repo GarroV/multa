@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api.ts';
+import { enqueue, flush } from './outbox.ts';
 
 export interface WorkspaceDto {
   id: string;
@@ -999,10 +1000,22 @@ export interface SpendInput {
 }
 
 /** Факт меняет и список трат, и план (остаток, цифра дня) — инвалидируем оба. */
-function useTransactionMutation<TVars>(mutationFn: (vars: TVars) => Promise<unknown>) {
+function useTransactionMutation<TVars>(
+  mutationFn: (vars: TVars) => Promise<unknown>,
+  /**
+   * `always` отключает встроенную паузу TanStack Query в офлайне (Спринт 6).
+   *
+   * По умолчанию Query держит мутацию в памяти до появления сети — и теряет её при перезагрузке
+   * страницы, то есть ровно тогда, когда человек в метро закроет вкладку. Нам нужна пауза, которая
+   * переживает закрытие приложения, поэтому запрос всё-таки уходит, падает, и запись ловит наша
+   * очередь в localStorage.
+   */
+  networkMode?: 'always',
+) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn,
+    ...(networkMode ? { networkMode } : {}),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['transactions'] });
       void qc.invalidateQueries({ queryKey: ['plan'] });
@@ -1041,10 +1054,63 @@ export function useDeleteIncomeSource() {
   });
 }
 
+/**
+ * Запись траты с очередью на случай отсутствия сети (Спринт 6).
+ *
+ * Приложение открывается из кэша, значит трату записывают и в метро. Молча проглотить её хуже, чем
+ * отказать: человек видел «записано» и больше к этой покупке не вернётся. Поэтому сетевая ошибка
+ * (именно сетевая — не отказ сервера) кладёт запись в очередь и считается успехом для интерфейса.
+ *
+ * У каждой попытки свой `clientKey`: повтор не может знать, дошла ли первая отправка, и без ключа
+ * создал бы вторую такую же трату. Уникальность ключа держит БД (миграция 0019).
+ */
 export function useCreateSpend() {
-  return useTransactionMutation<SpendInput>((body) =>
-    api<Transaction>('/v1/transactions', { method: 'POST', body: JSON.stringify(body) }),
-  );
+  return useTransactionMutation<SpendInput>(async (body) => {
+    const clientKey = crypto.randomUUID();
+    const payload: Record<string, unknown> = { ...body, clientKey };
+    try {
+      return await api<Transaction>('/v1/transactions', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      // Отказ сервера в очередь не идёт: он не станет успехом от повторов, о нём надо сказать сразу.
+      if (err instanceof ApiError) throw err;
+      enqueue({ clientKey, body: payload, queuedAt: new Date().toISOString() });
+      return null;
+    }
+  }, 'always');
+}
+
+/**
+ * Отправляет отложенные траты. Зовётся при появлении сети и при запуске приложения.
+ *
+ * Отказ сервера (`ApiError`) снимает запись с очереди: невалидная строка не станет валидной от
+ * повторов и иначе навсегда заблокировала бы хвост. Сетевая ошибка оставляет очередь как есть.
+ */
+export function useFlushOutbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    // См. комментарий к useTransactionMutation: пауза Query здесь только мешает.
+    networkMode: 'always',
+    mutationFn: () =>
+      flush(async (item) => {
+        try {
+          await api<Transaction>('/v1/transactions', {
+            method: 'POST',
+            body: JSON.stringify(item.body),
+          });
+          return 'sent';
+        } catch (err) {
+          return err instanceof ApiError ? 'rejected' : 'offline';
+        }
+      }),
+    onSuccess: (sent) => {
+      if (sent === 0) return;
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
 }
 
 /** «Сделал» по плановой строке: без суммы — целиком, с суммой — частично. Ответ — свежий план. */

@@ -134,9 +134,27 @@ transactionsRoute.post('/transactions', async (c) => {
       source: body.source ?? 'manual',
       ...(body.note ? { note: body.note } : {}),
       ...(body.rawInput ? { rawInput: body.rawInput } : {}),
+      ...(body.clientKey ? { clientKey: body.clientKey } : {}),
     })
+    /*
+     * Повтор той же попытки не создаёт вторую трату (офлайн-очередь, Спринт 6). Клиент, отправивший
+     * трату без сети, повторит её при появлении связи — и не может знать, дошла ли первая попытка.
+     * Без этой защиты человек увидел бы двойной расход и не понял бы, откуда он.
+     */
+    .onConflictDoNothing({ target: [transactions.workspaceId, transactions.clientKey] })
     .returning();
-  return c.json(serialize(inserted[0]!), 201);
+
+  const row = inserted[0];
+  if (row) return c.json(serialize(row), 201);
+
+  // Конфликт: запись уже есть. Отдаём её же со статусом 200 — это не ошибка, а «уже сделано».
+  const existing = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.workspaceId, ws.id), eq(transactions.clientKey, body.clientKey!)))
+    .limit(1);
+  if (!existing[0]) return c.json({ error: 'conflict' }, 409);
+  return c.json(serialize(existing[0]), 200);
 });
 
 transactionsRoute.delete('/transactions/:id', async (c) => {

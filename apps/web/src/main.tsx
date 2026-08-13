@@ -23,6 +23,19 @@ const queryClient = new QueryClient({
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не найден');
 
+/*
+ * Регистрация service worker (Спринт 6): приложение должно открываться без сети.
+ *
+ * Только в прод-сборке: в деве worker перехватывал бы ассеты и отдавал вчерашние — отладка
+ * превращается в охоту за призраками. Регистрация после `load`, чтобы не соревноваться за сеть с
+ * первым рендером, и без падения наружу: не установился — приложение работает как обычно.
+ */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  });
+}
+
 createRoot(rootEl).render(
   <StrictMode>
     {/*

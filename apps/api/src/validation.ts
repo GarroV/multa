@@ -427,6 +427,11 @@ export const transactionCreateSchema = z
     note: z.string().max(500).optional(),
     source: z.enum(['manual', 'text', 'voice', 'receipt', 'import']).optional(),
     rawInput: z.string().max(500).optional(),
+    /**
+     * Ключ попытки записи (офлайн-очередь, Спринт 6): повтор той же попытки не создаёт вторую
+     * трату. Генерирует клиент — только он знает, что это повтор, а не новая покупка на ту же сумму.
+     */
+    clientKey: z.string().uuid().optional(),
   })
   .refine((v) => v.kind !== 'income' || v.categoryId === undefined, {
     // Категории описывают траты: приход с категорией исказил бы её бюджет и остаток.

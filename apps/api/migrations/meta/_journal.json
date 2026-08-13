@@ -134,6 +134,13 @@
       "when": 1786700000000,
       "tag": "0018_revision_reason_undo",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786800000000,
+      "tag": "0019_transaction_client_key",
+      "breakpoints": true
     }
   ]
 }
