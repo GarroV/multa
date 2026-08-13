@@ -215,7 +215,6 @@ describe('совместный доступ', () => {
     await setMode(owner, 'goals', 'hidden');
 
     for (const path of [
-      '/v1/plan/grid?periods=3',
       '/v1/analytics/categories',
       '/v1/analytics/spread',
       '/v1/exchange-ops',
@@ -273,6 +272,42 @@ describe('совместный доступ', () => {
     const openList = await member.get('/v1/recurring-items');
     expect(openList.status).toBe(200);
     expect(JSON.stringify(await openList.json())).toContain('СЕКРЕТНЫЙ ПЛАТЁЖ');
+  });
+
+  test('мастер-сетка сворачивает закрытый раздел, а не теряет деньги (#84)', async () => {
+    /*
+     * Исчезновение хуже сокрытия: пропади скрытая строка из столбцов — итоги перестали бы сходиться,
+     * «свободно» оказалось бы больше, чем есть, и участник спланировал бы на несуществующие деньги.
+     * Поэтому закрытый раздел сворачивается в группу без имён, но с суммами.
+     */
+    const { owner, member } = await pair();
+    await expectOk(
+      await owner.post('/v1/goals', {
+        name: 'Мотоцикл',
+        currency: 'RUB',
+        targetMinor: '50000000',
+        plannedPerPeriodMinor: '1000000',
+      }),
+      201,
+    );
+    await setMode(owner, 'goals', 'hidden');
+
+    const asOwner = await expectOk<{ groups: { kind: string; totals: string[] }[] }>(
+      await owner.get('/v1/plan/grid?periods=3'),
+    );
+    const asMember = await expectOk<{ groups: { kind: string; totals: string[] }[] }>(
+      await member.get('/v1/plan/grid?periods=3'),
+    );
+
+    // Имени скрытой строки у участника нет вовсе.
+    expect(JSON.stringify(asMember)).not.toContain('Мотоцикл');
+    expect(asMember.groups.some((g) => g.kind === 'goal')).toBe(false);
+
+    // Но деньги на месте: сумма группы «личное» равна сумме скрытых разделов владельца.
+    const hidden = asOwner.groups.find((g) => g.kind === 'goal')!;
+    const priv = asMember.groups.find((g) => g.kind === 'private')!;
+    expect(priv).toBeDefined();
+    expect(priv.totals[0]).toBe(hidden.totals[0]);
   });
 
   test('владельца новый сторож не трогает', async () => {

@@ -35,6 +35,9 @@ import { isSectionVisible } from '../lib/sections.ts';
  */
 
 const GROUP_LABEL = {
+  /* Свёрнутые закрытые разделы участника: имён нет, суммы есть (issue #84). Подпись та же, что в
+     плане, — «Личное»: два разных слова для одного и того же читались бы как две разные вещи. */
+  private: 'share.private',
   income: 'plan.groups.income',
   debt: 'plan.groups.debt',
   bucket: 'obl.buckets',

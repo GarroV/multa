@@ -32,6 +32,8 @@ import { getRate } from '../fx/service.ts';
 import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { settingsOf } from '../settings/store.ts';
+import { SHARING_SECTION_OF } from './sharing.ts';
+import type { ShareMode } from '../validation.ts';
 import { getCurrentPlan } from './assemble.ts';
 
 /**
@@ -155,10 +157,13 @@ export async function getPlanGrid(
   ws: Workspace,
   asOf: string,
   periodsWanted: number,
+  /** Участник видит сетку через матрицу видимости: закрытые разделы сворачиваются (issue #84). */
+  asMember = false,
 ): Promise<GridDto> {
   if (!ws.periodAnchors) throw new Error('onboarding_incomplete');
   const base = ws.baseCurrency;
   const anchors = ws.periodAnchors as PeriodConfig;
+  const sharing = settingsOf(ws).sharing;
   const periods = generatePeriods(anchors, asOf, periodsWanted);
   if (periods.length === 0) throw new Error('period_undeterminable');
 
@@ -474,6 +479,31 @@ export async function getPlanGrid(
     totalMinor: incomeMinor.reduce((a, b) => a + b, 0n).toString(),
   };
 
+  /*
+   * Матрица видимости для сетки (issue #84). `sum` показывает участнику суммы без имён, `hidden` —
+   * не показывает ничего, но деньги всё равно остаются в итогах столбца.
+   */
+  const sectionMode = (kind: string): ShareMode => {
+    if (!asMember) return 'open';
+    const section = SHARING_SECTION_OF[kind];
+    return section ? sharing[section] : 'open';
+  };
+
+  const hiddenGroups = grid.groups.filter((g) => sectionMode(g.kind) !== 'open');
+  const privateGroup =
+    hiddenGroups.length === 0
+      ? null
+      : {
+          kind: 'private' as TargetKind,
+          rows: [],
+          totals: cellsToStrings(
+            periods.map((_: PayPeriod, i: number) =>
+              hiddenGroups.reduce((acc: bigint, g) => acc + (g.totals[i] ?? 0n), 0n),
+            ),
+          ),
+          totalMinor: hiddenGroups.reduce((acc: bigint, g) => acc + g.totalMinor, 0n).toString(),
+        };
+
   return {
     baseCurrency: base,
     periods: periods.map((p: PayPeriod, i: number) => ({
@@ -486,20 +516,28 @@ export async function getPlanGrid(
     groups: [
       incomeGroup,
       ...(recurringGroup ? [recurringGroup] : []),
-      ...grid.groups.map((g) => ({
-        kind: g.kind,
-        rows: g.rows.map((r) => ({
-          targetKind: r.targetKind,
-          targetId: r.targetId,
-          name: r.name,
-          sourceCurrency: r.sourceCurrency,
-          cells: r.cells.map((c) => ({ minor: c.minor.toString(), state: c.state })),
-          totalMinor: r.totalMinor.toString(),
-          endsAfterIndex: r.endsAfterIndex,
+      ...grid.groups
+        .filter((g) => sectionMode(g.kind) === 'open')
+        .map((g) => ({
+          kind: g.kind,
+          rows: g.rows.map((r) => ({
+            targetKind: r.targetKind,
+            targetId: r.targetId,
+            name: r.name,
+            sourceCurrency: r.sourceCurrency,
+            cells: r.cells.map((c) => ({ minor: c.minor.toString(), state: c.state })),
+            totalMinor: r.totalMinor.toString(),
+            endsAfterIndex: r.endsAfterIndex,
+          })),
+          totals: cellsToStrings(g.totals),
+          totalMinor: g.totalMinor.toString(),
         })),
-        totals: cellsToStrings(g.totals),
-        totalMinor: g.totalMinor.toString(),
-      })),
+      /*
+       * Закрытые разделы сворачиваются в «Личное» с суммами по колонкам, а не исчезают (issue #84).
+       * Исчезновение хуже сокрытия: деньги пропали бы из столбцов, итоги перестали бы сходиться, и
+       * участник спланировал бы на несуществующие деньги. Имён строк здесь нет — только суммы.
+       */
+      ...(privateGroup ? [privateGroup] : []),
     ],
     footer: {
       freeMinor: cellsToStrings(grid.footer.freeMinor),

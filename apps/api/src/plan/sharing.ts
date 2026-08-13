@@ -15,7 +15,8 @@ import type { WorkspaceRole } from '../middleware.ts';
  */
 
 /** Раздел, к которому относится строка плана. Регулярные платежи в каскаде не участвуют. */
-const SECTION_OF: Record<string, keyof SharingSettings> = {
+/** Раздел матрицы по виду строки. Экспортируется: сетке нужна та же карта (issue #84). */
+export const SHARING_SECTION_OF: Record<string, keyof SharingSettings> = {
   debt: 'debts',
   bucket: 'buckets',
   envelope: 'envelopes',
@@ -35,7 +36,7 @@ export function sectionVisible(
   asMember: boolean,
 ): boolean {
   if (!asMember) return true;
-  const section = SECTION_OF[targetKind];
+  const section = SHARING_SECTION_OF[targetKind];
   // Строка вне матрицы (например регулярный платёж) прячется вместе со своим разделом отдельно.
   return section === undefined ? true : sharing[section] === 'open';
 }
@@ -80,7 +81,7 @@ export function applySharing(
   }
 
   const modeOf = (targetKind: string): ShareMode => {
-    const section = SECTION_OF[targetKind];
+    const section = SHARING_SECTION_OF[targetKind];
     return section ? sharing[section] : 'open';
   };
 
@@ -93,7 +94,7 @@ export function applySharing(
     if (mode === 'open') continue;
     const minor = BigInt(allocation.allocatedMinor);
     if (mode === 'sum') {
-      const section = SECTION_OF[allocation.targetKind]!;
+      const section = SHARING_SECTION_OF[allocation.targetKind]!;
       sums.set(section, (sums.get(section) ?? 0n) + minor);
     } else {
       hiddenMinor += minor;

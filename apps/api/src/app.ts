@@ -530,7 +530,8 @@ app.get('/v1/plan/grid', requireWorkspace, async (c) => {
   const ws = c.get('workspace')!;
   const { periods } = planGridQuerySchema.parse(c.req.query());
   try {
-    return c.json(await getPlanGrid(ws, today(ws.timezone), periods));
+    // Участник видит сетку через матрицу: закрытые разделы сворачиваются в «Личное» (issue #84).
+    return c.json(await getPlanGrid(ws, today(ws.timezone), periods, c.get('role') === 'member'));
   } catch (err) {
     if (err instanceof Error && err.message === 'onboarding_incomplete') {
       return c.json({ error: 'onboarding_incomplete' }, 409);
