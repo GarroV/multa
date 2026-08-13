@@ -1,5 +1,6 @@
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { db, pool } from './db/client.ts';
+import { migrationPool } from './db/client.ts';
 import { logger } from './logger.ts';
 
 /**
@@ -9,8 +10,15 @@ import { logger } from './logger.ts';
  */
 const folder = process.env.MIGRATIONS_DIR ?? 'migrations';
 
+/*
+ * Свой пул без предела на время запроса (issue #81): миграция может законно идти минуты, а отмена
+ * на середине опаснее медленности — часть изменений применена, журнал не дописан, и следующий
+ * запуск не знает, с чего продолжать.
+ */
+const pool = migrationPool();
+
 try {
-  await migrate(db, { migrationsFolder: folder });
+  await migrate(drizzle(pool), { migrationsFolder: folder });
   logger.info(`миграции применены (${folder})`);
 } catch (err) {
   logger.error('миграции не применились', err);
