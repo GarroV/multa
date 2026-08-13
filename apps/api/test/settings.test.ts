@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { categoryId, expectOk, getPlan, onboarded, type TestClient } from './client.ts';
+import { categoryId, expectOk, getPlan, onboarded, seedRate, type TestClient } from './client.ts';
 
 /**
  * Настройки воркспейса (issue #49). Проверяется не «сохранилось ли поле», а то, что настройка
@@ -279,5 +279,50 @@ describe('совет считается от плана, а не от уреза
     // Сжатие действительно случилось — иначе тест ничего не проверяет.
     expect(BigInt(row.allocatedMinor)).toBeLessThan(BigInt(row.plannedMinor));
     expect(row.advice).toBeUndefined();
+  });
+});
+
+describe('округление суммы к размену (#49)', () => {
+  /*
+   * Никто не идёт в обменник менять 47 813 ₽ — меняют 48 000. Неокруглённая цифра выглядит точной,
+   * но пользоваться ей нельзя: человек всё равно округлит в уме, каждый раз по-своему.
+   *
+   * Только вверх: вниз означало бы поменять меньше, чем нужно на обязательства периода, — тихо
+   * оставить человека без части денег ровно там, где он их запланировал.
+   */
+  test('сумма к размену поднимается до шага и не опускается', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    await expectOk(
+      await client.post('/v1/buckets', {
+        name: 'Жизнь в евро',
+        fromCurrency: 'RUB',
+        toCurrency: 'EUR',
+        amountMinor: '50000',
+      }),
+      201,
+    );
+    await seedRate('EUR', 'RUB', '95.4321', new Date().toISOString().slice(0, 10));
+
+    const raw = await getPlan(client);
+    const exact = BigInt(raw.toExchangeMinor);
+    // Проверка осмысленна, только если сумма и правда некруглая — иначе тест ничего не значит.
+    expect(exact % 100000n).not.toBe(0n);
+
+    await patch(client, { currency: { exchangeRoundingMajor: 1000 } });
+
+    const rounded = BigInt((await getPlan(client)).toExchangeMinor);
+    expect(rounded % 100000n).toBe(0n);
+    expect(rounded).toBeGreaterThanOrEqual(exact);
+    // И не больше, чем на один шаг: округление, а не прибавка.
+    expect(rounded - exact).toBeLessThan(100000n);
+  });
+
+  test('без настройки цифра остаётся точной', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const settings = await expectOk<{ currency: { exchangeRoundingMajor: number } }>(
+      await client.get('/v1/workspace/settings'),
+    );
+    // Ноль по умолчанию: округление — выбор человека, а не поведение продукта по умолчанию.
+    expect(settings.currency.exchangeRoundingMajor).toBe(0);
   });
 });

@@ -21,3 +21,4 @@ export * from './importXlsx.ts';
 export * from './providers.ts';
 export * from './csv.ts';
 export * from './scrub.ts';
+export * from './rounding.ts';

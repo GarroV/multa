@@ -160,6 +160,13 @@ const currencySettings = z.object({
   /** Спред по умолчанию в базисных пунктах: 150 = 1,5%. */
   defaultSpreadBp: z.number().int().min(0).max(2000).default(0),
   defaultProvider: z.string().min(1).max(40).nullable().default(null),
+  /**
+   * Шаг округления суммы к размену в major units валюты (issue #49). 0 — не округлять.
+   *
+   * Никто не меняет 47 813 ₽ — меняют 48 000. Округляем только вверх: вниз означало бы поменять
+   * меньше, чем нужно на обязательства периода.
+   */
+  exchangeRoundingMajor: z.number().int().min(0).max(100000).default(0),
 });
 
 const cascadeSettings = z.object({

@@ -449,6 +449,15 @@ export const ru: Record<TranslationKey, string> = {
 
   // Настройки
   'settings.currency': 'Базовая валюта',
+  'set.currency.title': 'Валюта и курс',
+  'set.currency.source': 'Источник курса',
+  'set.currency.source.cbr': 'ЦБ РФ',
+  'set.currency.source.ecb': 'ЕЦБ',
+  'set.currency.source.manual': 'Только свои курсы',
+  'set.currency.rounding': 'Округлять к размену',
+  'set.currency.rounding.off': 'Не округлять',
+  'set.currency.rounding.hint':
+    'Сумму к размену поднимаем до круглой: в обменник идут с 48 000, а не с 47 813. Только вверх — вниз означало бы поменять меньше, чем нужно на период.',
   'settings.rhythm': 'Ритм планирования',
   'set.behaviour': 'ПОВЕДЕНИЕ',
   'set.buffer': 'Буфер дневной цифры',

@@ -454,6 +454,15 @@ export const en = {
 
   // Настройки
   'settings.currency': 'Base currency',
+  'set.currency.title': 'Currency and rates',
+  'set.currency.source': 'Rate source',
+  'set.currency.source.cbr': 'CBR',
+  'set.currency.source.ecb': 'ECB',
+  'set.currency.source.manual': 'Own rates only',
+  'set.currency.rounding': 'Round the exchange amount',
+  'set.currency.rounding.off': 'No rounding',
+  'set.currency.rounding.hint':
+    'The amount to exchange is rounded up to something you can actually hand over: 48,000 rather than 47,813. Up only — rounding down would exchange less than the period needs.',
   'settings.rhythm': 'Planning rhythm',
   'set.behaviour': 'BEHAVIOUR',
   'set.buffer': 'Daily figure buffer',

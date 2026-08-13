@@ -14,6 +14,9 @@
 import {
   amountOn,
   assemblePlan,
+  exponentOf,
+  roundExchangeUp,
+  type Currency,
   budgetAdvice,
   burnRate,
   categorySpending,
@@ -1019,7 +1022,21 @@ async function assembleForPeriod(
     compressedMinor: result.compressedMinor.toString(),
     bufferMinor: fact.bufferMinor.toString(),
     freeMinor: result.freeMinor.toString(),
-    toExchangeMinor: summary.toExchangeMinor.toString(),
+    /*
+     * Сумма к размену округляется вверх по настройке (issue #49): человек идёт в обменник с
+     * круглым числом, а не с 47 813. Округление живёт здесь, а не в ядре плана: это про то, как
+     * человек пользуется цифрой, а не про то, сколько денег каскад отложил.
+     */
+    /*
+     * Сумма к размену округляется вверх по настройке (issue #49): человек идёт в обменник с
+     * круглым числом, а не с 47 813. Округление живёт здесь, а не в ядре плана: это про то, как
+     * человек пользуется цифрой, а не про то, сколько денег каскад отложил.
+     */
+    toExchangeMinor: roundExchangeUp(
+      summary.toExchangeMinor,
+      settings.currency.exchangeRoundingMajor,
+      exponentOf(ws.baseCurrency as Currency),
+    ).toString(),
     canSpendPerDayMinor: fact.canSpendPerDayMinor.toString(),
     livingMinor: summary.livingMinor.toString(),
     spentLivingMinor: fact.spentLivingMinor.toString(),

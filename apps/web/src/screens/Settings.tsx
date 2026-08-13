@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
+import { CurrencySettings } from '../components/CurrencySettings.tsx';
 import { ImportExcel } from '../components/ImportExcel.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { useIsMember } from '../lib/role.ts';
@@ -153,6 +154,9 @@ export function Settings() {
           </Panel>
 
           <BehaviourSettings />
+
+          {/* Источник курса и округление к размену: раньше жили только на сервере (#49). */}
+          <CurrencySettings />
 
           {/* Переезд с Excel пишет данные: участнику он вернул бы 403 на первом же шаге. */}
           {!isMember && <ImportExcel base={ws.baseCurrency} />}

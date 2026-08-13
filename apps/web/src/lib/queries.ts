@@ -534,6 +534,8 @@ export interface WorkspaceSettingsDto {
     rateSource: 'cbr' | 'ecb' | 'manual';
     defaultSpreadBp: number;
     defaultProvider: string | null;
+    /** Шаг округления суммы к размену в major units; 0 — не округлять (#49). */
+    exchangeRoundingMajor: number;
   };
   cascade: { bufferPct: number; compressOrder: ('goal' | 'envelope' | 'category')[] };
   signals: {
