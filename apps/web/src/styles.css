@@ -2255,3 +2255,17 @@ a {
   white-space: nowrap;
   border: 0;
 }
+
+/*
+ * Необратимое действие выглядит необратимым. Цвет берётся из токена перерасхода — того же, которым
+ * размечен выход за план: это предупреждение о потере, а не «красный стыд» из принципа 3.
+ */
+.btn-danger {
+  border-color: var(--over);
+  color: var(--over);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--over);
+  color: var(--bg);
+}

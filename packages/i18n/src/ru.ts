@@ -8,6 +8,15 @@ export const ru: Record<TranslationKey, string> = {
   'common.back': 'назад',
   'common.skip': 'пропустить',
   'common.done': 'готово',
+  'account.export': 'Забрать данные',
+  'account.export.hint':
+    'Файл CSV со всеми тратами: дата, сумма, валюта, курс на дату, категория и заметка. Открывается в Excel, Numbers и Google Таблицах.',
+  'account.export.action': 'Скачать CSV',
+  'account.delete': 'Удалить аккаунт',
+  'account.delete.hint':
+    'Уносит воркспейс со всеми тратами, планами и обязательствами. Это необратимо — сначала забери данные файлом.',
+  'account.delete.action': 'Удалить',
+  'account.delete.confirm': 'Введите {email}, чтобы подтвердить',
   'common.cancel': 'Отмена',
 
   // Онбординг — шаг 1: базовая валюта

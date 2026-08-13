@@ -10,6 +10,15 @@ export const en = {
   'common.back': 'back',
   'common.skip': 'skip',
   'common.done': 'done',
+  'account.export': 'Take your data',
+  'account.export.hint':
+    'A CSV of every transaction: date, amount, currency, the rate on that date, category and note. Opens in Excel, Numbers and Google Sheets.',
+  'account.export.action': 'Download CSV',
+  'account.delete': 'Delete account',
+  'account.delete.hint':
+    'Removes the workspace with every transaction, plan and obligation. This cannot be undone — download your data first.',
+  'account.delete.action': 'Delete',
+  'account.delete.confirm': 'Type {email} to confirm',
   'common.cancel': 'Cancel',
 
   // Онбординг — шаг 1: базовая валюта

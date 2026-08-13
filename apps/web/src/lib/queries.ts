@@ -1304,6 +1304,21 @@ export function useParseVoice() {
   });
 }
 
+/**
+ * Удаление аккаунта (Спринт 6). После успеха перезагружаем страницу целиком, а не чистим кэш:
+ * сессия на сервере уже мертва, и любой следующий запрос из живого приложения упрётся в 401 —
+ * честнее сразу вернуть человека на вход.
+ */
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: (confirm: string) =>
+      api(`/v1/me?confirm=${encodeURIComponent(confirm)}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      window.location.href = '/';
+    },
+  });
+}
+
 export function useParseEntry() {
   return useMutation({
     mutationFn: (text: string) =>

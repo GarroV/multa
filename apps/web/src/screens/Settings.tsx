@@ -6,6 +6,7 @@ import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { useIsMember } from '../lib/role.ts';
 import { Sharing } from '../components/Sharing.tsx';
 import { TwoFactor } from '../components/TwoFactor.tsx';
+import { AccountData } from '../components/AccountData.tsx';
 import { Panel } from '../components/ui/Panel.tsx';
 import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { api } from '../lib/api.ts';
@@ -164,6 +165,7 @@ export function Settings() {
               <span />
             </div>
             <TwoFactor enabled={me?.user?.twoFactorEnabled === true} />
+            <AccountData email={me?.user?.email ?? null} />
           </Panel>
 
           <Sharing />

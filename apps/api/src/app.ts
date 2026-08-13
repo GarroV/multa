@@ -1,7 +1,7 @@
-import type { TargetKind } from '@multa/core';
+import { money, toCsv, toMajorString, type Currency, type TargetKind } from '@multa/core';
 import { isUuid } from './http/ids.ts';
 import { rateLimit } from './http/rateLimit.ts';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
@@ -19,7 +19,8 @@ import {
 } from './validation.ts';
 import { auth } from './auth.ts';
 import { db } from './db/client.ts';
-import { workspaceMembers, workspaces } from './db/schema/domain.ts';
+import { user } from './db/schema/auth.ts';
+import { categories, transactions, workspaceMembers, workspaces } from './db/schema/domain.ts';
 import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
@@ -113,6 +114,148 @@ app.use('*', sessionMiddleware);
 app.get('/v1/health', async (c) =>
   c.json({ ok: true, fxFreshnessHours: await fxFreshnessHours() }),
 );
+
+/**
+ * Удаление аккаунта (Спринт 6). Без него нельзя звать посторонних: человек, отдавший продукту свои
+ * деньги, обязан уметь забрать их обратно и уйти — кнопкой, а не письмом основателю.
+ *
+ * Каскады в схеме были с самого начала, запустить их было нечем. Удаляется строка пользователя:
+ * дальше базы уносят его воркспейсы со всем содержимым, членства в чужих и сессии. Чужой
+ * воркспейс, где человек был участником, не трогается — уходит он, а не хозяйский продукт.
+ *
+ * Подтверждение — собственная почта, как у GitHub с именем репозитория. Сессия уже доказала, КТО
+ * пришёл; ввод подтверждает, что человек понимает, ЧТО сейчас произойдёт. Второй пароль здесь был
+ * бы не защитой, а ещё одним полем.
+ */
+/**
+ * Выгрузка трат файлом (Спринт 6). Второе условие, без которого нельзя звать посторонних: уйти
+ * можно только с данными. Выгружаются именно траты — план и обязательства выводятся из них и
+ * настроек, а история операций это то единственное, что человек вводил руками.
+ *
+ * Курс и base-сумма в файле не для красоты: без них строка «2 500 RSD» через год не значит ничего,
+ * а пересчитать её задним числом уже нечем — курс на ту дату мы храним снапшотом (правило 2).
+ */
+app.get('/v1/export/transactions.csv', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const rows = await db
+    .select({
+      occurredOn: transactions.occurredOn,
+      kind: transactions.kind,
+      amountMinor: transactions.amountMinor,
+      currency: transactions.currency,
+      baseAmountMinor: transactions.baseAmountMinor,
+      rate: transactions.rate,
+      note: transactions.note,
+      categoryName: categories.name,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(categories.id, transactions.targetId))
+    .where(eq(transactions.workspaceId, ws.id))
+    .orderBy(desc(transactions.occurredOn));
+
+  const csv = toCsv(
+    [
+      'date',
+      'kind',
+      'amount',
+      'currency',
+      'base_amount',
+      'base_currency',
+      'rate',
+      'category',
+      'note',
+    ],
+    rows.map((r) => ({
+      date: r.occurredOn,
+      kind: r.kind,
+      // Суммы в major: файл читает человек в таблице, а не наш же парсер.
+      amount: toMajorString(money(r.amountMinor, r.currency as Currency)),
+      currency: r.currency,
+      base_amount: toMajorString(money(r.baseAmountMinor, ws.baseCurrency as Currency)),
+      base_currency: ws.baseCurrency,
+      rate: r.rate,
+      category: r.categoryName,
+      note: r.note,
+    })),
+  );
+
+  return new Response(csv, {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': 'attachment; filename="multa-transactions.csv"',
+    },
+  });
+});
+
+/**
+ * Выгрузка трат файлом (Спринт 6). Второе условие, без которого нельзя звать посторонних: уйти
+ * можно только с данными. Выгружаются именно траты — план и обязательства выводятся из них и
+ * настроек, а история операций это то единственное, что человек вводил руками.
+ *
+ * Курс и base-сумма в файле не для красоты: без них строка «2 500 RSD» через год не значит ничего,
+ * а пересчитать её задним числом уже нечем — курс на ту дату мы храним снапшотом (правило 2).
+ */
+app.get('/v1/export/transactions.csv', requireWorkspace, async (c) => {
+  const ws = c.get('workspace')!;
+  const rows = await db
+    .select({
+      occurredOn: transactions.occurredOn,
+      kind: transactions.kind,
+      amountMinor: transactions.amountMinor,
+      currency: transactions.currency,
+      baseAmountMinor: transactions.baseAmountMinor,
+      rate: transactions.rate,
+      note: transactions.note,
+      categoryName: categories.name,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(categories.id, transactions.targetId))
+    .where(eq(transactions.workspaceId, ws.id))
+    .orderBy(desc(transactions.occurredOn));
+
+  const csv = toCsv(
+    [
+      'date',
+      'kind',
+      'amount',
+      'currency',
+      'base_amount',
+      'base_currency',
+      'rate',
+      'category',
+      'note',
+    ],
+    rows.map((r) => ({
+      date: r.occurredOn,
+      kind: r.kind,
+      // Суммы в major: файл читает человек в таблице, а не наш же парсер.
+      amount: toMajorString(money(r.amountMinor, r.currency as Currency)),
+      currency: r.currency,
+      base_amount: toMajorString(money(r.baseAmountMinor, ws.baseCurrency as Currency)),
+      base_currency: ws.baseCurrency,
+      rate: r.rate,
+      category: r.categoryName,
+      note: r.note,
+    })),
+  );
+
+  return new Response(csv, {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': 'attachment; filename="multa-transactions.csv"',
+    },
+  });
+});
+
+app.delete('/v1/me', requireAuth, async (c) => {
+  const current = c.get('user')!;
+  const confirm = c.req.query('confirm')?.trim().toLowerCase();
+  if (!confirm || confirm !== current.email.trim().toLowerCase()) {
+    return c.json({ error: 'confirm_mismatch' }, 400);
+  }
+  await db.delete(user).where(eq(user.id, current.id));
+  return c.json({ ok: true });
+});
 
 app.get('/v1/me', requireAuth, async (c) => {
   const user = c.get('user')!;
