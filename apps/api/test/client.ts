@@ -92,6 +92,8 @@ export interface WorkspaceOptions {
   readonly payoutMinor?: string;
   /** Числа месяца, когда приходят деньги. */
   readonly days?: number[];
+  /** Таймзона воркспейса: от неё зависит, какой день сервер считает сегодняшним (#109). */
+  readonly timezone?: string;
 }
 
 /** Пользователь с воркспейсом и настроенным доходом — обычная точка старта сценария. */
@@ -100,7 +102,13 @@ export async function onboarded(options: WorkspaceOptions = {}): Promise<TestCli
   const baseCurrency = options.baseCurrency ?? 'RUB';
   const days = options.days ?? [10, 25];
 
-  await expectOk(await client.post('/v1/workspace', { baseCurrency }), 201);
+  await expectOk(
+    await client.post('/v1/workspace', {
+      baseCurrency,
+      ...(options.timezone ? { timezone: options.timezone } : {}),
+    }),
+    201,
+  );
   await expectOk(
     await client.post('/v1/onboarding/income', {
       rhythm: { kind: 'monthly-days', days },

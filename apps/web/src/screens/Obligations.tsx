@@ -10,8 +10,8 @@ import { Hint } from '../components/ui/Hint.tsx';
 import { ObligationEdit } from '../components/ObligationEdit.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { useToday } from '../lib/useToday.ts';
 
-const todayISO = (): string => new Date().toISOString().slice(0, 10);
 import {
   useAccounts,
   useCreateEntity,
@@ -230,6 +230,7 @@ function AccountsSection({ base }: SectionProps) {
 
 function DebtsSection({ base }: SectionProps) {
   const { t, locale } = useI18n();
+  const today = useToday();
   const { data = [], isError, refetch } = useEntities<Debt>('debts');
   const create = useCreateEntity('debts');
   const del = useDeleteEntity('debts');
@@ -260,7 +261,7 @@ function DebtsSection({ base }: SectionProps) {
       ? periodsUntil(
           meForDebt.workspace.rhythm,
           (meForDebt.workspace.weekendRule ?? 'before') as WeekendRule,
-          todayISO(),
+          today,
           closeBy,
         )
       : 0;

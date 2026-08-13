@@ -6,6 +6,7 @@ import { weekdayName } from '../components/IncomeEditor.tsx';
 import { OnboardingShell } from '../components/OnboardingShell.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { api } from '../lib/api.ts';
+import { useToday } from '../lib/useToday.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   formatPayday,
@@ -42,8 +43,6 @@ function toMinor(value: string, ccy: string): string | null {
 
 // --- Шаг 2: ритм планирования + источники дохода ---
 
-const todayISO = (): string => new Date().toISOString().slice(0, 10);
-
 /** Payload источников → доменный вид для проверки рассинхрона (суммы для неё не важны). */
 function toProbeSources(sources: readonly SourcePayload[]): IncomeSource[] {
   return sources.map((s, i) => ({
@@ -59,7 +58,8 @@ function toProbeSources(sources: readonly SourcePayload[]): IncomeSource[] {
 
 function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
   const { t, locale } = useI18n();
-  const today = todayISO();
+  // Воркспейс к этому шагу уже создан, значит таймзона известна — дату берём у сервера (#109).
+  const today = useToday();
   /*
    * Первый вопрос шага — КАК приходят деньги, а не по каким числам. «По числам месяца» отвечает
    * оклад, но у смен, такси и торговли числа нет вовсе: живой тестер (05.08.2026) остановился

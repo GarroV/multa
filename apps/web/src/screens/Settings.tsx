@@ -11,15 +11,18 @@ import { Panel } from '../components/ui/Panel.tsx';
 import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { api } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { useToday } from '../lib/useToday.ts';
 import { rhythmToPayload, type RhythmForm } from '../lib/income.ts';
 import { useMe } from '../lib/queries.ts';
 
-const todayISO = (): string => new Date().toISOString().slice(0, 10);
-
 /** Ритм воркспейса → состояние формы. Незнакомый вид → дефолт «два раза в месяц». */
-function toRhythmForm(rhythm: unknown, weekendRule: RhythmForm['weekendRule']): RhythmForm {
+function toRhythmForm(
+  rhythm: unknown,
+  weekendRule: RhythmForm['weekendRule'],
+  /* Дата параметром: это чистая функция вне компонента, хук здесь звать нельзя (#109). */
+  today: string,
+): RhythmForm {
   const r = rhythm as { kind?: string; days?: number[]; weeks?: number; startsOn?: string } | null;
-  const today = todayISO();
   if (r?.kind === 'every-weeks') {
     return {
       kind: 'everyWeeks',
@@ -53,12 +56,13 @@ export function Settings() {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const ws = me?.workspace;
+  const today = useToday();
   // Участник совместного доступа: пишущие блоки настроек ему недоступны (issue #46).
   const isMember = useIsMember();
 
   const [currency, setCurrency] = useState(ws?.baseCurrency ?? 'RUB');
   const [rhythm, setRhythm] = useState<RhythmForm>(
-    toRhythmForm(ws?.rhythm ?? null, ws?.weekendRule ?? 'before'),
+    toRhythmForm(ws?.rhythm ?? null, ws?.weekendRule ?? 'before', today),
   );
   const [saved, setSaved] = useState(false);
 
@@ -142,7 +146,7 @@ export function Settings() {
                     setRhythm(next);
                     setSaved(false);
                   }}
-                  today={todayISO()}
+                  today={today}
                 />
               </span>
             </div>

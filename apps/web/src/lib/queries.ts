@@ -20,6 +20,8 @@ export interface MeDto {
   onboardingSkipped: boolean;
   /** Роль в воркспейсе (issue #46): участник смотрит и не правит. null — воркспейса нет. */
   role: 'owner' | 'member' | null;
+  /** «Сегодня» в таймзоне воркспейса: браузерный UTC для этого не годится (#109). */
+  today: string;
 }
 
 /** Онбординг не пройден: план собрать нельзя, но это не ошибка — нужен пустой экран с CTA. */
@@ -136,6 +138,8 @@ export function useMe() {
             workspace: null,
             onboardingComplete: false,
             onboardingSkipped: false,
+            // Гостю дату считаем в UTC: воркспейса с таймзоной у него ещё нет.
+            today: new Date().toISOString().slice(0, 10),
             role: null,
           };
         }

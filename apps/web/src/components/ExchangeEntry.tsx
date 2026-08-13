@@ -2,6 +2,7 @@ import { fromMajor } from '@multa/core';
 import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
+import { useToday } from '../lib/useToday.ts';
 import { useCreateExchange, useMe, useSettings } from '../lib/queries.ts';
 
 /**
@@ -9,8 +10,6 @@ import { useCreateExchange, useMe, useSettings } from '../lib/queries.ts';
  * «сколько я теряю на менялах» должно быть суммой, а не ощущением. Форма живёт отдельно от
  * экрана, потому что размен вводят из статистики, а раньше — с собственного экрана.
  */
-
-const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
 /** major-строка → minor или null (мусор молча не превращаем в ноль). */
 function parseMinor(value: string, ccy: string): string | null {
@@ -26,6 +25,7 @@ function parseMinor(value: string, ccy: string): string | null {
 
 export function ExchangeEntry() {
   const { t } = useI18n();
+  const today = useToday();
   const { data: me } = useMe();
   const base = me?.workspace?.baseCurrency ?? 'RUB';
   const create = useCreateExchange();
@@ -36,7 +36,7 @@ export function ExchangeEntry() {
   const [toCurrency, setToCurrency] = useState(base === 'RUB' ? 'RSD' : 'RUB');
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
-  const [occurredOn, setOccurredOn] = useState(todayISO());
+  const [occurredOn, setOccurredOn] = useState(today);
   const [provider, setProvider] = useState('');
   const providerHint = settings?.currency.defaultProvider ?? '';
   const [invalid, setInvalid] = useState(false);
@@ -110,7 +110,7 @@ export function ExchangeEntry() {
         <input
           className="field num"
           type="date"
-          max={todayISO()}
+          max={today}
           aria-label={t('spend.date')}
           value={occurredOn}
           onChange={(e) => setOccurredOn(e.target.value)}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterDemo, resetDemo } from './helpers.ts';
+import { API_URL, enterDemo, resetDemo } from './helpers.ts';
 
 /**
  * Рабочие флоу поверх демо: запись траты, тема и язык, защита форм от невалидного ввода
@@ -446,4 +446,21 @@ test('валюта из умного поля доезжает до записи
   await expect(
     sheet.locator('.list-item').filter({ hasText: 'flatwhite' }).filter({ hasText: 'EUR' }),
   ).toHaveCount(1, { timeout: 15_000 });
+});
+
+test('дата в форме ввода приходит с сервера, а не считается браузером (#109)', async ({ page }) => {
+  /*
+   * Фронт вычислял «сегодня» через toISOString() — это UTC, а сервер живёт по таймзоне воркспейса.
+   * Ночью они расходились на день, и трата уезжала во вчерашний день, а на стыке полумесяцев — в
+   * предыдущий период. Проверяем не расхождение (его не подстроить, не подменяя часы), а причину:
+   * поле берёт дату у сервера, поэтому расходиться больше нечему.
+   */
+  const me = await page.request
+    .get(`${API_URL}/v1/me`)
+    .then((r) => r.json() as Promise<{ today: string }>);
+
+  await page.locator('.act-primary').click();
+  const sheet = page.locator('.sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('input[type=date]').first()).toHaveValue(me.today);
 });

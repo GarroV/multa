@@ -5,6 +5,7 @@ import { useSheet } from '../lib/useSheet.ts';
 import { useVoiceCapture } from '../lib/useVoiceCapture.ts';
 import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { useI18n } from '../lib/i18n.tsx';
+import { useToday } from '../lib/useToday.ts';
 import { ApiError } from '../lib/api.ts';
 import {
   useCategories,
@@ -28,8 +29,6 @@ function parseMinor(value: string, ccy: string): string | null {
     return null;
   }
 }
-
-const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
 function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale: string }) {
   const { t } = useI18n();
@@ -100,9 +99,10 @@ export function SpendEntry({
    */
   const [currency, setCurrency] = useState(base);
   const voice = useVoiceCapture();
+  const today = useToday();
   const parseVoice = useParseVoice();
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
-  const [occurredOn, setOccurredOn] = useState(todayISO());
+  const [occurredOn, setOccurredOn] = useState(today);
   const [note, setNote] = useState('');
   const [badAmount, setBadAmount] = useState(false);
   const [smart, setSmart] = useState('');
@@ -140,7 +140,7 @@ export function SpendEntry({
     if (!line) return;
     const parsed = parseEntry(line, {
       baseCurrency: base,
-      today: todayISO(),
+      today: today,
       categories: categories.map((c) => c.name),
     });
     if (parsed.amountMinor === null) {
@@ -329,7 +329,7 @@ export function SpendEntry({
               className="field num"
               type="date"
               value={occurredOn}
-              max={todayISO()}
+              max={today}
               onChange={(e) => setOccurredOn(e.target.value)}
             />
           </div>

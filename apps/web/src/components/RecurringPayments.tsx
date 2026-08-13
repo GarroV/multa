@@ -3,6 +3,7 @@ import type { TranslationKey } from '@multa/i18n';
 import { Fragment, useState } from 'react';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { useToday } from '../lib/useToday.ts';
 import { RecurringMore } from './RecurringMore.tsx';
 import {
   useCreateRecurring,
@@ -64,8 +65,6 @@ const NTH_KEYS: Record<string, TranslationKey> = {
   '-1': 'rec.nth.last',
 };
 
-const todayISO = (): string => new Date().toISOString().slice(0, 10);
-
 /** major-строка → minor или null. Мусор молча в ноль не превращаем (правило ревью #20). */
 function parseMinor(value: string, ccy: string): string | null {
   const s = value.trim().replace(',', '.').replace(/[\s ]/g, '');
@@ -79,6 +78,7 @@ function parseMinor(value: string, ccy: string): string | null {
 
 export function RecurringPayments({ base }: { base: string }) {
   const { t, locale } = useI18n();
+  const today = useToday();
   const { data: items = [], isError, refetch } = useRecurringItems();
   const create = useCreateRecurring();
   const patch = usePatchRecurring();
@@ -86,7 +86,7 @@ export function RecurringPayments({ base }: { base: string }) {
 
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [firstOn, setFirstOn] = useState(todayISO());
+  const [firstOn, setFirstOn] = useState(today);
   const [ruleIndex, setRuleIndex] = useState(0);
   const [invalid, setInvalid] = useState(false);
   /* Срок и ступени нужны редко — прячем их за «…», чтобы строка осталась из сути. */
@@ -202,7 +202,7 @@ export function RecurringPayments({ base }: { base: string }) {
             aria-label={t('rec.firstOn')}
             value={firstOn}
             onChange={(e) => {
-              setFirstOn(e.target.value || todayISO());
+              setFirstOn(e.target.value || today);
               // Варианты повтора зависят от даты: старый выбор к новой дате уже не относится.
               setRuleIndex(0);
             }}
