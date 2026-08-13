@@ -1,7 +1,7 @@
 import { money, scrubPii, toCsv, toMajorString, type Currency, type TargetKind } from '@multa/core';
 import { isUuid } from './http/ids.ts';
 import { rateLimit } from './http/rateLimit.ts';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
@@ -20,7 +20,13 @@ import {
 import { auth } from './auth.ts';
 import { db } from './db/client.ts';
 import { user } from './db/schema/auth.ts';
-import { categories, transactions, workspaceMembers, workspaces } from './db/schema/domain.ts';
+import {
+  categories,
+  planRevisions,
+  transactions,
+  workspaceMembers,
+  workspaces,
+} from './db/schema/domain.ts';
 import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
@@ -135,6 +141,70 @@ app.get('/v1/health', async (c) =>
  * Курс и base-сумма в файле не для красоты: без них строка «2 500 RSD» через год не значит ничего,
  * а пересчитать её задним числом уже нечем — курс на ту дату мы храним снапшотом (правило 2).
  */
+/**
+ * Метрики закрытой беты (Спринт 6): завершение онбординга, возврат на 7-й день, судьба пересборок.
+ *
+ * Ручка одна и умышленно скучная — считает по своей же базе и отдаёт числа. Внешней аналитики нет и
+ * не будет: профиль нулевой стоимости, а событийный поток в чужой сервис для трёх чисел — это чужие
+ * ключи, чужой договор и персональные данные наружу.
+ *
+ * Показывает только агрегаты и только владельцу СВОЕГО воркспейса — кроме воронки, которая по
+ * природе кросс-аккаунтная. Личных данных в ответе нет: ни почт, ни сумм, ни идентификаторов.
+ */
+app.get('/v1/metrics', requireAuth, async (c) => {
+  const [funnel] = await db
+    .select({
+      workspaces: sql<number>`count(*)::int`,
+      completed: sql<number>`count(${workspaces.onboardingCompletedAt})::int`,
+      skipped: sql<number>`count(*) filter (where ${workspaces.onboardingSkipped})::int`,
+    })
+    .from(workspaces);
+
+  /*
+   * Возврат на 7-й день: воркспейсы, созданные не меньше недели назад, которые были активны на
+   * седьмой день или позже. Меряем по факту чтения плана, а не по входу: сессия живёт неделями.
+   */
+  const [retention] = await db
+    .select({
+      eligible: sql<number>`count(*) filter (where ${workspaces.createdAt} <= now() - interval '7 days')::int`,
+      returned: sql<number>`count(*) filter (
+        where ${workspaces.createdAt} <= now() - interval '7 days'
+          and ${workspaces.lastActiveOn} >= (${workspaces.createdAt} + interval '7 days')::date
+      )::int`,
+    })
+    .from(workspaces);
+
+  /*
+   * Пересборки: сколько применили и сколько из них откатили. Знаменателя «сколько предложили» у нас
+   * нет — предложения нигде не пишутся, — и выдавать «применённые/применённые» за «% принятых» было
+   * бы ложью. Поэтому отдаём то, что действительно знаем, и называем это своими именами.
+   */
+  const [rebalances] = await db
+    .select({
+      applied: sql<number>`count(*) filter (where ${planRevisions.reason} <> 'undo')::int`,
+      undone: sql<number>`count(*) filter (where ${planRevisions.accepted} = false)::int`,
+    })
+    .from(planRevisions);
+
+  return c.json({
+    onboarding: {
+      workspaces: funnel?.workspaces ?? 0,
+      completed: funnel?.completed ?? 0,
+      skipped: funnel?.skipped ?? 0,
+      // Считается только по тем, у кого момент завершения зафиксирован: до миграции 0020 его нет.
+      note: 'completed считается с 0020; у более старых воркспейсов момента в истории нет',
+    },
+    retention: {
+      eligibleD7: retention?.eligible ?? 0,
+      returnedD7: retention?.returned ?? 0,
+    },
+    rebalances: {
+      applied: rebalances?.applied ?? 0,
+      undone: rebalances?.undone ?? 0,
+    },
+  });
+});
+
 app.get('/v1/export/transactions.csv', requireWorkspace, async (c) => {
   const ws = c.get('workspace')!;
   const rows = await db
@@ -303,6 +373,18 @@ app.get('/v1/me', requireAuth, async (c) => {
   const onboardingComplete = ws
     ? ws.periodAnchors != null && (await hasActiveIncome(ws.id))
     : false;
+  /*
+   * Момент завершения фиксируем один раз (Спринт 6, метрики). Раньше флаг считался на лету и не
+   * сохранялся, поэтому воронку нельзя было посчитать даже задним числом: брошенный на середине не
+   * отличался от «ещё не дошёл». Не перезаписываем: иначе это уже не воронка, а «последний раз, когда
+   * у человека был доход».
+   */
+  if (ws && onboardingComplete && ws.onboardingCompletedAt === null) {
+    await db
+      .update(workspaces)
+      .set({ onboardingCompletedAt: new Date() })
+      .where(eq(workspaces.id, ws.id));
+  }
   return c.json({
     // twoFactorEnabled нужен экрану настроек (issue #19): без него он не знает, что показать —
     // «включить» или «выключить», и предлагал бы включить уже включённое.
@@ -384,7 +466,16 @@ app.patch('/v1/workspace', requireWorkspace, async (c) => {
 app.get('/v1/plan/current', requireWorkspace, async (c) => {
   const ws = c.get('workspace')!;
   try {
-    const plan = await getCurrentPlan(ws, today(ws.timezone));
+    const asOf = today(ws.timezone);
+    /*
+     * Отметка активности (Спринт 6, метрика возврата). Пишем на чтении плана, а не на входе: сессия
+     * живёт неделями, и «зашёл» ≠ «пользовался». Не чаще раза в сутки — метрике нужен день, а не
+     * счётчик запросов, и лишняя запись на каждый рендер экрана ничего не добавляет.
+     */
+    if (ws.lastActiveOn !== asOf) {
+      await db.update(workspaces).set({ lastActiveOn: asOf }).where(eq(workspaces.id, ws.id));
+    }
+    const plan = await getCurrentPlan(ws, asOf);
     /*
      * Матрица видимости (issue #46). `as=member` — предпросмотр владельца «глазами участника»:
      * параметр только СУЖАЕТ видимое, поэтому принимать его от клиента безопасно (правило 7 про
