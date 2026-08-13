@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.tsx';
 import { draftToPatch, sourceToDraft, type SourceDraft } from '../lib/income.ts';
 import { usePatchIncomeSource, type IncomeSourceDto } from '../lib/queries.ts';
 import { Hint } from './ui/Hint.tsx';
+import { Select } from './ui/Select.tsx';
 import { weekdayName } from './IncomeEditor.tsx';
 
 /**
@@ -68,45 +69,50 @@ export function IncomeSourceEdit({
             />
             {!nameOnly && (
               <>
-                <select
-                  className="field field-sm"
-                  aria-label={t('income.kind.legend')}
+                <Select
+                  className="field field-choice"
+                  label={t('income.kind.legend')}
                   value={draft.kind}
-                  onChange={(e) =>
-                    setDraft({ ...draft, kind: e.target.value as SourceDraft['kind'] })
-                  }
-                >
-                  <option value="monthly">{t('income.kind.monthly')}</option>
-                  <option value="weekly">{t('income.kind.weekly')}</option>
-                  <option value="daily">{t('income.kind.daily')}</option>
-                </select>
-                {/* Ежедневному доходу день не нужен: поле, которое ни на что не влияет, только врёт. */}
-                {draft.kind === 'monthly' && (
-                  <input
-                    className="field num field-ccy"
-                    inputMode="numeric"
-                    aria-label={t('income.amounts.day')}
-                    value={draft.day}
-                    onChange={(e) => {
-                      const n = Number(e.target.value.replace(/\D/g, ''));
-                      setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
-                    }}
-                  />
-                )}
-                {draft.kind === 'weekly' && (
-                  <select
-                    className="field field-sm"
-                    aria-label={t('income.kind.weekday')}
-                    value={draft.weekday}
-                    onChange={(e) => setDraft({ ...draft, weekday: Number(e.target.value) })}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-                      <option value={d} key={d}>
-                        {weekdayName(d, locale)}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                  onChange={(next) => setDraft({ ...draft, kind: next as SourceDraft['kind'] })}
+                  options={[
+                    { value: 'monthly', label: t('income.kind.monthly') },
+                    { value: 'weekly', label: t('income.kind.weekly') },
+                    { value: 'daily', label: t('income.kind.daily') },
+                  ]}
+                />
+                {/*
+                  Слот под уточнение ритма имеет постоянную ширину (жалоба владельца 13.08.2026:
+                  «положение контекстного окна прыгает»). Раньше поле «число» появлялось и исчезало вместе
+                  с видом ритма, строка перестраивалась, и выпадашка каждый раз оказывалась в новом месте.
+                  Пустой слот в состоянии «каждый день» — не декорация, а обещание, что ряд не поедет.
+                */}
+                <span className="slot-rhythm">
+                  {/* Ежедневному доходу день не нужен: поле, которое ни на что не влияет, только врёт. */}
+                  {draft.kind === 'monthly' && (
+                    <input
+                      className="field num field-ccy"
+                      inputMode="numeric"
+                      aria-label={t('income.amounts.day')}
+                      value={draft.day}
+                      onChange={(e) => {
+                        const n = Number(e.target.value.replace(/\D/g, ''));
+                        setDraft({ ...draft, day: n >= 1 && n <= 31 ? n : draft.day });
+                      }}
+                    />
+                  )}
+                  {draft.kind === 'weekly' && (
+                    <Select
+                      className="field field-sm"
+                      label={t('income.kind.weekday')}
+                      value={String(draft.weekday)}
+                      onChange={(next) => setDraft({ ...draft, weekday: Number(next) })}
+                      options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({
+                        value: String(d),
+                        label: weekdayName(d, locale),
+                      }))}
+                    />
+                  )}
+                </span>
                 <input
                   className="field num field-sm"
                   inputMode="decimal"

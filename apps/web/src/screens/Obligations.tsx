@@ -11,6 +11,7 @@ import { ObligationEdit } from '../components/ObligationEdit.tsx';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useToday } from '../lib/useToday.ts';
+import { Select } from '../components/ui/Select.tsx';
 
 import {
   useAccounts,
@@ -199,18 +200,16 @@ function AccountsSection({ base }: SectionProps) {
             />
           </div>
           <div className="form-row">
-            <select
-              className="field"
-              aria-label={t('acc.title')}
+            <Select
+              className="field field-choice"
+              label={t('acc.title')}
               value={kind}
-              onChange={(e) => setKind(e.target.value as typeof kind)}
-            >
-              {(['cash', 'card', 'savings', 'other'] as const).map((k) => (
-                <option key={k} value={k}>
-                  {t(`acc.kind.${k}`)}
-                </option>
-              ))}
-            </select>
+              onChange={(next) => setKind(next as typeof kind)}
+              options={(['cash', 'card', 'savings', 'other'] as const).map((k) => ({
+                value: k,
+                label: t(`acc.kind.${k}`),
+              }))}
+            />
             <input
               className="field mono field-sm"
               inputMode="decimal"
@@ -597,15 +596,16 @@ function EnvelopesSection({ base }: SectionProps) {
             />
           </div>
           <div className="form-row">
-            <select
-              className="field"
-              aria-label={t('obl.rule.fixed')}
+            <Select
+              className="field field-choice"
+              label={t('obl.rule.fixed')}
               value={ruleKind}
-              onChange={(ev) => setRuleKind(ev.target.value as 'fixed' | 'percent')}
-            >
-              <option value="fixed">{t('obl.rule.fixed')}</option>
-              <option value="percent">{t('obl.rule.percent')}</option>
-            </select>
+              onChange={(next) => setRuleKind(next as 'fixed' | 'percent')}
+              options={[
+                { value: 'fixed', label: t('obl.rule.fixed') },
+                { value: 'percent', label: t('obl.rule.percent') },
+              ]}
+            />
             <input
               className="field mono field-sm"
               inputMode="decimal"

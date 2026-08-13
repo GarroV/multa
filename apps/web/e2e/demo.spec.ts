@@ -143,12 +143,14 @@ test('регулярные платежи управляются из интер
   await expect(panel.locator('.tag', { hasText: 'EVERY PAYDAY' })).toHaveCount(1);
 
   await panel.getByLabel('First time').fill('2026-09-29');
-  const repeat = panel.getByLabel('Repeat');
-  // «Пятого вторника» как правила не существует: пятая неделя предлагается как «последняя».
-  await expect(repeat.locator('option')).toContainText([
-    'day 29 of the month',
-    'last Tuesday of the month',
-  ]);
+  /*
+   * Выпадашка теперь своя (нативный select заменён — его список рисовала ОС), поэтому варианты
+   * лежат не в <option>, а в открытом списке. Смысл проверки тот же: «пятого вторника» как правила
+   * не существует, пятая неделя предлагается как «последняя».
+   */
+  await panel.getByRole('button', { name: 'Repeat' }).click();
+  const options = page.locator('.sel-list [role=option]');
+  await expect(options).toContainText(['day 29 of the month', 'last Tuesday of the month']);
 });
 
 test('сигналы приходят сущностями и у каждого есть действие', async ({ page }) => {

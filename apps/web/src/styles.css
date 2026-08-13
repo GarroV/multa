@@ -2404,3 +2404,120 @@ a {
   font-size: 15px;
   color: var(--ink);
 }
+
+/*
+ * Свой выпадающий список вместо нативного (жалоба владельца 13.08.2026).
+ *
+ * Кнопка выглядит как поле рядом — иначе в строке формы один элемент читался бы «нажимаемым», а
+ * соседний нет, хотя оба про ввод. Цифры и подписи набраны тем же шрифтом, что вся таблица: чужая
+ * системная гарнитура и была главной причиной «смотрится как справка от системы».
+ */
+.sel-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sel-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sel-caret {
+  flex: none;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.sel-trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
+}
+
+/* Подложка невидима, но обязана перекрывать всё: иначе клик мимо списка попадёт в интерфейс. */
+.sel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.sel-list {
+  position: fixed;
+  z-index: 61;
+  max-height: 264px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--panel2);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+
+.sel-list:focus {
+  outline: none;
+}
+
+.sel-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--text-hi);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * Подсветка — тонкой заливкой акцента, а не системным синим: выбранная строка должна читаться как
+ * часть этого продукта. Текст остаётся светлым, поэтому контраст не зависит от насыщенности заливки.
+ */
+.sel-item.is-active {
+  background: var(--accent-quiet);
+}
+
+.sel-item[aria-selected='true'] {
+  color: var(--accent);
+}
+
+/* Отметка выбранного — точкой, а не галочкой: галочка в плотной строке шумит сильнее, чем помогает. */
+.sel-check {
+  width: 8px;
+  flex: none;
+  color: var(--accent);
+}
+
+/*
+ * Слот под уточнение ритма: «число месяца» для месячного, день недели для недельного, пусто для
+ * ежедневного. Ширина постоянная во всех трёх состояниях — иначе строка перестраивается при
+ * переключении и соседние поля (вместе с открытой выпадашкой) уезжают в новое место.
+ */
+.slot-rhythm {
+  display: inline-flex;
+  flex: none;
+  width: 120px;
+  min-width: 0;
+}
+
+.slot-rhythm > * {
+  width: 100%;
+}
+
+/*
+ * Ширина под выбор ритма. `field-sm` не годится: он рассчитан на числа — 120px и выравнивание по
+ * правому краю, из-за чего «Число месяца» обрезалось в «Число мес…». Подпись выпадашки читают
+ * целиком, иначе выбор приходится угадывать.
+ */
+.field-choice {
+  width: 156px;
+  text-align: left;
+}

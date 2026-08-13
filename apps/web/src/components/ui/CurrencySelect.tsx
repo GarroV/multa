@@ -1,4 +1,5 @@
 import { useSettings } from '../../lib/queries.ts';
+import { Select } from './Select.tsx';
 
 /**
  * Выбор валюты списком вместо ввода трёх букв руками (решение владельца 06.08.2026).
@@ -41,17 +42,12 @@ export function CurrencySelect({
   const options = list.includes(value) ? list : [value, ...list].filter(Boolean);
 
   return (
-    <select
+    <Select
       className={className}
-      aria-label={label}
+      label={label}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {options.map((code) => (
-        <option value={code} key={code}>
-          {code}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options.map((code) => ({ value: code, label: code }))}
+    />
   );
 }

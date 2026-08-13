@@ -8,6 +8,7 @@ import { RhythmPicker } from '../components/RhythmPicker.tsx';
 import { api } from '../lib/api.ts';
 import { useToday } from '../lib/useToday.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { Select } from '../components/ui/Select.tsx';
 import {
   formatPayday,
   onboardingIncome,
@@ -151,18 +152,16 @@ function IncomeStep({ base, onDone }: { base: string; onDone: () => void }) {
               onChange={(e) => setOneOff({ ...oneOff, label: e.target.value })}
             />
             {mode === 'weekly' && (
-              <select
+              <Select
                 className="field field-sm"
-                aria-label={t('income.kind.weekday')}
-                value={oneOff.weekday}
-                onChange={(e) => setOneOff({ ...oneOff, weekday: Number(e.target.value) })}
-              >
-                {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-                  <option value={d} key={d}>
-                    {weekdayName(d, locale)}
-                  </option>
-                ))}
-              </select>
+                label={t('income.kind.weekday')}
+                value={String(oneOff.weekday)}
+                onChange={(next) => setOneOff({ ...oneOff, weekday: Number(next) })}
+                options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({
+                  value: String(d),
+                  label: weekdayName(d, locale),
+                }))}
+              />
             )}
             <input
               className="field num field-sm"

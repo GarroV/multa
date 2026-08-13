@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api.ts';
 import { Panel, Tag } from './ui/Panel.tsx';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { Select } from './ui/Select.tsx';
 import {
   useImportBatches,
   useImportCommit,
@@ -122,31 +123,26 @@ export function ImportExcel({ base }: { base: string }) {
         <div className="prow">
           <span className="prow-day" aria-hidden />
           <span className="prow-name">
-            <select
-              className="field"
-              aria-label={t('imp.sheet')}
+            <Select
+              className="field field-choice"
+              label={t('imp.sheet')}
               value={sheet}
-              onChange={(e) => setSheet(e.target.value)}
-            >
-              {(shown?.sheets ?? []).map((s) => (
-                <option key={s.name} value={s.name}>
-                  {s.name} ({s.rows})
-                </option>
-              ))}
-            </select>
-            <select
-              className="field"
-              aria-label={t('imp.dictSheet')}
+              onChange={setSheet}
+              options={(shown?.sheets ?? []).map((s) => ({
+                value: s.name,
+                label: `${s.name} (${s.rows})`,
+              }))}
+            />
+            <Select
+              className="field field-choice"
+              label={t('imp.dictSheet')}
               value={dictionarySheet}
-              onChange={(e) => setDictionarySheet(e.target.value)}
-            >
-              <option value="">—</option>
-              {(shown?.sheets ?? []).map((s) => (
-                <option key={s.name} value={s.name}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              onChange={setDictionarySheet}
+              options={[
+                { value: '', label: '—' },
+                ...(shown?.sheets ?? []).map((s) => ({ value: s.name, label: s.name })),
+              ]}
+            />
           </span>
           <span className="prow-num" />
           <button type="button" className="act" disabled={preview.isPending} onClick={look}>

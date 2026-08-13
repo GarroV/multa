@@ -13,6 +13,7 @@ import {
   type RecurringItemDto,
 } from '../lib/queries.ts';
 import { Panel, Tag } from './ui/Panel.tsx';
+import { Select } from './ui/Select.tsx';
 
 /**
  * Регулярные платежи (issues #21, #55) — подписки, аренда, страховка: то, что иначе приходится
@@ -207,18 +208,13 @@ export function RecurringPayments({ base }: { base: string }) {
               setRuleIndex(0);
             }}
           />
-          <select
+          <Select
             className="field grow"
-            aria-label={t('rec.repeat')}
-            value={ruleIndex}
-            onChange={(e) => setRuleIndex(Number(e.target.value))}
-          >
-            {rules.map((rule, i) => (
-              <option key={rule.kind + i} value={i}>
-                {ruleLabel(rule)}
-              </option>
-            ))}
-          </select>
+            label={t('rec.repeat')}
+            value={String(ruleIndex)}
+            onChange={(next) => setRuleIndex(Number(next))}
+            options={rules.map((rule, i) => ({ value: String(i), label: ruleLabel(rule) }))}
+          />
           <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
             {create.isPending ? t('common.loading') : t('rec.add')}
           </button>

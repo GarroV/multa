@@ -433,7 +433,8 @@ test('валюта из умного поля доезжает до записи
   await smart.blur();
 
   // Разбор раскладывает поля формы — валюта обязана встать вместе с суммой.
-  await expect(sheet.locator('select').filter({ hasText: 'EUR' }).first()).toHaveValue('EUR', {
+  // Выпадашка теперь своя (нативный select заменён), значит смотрим на подпись кнопки.
+  await expect(sheet.locator('.sel-trigger').filter({ hasText: 'EUR' }).first()).toBeVisible({
     timeout: 10_000,
   });
 
