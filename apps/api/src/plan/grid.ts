@@ -16,7 +16,7 @@ import {
   type TargetKind,
   type WeekendRule,
 } from '@multa/core';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
 import {
   categories,
@@ -24,6 +24,8 @@ import {
   debts,
   envelopes,
   goals,
+  payPeriods,
+  plannedItems,
   recurringItems,
 } from '../db/schema/domain.ts';
 import { getRate } from '../fx/service.ts';
@@ -115,6 +117,39 @@ const keyOf = (kind: TargetKind, id: string): string => `${kind}:${id}`;
 
 /** Целая часть numeric-строки как minor units. Та же семантика, что в сборке плана. */
 const numericToMinor = (value: string): bigint => BigInt(value.trim().split('.')[0] || '0');
+
+/**
+ * Бюджеты категорий, заданные на конкретные периоды горизонта.
+ *
+ * Ключ — «дата начала периода : id категории»: сетка знает периоды по датам (их же она отдаёт в
+ * колонках), а не по внутренним id, и склеивать одно с другим в вызывающем коде значило бы завести
+ * там вторую арифметику периодов.
+ *
+ * Берём только материализованные периоды: у остальных плана и быть не может, а запрос по всем
+ * датам горизонта ничего бы не нашёл.
+ */
+async function plannedByPeriod(
+  workspaceId: string,
+  periods: readonly PayPeriod[],
+): Promise<Map<string, bigint>> {
+  const starts = periods.map((p) => p.startsOn);
+  const rows = await db
+    .select({
+      startsOn: payPeriods.startsOn,
+      targetId: plannedItems.targetId,
+      plannedMinor: plannedItems.plannedMinor,
+    })
+    .from(plannedItems)
+    .innerJoin(payPeriods, eq(payPeriods.id, plannedItems.periodId))
+    .where(
+      and(
+        eq(plannedItems.workspaceId, workspaceId),
+        eq(plannedItems.targetKind, 'category'),
+        inArray(payPeriods.startsOn, starts),
+      ),
+    );
+  return new Map(rows.map((r) => [`${r.startsOn}:${r.targetId}`, r.plannedMinor]));
+}
 
 export async function getPlanGrid(
   ws: Workspace,
@@ -250,15 +285,30 @@ export async function getPlanGrid(
       .filter((a) => a.targetKind === 'category')
       .map((a) => [a.targetId, BigInt(a.plannedMinor)]),
   );
+
+  /*
+   * Бюджеты, заданные на конкретные будущие периоды (правка ячейки сетки, 13.08.2026).
+   *
+   * Раньше вперёд тянулся один и тот же бюджет текущего периода, и запись в будущий столбец не
+   * влияла ни на что: правка молча пропадала. Теперь там, где для периода есть свой planned_item,
+   * берётся он, а где нет — по-прежнему бюджет текущего периода.
+   */
+  const futurePlans = await plannedByPeriod(ws.id, periods);
+
   for (const c of categoryRows) {
     const planned = categoryPlan.get(c.id) ?? 0n;
-    if (planned <= 0n) continue;
+    const byIndex = periods.map((p: PayPeriod, i: number) =>
+      i === 0 ? planned : (futurePlans.get(`${p.startsOn}:${c.id}`) ?? planned),
+    );
+    // Строки нет, только если её нет ни в одном периоде: иначе бюджет на май пропал бы из таблицы.
+    if (byIndex.every((v: bigint) => v <= 0n)) continue;
     rows.push({
       targetKind: 'category',
       targetId: c.id,
       name: c.name,
       sourceCurrency: base,
       perPeriodMinor: planned,
+      perPeriodByIndex: byIndex,
       ...(c.protected ? { protected: true } : {}),
     });
   }

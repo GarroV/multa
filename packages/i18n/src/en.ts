@@ -293,6 +293,8 @@ export const en = {
   'plan.master.free': 'Free remainder',
   'plan.master.perDay': 'Per day',
   'plan.master.toExchange': 'To exchange',
+  'plan.master.editCell': 'Budget for this period — click to change',
+  'plan.master.editFrom': 'From this date onward — click to change',
   'plan.master.ended': 'line has ended: nothing left to pay',
   'plan.master.noRate': 'No rate for today, so out of the table: {list}',
   'plan.master.hint':

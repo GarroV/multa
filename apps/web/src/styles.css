@@ -2521,3 +2521,50 @@ a {
   width: 156px;
   text-align: left;
 }
+
+/*
+ * Правка ячейки в таблице (запрос владельца 13.08.2026). Кнопка выглядит как обычная ячейка — рамка
+ * появляется только при наведении и фокусе: если бы каждая правимая ячейка всё время была обведена,
+ * таблица из плотной сетки чисел превратилась бы в поле кнопок.
+ */
+.mgrid-cell-btn {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: text;
+  text-align: right;
+}
+
+.mgrid-cell-btn:hover {
+  border-color: var(--line-strong);
+}
+
+.mgrid-cell-btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
+}
+
+.mgrid-cell-edit {
+  padding: 0;
+}
+
+/* Поле повторяет геометрию ячейки: иначе строка дёргается в момент, когда в неё начали вводить. */
+.mgrid-input {
+  width: 100%;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-hi);
+  background: var(--bg-void);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.mgrid-input:focus {
+  outline: none;
+}

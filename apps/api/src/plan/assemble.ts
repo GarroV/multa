@@ -1088,6 +1088,134 @@ export async function getCurrentPlan(ws: Workspace, asOf: string): Promise<PlanD
  * (0 = «без бюджета»). Проверяет принадлежность категории workspace (изоляция, правило 7).
  * Возвращает пересобранный план текущего периода.
  */
+/**
+ * Правка ячейки мастер-сетки (запрос владельца 13.08.2026: «в режиме таблицы должна быть возможность
+ * редактировать поля, и чтобы оттуда шло распределение обратно»).
+ *
+ * В сетке смешаны числа двух разных природ, и делать вид, что они одинаковы, нельзя:
+ *
+ * - **бюджет категории** живёт на периоде (`planned_items`) — правка меняет ОДИН столбец;
+ * - **платёж долга, правило конверта, взнос в цель** живут на самой сущности — правка означает «с
+ *   этой даты и далее столько», то есть ступень суммы (`amountSteps`). Иначе человек поправил бы
+ *   декабрь и не понял, почему поехал март.
+ *
+ * Прошлые периоды не правятся: план закрытого периода — история, а не черновик.
+ */
+/**
+ * Ступень суммы обязательства с указанной даты (или правка базовой суммы для текущего периода).
+ *
+ * Одна функция на долг, конверт и цель: у них разные колонки суммы, но одно правило — «с этой даты
+ * платить столько». Держать три почти одинаковые ветки в вызывающем коде значило бы гарантированно
+ * разойтись в одной из них.
+ */
+async function setObligationAmountFrom(
+  ws: Workspace,
+  cell: { targetKind: TargetKind; targetId: string; startsOn: string; plannedMinor: bigint },
+  isCurrent: boolean,
+): Promise<void> {
+  const table =
+    cell.targetKind === 'debt'
+      ? debts
+      : cell.targetKind === 'envelope'
+        ? envelopes
+        : cell.targetKind === 'goal'
+          ? goals
+          : null;
+  if (!table) throw new Error('cell_not_editable');
+
+  const rows = await db
+    .select()
+    .from(table)
+    .where(and(eq(table.id, cell.targetId), eq(table.workspaceId, ws.id)))
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw new Error('target_not_found');
+
+  if (isCurrent) {
+    // Базовая сумма: для долга это платёж, для конверта — значение правила, для цели — взнос.
+    const patch =
+      cell.targetKind === 'debt'
+        ? { paymentMinor: cell.plannedMinor }
+        : cell.targetKind === 'envelope'
+          ? { ruleValue: cell.plannedMinor.toString() }
+          : { plannedPerPeriodMinor: cell.plannedMinor };
+    await db
+      .update(table)
+      .set(patch as never)
+      .where(eq(table.id, cell.targetId));
+    return;
+  }
+
+  const steps = parseAmountSteps((row as { amountSteps?: unknown }).amountSteps).filter(
+    (s) => s.from !== cell.startsOn,
+  );
+  const next = [...steps, { from: cell.startsOn, amountMinor: cell.plannedMinor }]
+    .sort((a, b) => (a.from < b.from ? -1 : 1))
+    .map((s) => ({ from: s.from, amountMinor: s.amountMinor.toString() }));
+  await db
+    .update(table)
+    .set({ amountSteps: next } as never)
+    .where(eq(table.id, cell.targetId));
+}
+
+export async function setGridCell(
+  ws: Workspace,
+  asOf: string,
+  cell: { targetKind: TargetKind; targetId: string; startsOn: string; plannedMinor: bigint },
+): Promise<void> {
+  const current = currentPeriod(ws, asOf);
+  if (cell.startsOn < current.startsOn) throw new Error('period_is_past');
+
+  if (cell.targetKind === 'category') {
+    const owned = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.id, cell.targetId), eq(categories.workspaceId, ws.id)))
+      .limit(1);
+    if (!owned[0]) throw new Error('category_not_found');
+
+    const period = periodForDate(ws.periodAnchors as PeriodConfig, cell.startsOn);
+    const sources = await activeSources(ws);
+    const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+    const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
+
+    if (cell.plannedMinor <= 0n) {
+      await db
+        .delete(plannedItems)
+        .where(
+          and(
+            eq(plannedItems.periodId, periodId),
+            eq(plannedItems.targetKind, 'category'),
+            eq(plannedItems.targetId, cell.targetId),
+          ),
+        );
+      return;
+    }
+    await db
+      .insert(plannedItems)
+      .values({
+        workspaceId: ws.id,
+        periodId,
+        targetKind: 'category',
+        targetId: cell.targetId,
+        plannedMinor: cell.plannedMinor,
+        executionStatus: 'n_a',
+      })
+      .onConflictDoUpdate({
+        target: [plannedItems.periodId, plannedItems.targetKind, plannedItems.targetId],
+        set: { plannedMinor: sql`excluded.planned_minor` },
+      });
+    return;
+  }
+
+  /*
+   * Обязательства: ступень суммы с даты периода. В текущем периоде правим базовую сумму — ступень
+   * «с сегодня» была бы тем же числом, но лишней строкой в списке ступеней, которую человек потом
+   * увидит и не поймёт, откуда она.
+   */
+  await setObligationAmountFrom(ws, cell, cell.startsOn === current.startsOn);
+}
+
 export async function setCategoryBudget(
   ws: Workspace,
   asOf: string,

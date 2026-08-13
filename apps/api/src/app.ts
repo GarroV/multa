@@ -11,6 +11,7 @@ import {
   createWorkspaceSchema,
   patchWorkspaceSchema,
   executionSchema,
+  gridCellSchema,
   planGridQuerySchema,
   rateQuerySchema,
   rebalanceApplySchema,
@@ -33,6 +34,7 @@ import { hasActiveIncome } from './income/store.ts';
 import { logger } from './logger.ts';
 import {
   requireAuth,
+  requireOwner,
   requireWorkspace,
   sessionMiddleware,
   type AppVariables,
@@ -55,6 +57,7 @@ import {
   setExecution,
 } from './plan/assemble.ts';
 import { getPlanGrid } from './plan/grid.ts';
+import { setGridCell } from './plan/assemble.ts';
 import { applySharing } from './plan/sharing.ts';
 import { categoriesRoute, seedPresetCategories } from './routes/categories.ts';
 import { patchSettings, settingsOf } from './settings/store.ts';
@@ -506,6 +509,34 @@ app.get('/v1/plan/grid', requireWorkspace, async (c) => {
     if (err instanceof Error && err.message === 'onboarding_incomplete') {
       return c.json({ error: 'onboarding_incomplete' }, 409);
     }
+    throw err;
+  }
+});
+
+/**
+ * Правка ячейки мастер-сетки (запрос владельца 13.08.2026).
+ *
+ * Отвечает пересобранной СЕТКОЙ, а не «ок»: правка одной ячейки меняет весь столбец через каскад —
+ * сжатие, свободные деньги, итоги, — а у долга ещё и все столбцы правее. Отдать успех и заставить
+ * клиента перезапросить значило бы оставить кадр, где числа на экране не сходятся между собой.
+ */
+app.put('/v1/plan/grid/cell', requireWorkspace, requireOwner, async (c) => {
+  const ws = c.get('workspace')!;
+  const cell = gridCellSchema.parse(await c.req.json());
+  const { periods } = planGridQuerySchema.parse(c.req.query());
+  const asOf = today(ws.timezone);
+  try {
+    await setGridCell(ws, asOf, cell);
+    return c.json(await getPlanGrid(ws, asOf, periods));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    // Разные отказы — разные коды: «в прошлое нельзя» это не «не найдено».
+    if (message === 'period_is_past') return c.json({ error: 'period_is_past' }, 422);
+    if (message === 'cell_not_editable') return c.json({ error: 'cell_not_editable' }, 422);
+    if (message === 'category_not_found' || message === 'target_not_found') {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    if (message === 'onboarding_incomplete') return c.json({ error: 'onboarding_incomplete' }, 409);
     throw err;
   }
 });

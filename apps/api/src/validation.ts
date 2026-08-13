@@ -477,6 +477,17 @@ export const voiceEntrySchema = z.object({
     .refine((v) => v.startsWith('data:audio/'), 'ожидается data:audio/...'),
 });
 
+/**
+ * Правка ячейки мастер-сетки. Период задаётся датой начала — той же, что сетка отдаёт в колонках:
+ * так клиент не изобретает собственную арифметику периодов и не может разойтись с сервером.
+ */
+export const gridCellSchema = z.object({
+  targetKind: z.enum(['category', 'debt', 'envelope', 'goal']),
+  targetId: z.string().uuid(),
+  startsOn: isoDate,
+  plannedMinor: minor,
+});
+
 /** Запрос вариантов пересборки: какой строке и сколько нужно добавить. */
 export const rebalanceQuerySchema = z.object({
   targetId: z.string().uuid(),

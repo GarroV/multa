@@ -811,6 +811,38 @@ export function usePlanGrid(periods: number, enabled = true) {
   });
 }
 
+/**
+ * Правка ячейки мастер-сетки (запрос владельца 13.08.2026).
+ *
+ * Ответ сервера — пересобранная сетка, и мы кладём её в кэш вместо инвалидации: правка одной ячейки
+ * меняет весь столбец каскадом, а у долга и все столбцы правее. Инвалидация оставила бы кадр со
+ * старыми числами рядом с новым — ровно то, из-за чего таблице перестают верить.
+ */
+export function useEditGridCell(periods: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cell: {
+      targetKind: string;
+      targetId: string;
+      startsOn: string;
+      plannedMinor: string;
+    }) =>
+      api<PlanGridDto>(`/v1/plan/grid/cell?periods=${periods}`, {
+        method: 'PUT',
+        body: JSON.stringify(cell),
+      }),
+    onSuccess: (grid) => {
+      qc.setQueryData(['plan', 'grid', periods], grid);
+      /*
+       * План периода тоже поменялся: бюджет категории на текущий период — это он же. Инвалидируем
+       * по префиксу, но ПОСЛЕ setQueryData — иначе сетка перезапросилась бы и на миг показала
+       * старые числа, хотя ответ с новыми уже пришёл.
+       */
+      void qc.invalidateQueries({ queryKey: ['plan'], predicate: (q) => q.queryKey[1] !== 'grid' });
+    },
+  });
+}
+
 // --- Сравнение провайдеров размена (issue #53) ---
 
 export interface ProviderStatsDto {

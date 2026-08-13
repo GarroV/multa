@@ -291,6 +291,8 @@ export const ru: Record<TranslationKey, string> = {
   'plan.master.free': 'Свободный остаток',
   'plan.master.perDay': 'На день',
   'plan.master.toExchange': 'К размену',
+  'plan.master.editCell': 'Бюджет этого периода — нажми, чтобы поправить',
+  'plan.master.editFrom': 'С этой даты и далее — нажми, чтобы поправить',
   'plan.master.ended': 'строка кончилась: платить больше нечего',
   'plan.master.noRate': 'Без курса на сегодня и потому вне таблицы: {list}',
   'plan.master.hint':

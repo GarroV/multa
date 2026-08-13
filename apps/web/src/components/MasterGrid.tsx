@@ -1,9 +1,16 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
+import { fromMajor, money, toMajorString } from '@multa/core';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { usePlanGrid, type GridCellDto, type GridGroupDto } from '../lib/queries.ts';
+import {
+  useEditGridCell,
+  usePlanGrid,
+  type GridCellDto,
+  type GridGroupDto,
+} from '../lib/queries.ts';
 import { IconPlus } from './ui/icons.tsx';
+import { useIsMember } from '../lib/role.ts';
 import { isSectionVisible } from '../lib/sections.ts';
 
 /**
@@ -42,6 +49,14 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
   const { data, isPending, isError, refetch } = usePlanGrid(periods);
   /* Сложенные разделы: состояние экрана, не домена, поэтому живёт здесь и не уезжает на сервер. */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  /*
+   * Хуки правки — здесь, до ранних return. Первая версия ставила их ниже, после «загружается» и
+   * «ошибка», и React падал с «rendered more hooks than during the previous render»: на первом
+   * рендере с данными хуков становилось больше, чем на рендере загрузки. Экран уходил в белый лист.
+   */
+  const [editing, setEditing] = useState<string | null>(null);
+  const edit = useEditGridCell(periods);
+  const isMember = useIsMember();
 
   if (isPending) return <div className="mgrid-note">{t('common.loading')}</div>;
   if (isError || !data) {
@@ -56,6 +71,33 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
   }
 
   const base = data.baseCurrency;
+
+  /**
+   * Записывает правку. Пустое поле и ноль означают «нет плана» — это не ошибка ввода, а способ
+   * убрать строку из периода, поэтому нуль отправляется как есть, а мусор молча не отправляется.
+   */
+  const commit = (row: { targetKind: string; targetId: string }, startsOn: string, raw: string) => {
+    setEditing(null);
+    const text = raw.trim().replace(',', '.');
+    let minor: bigint;
+    if (text === '') {
+      minor = 0n;
+    } else {
+      try {
+        minor = fromMajor(text, base).minor;
+      } catch {
+        // Мусор не отправляем и не ругаемся: человек нажал Esc мимо или начал вводить и передумал.
+        return;
+      }
+    }
+    edit.mutate({
+      targetKind: row.targetKind,
+      targetId: row.targetId,
+      startsOn,
+      plannedMinor: minor.toString(),
+    });
+  };
+
   const fmt = (minor: string) => formatMinor(minor, base, locale);
   const columns = data.periods.length;
 
@@ -69,6 +111,69 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
       {c.state === 'planned' ? fmt(c.minor) : '—'}
     </span>
   );
+
+  /**
+   * Ячейка, которую можно поправить прямо в таблице (запрос владельца 13.08.2026).
+   *
+   * Правится не всё: доход в сетке — это «сколько придёт», а не план, и правка там означала бы
+   * override поступления — отдельное решение. Итоги выводятся из строк и правке не подлежат вовсе.
+   *
+   * Смысл правки зависит от природы строки, и подпись это говорит прямо: у категории — бюджет
+   * этого периода, у долга и накопления — «с этой даты и далее». Молча вести себя по-разному в
+   * одинаковых с виду ячейках хуже, чем не давать править совсем.
+   */
+  const editableCell = (
+    c: GridCellDto,
+    key: string,
+    row: { targetKind: string; targetId: string; name: string },
+    index: number,
+  ) => {
+    const startsOn = data.periods[index]?.startsOn;
+    if (!startsOn || c.state === 'ended' || isMember) return cell(c, key);
+    const isEditing = editing === key;
+
+    if (isEditing) {
+      return (
+        <span className="mgrid-cell mgrid-cell-edit" key={key}>
+          <input
+            className="mgrid-input"
+            inputMode="decimal"
+            autoFocus
+            aria-label={`${row.name} · ${formatDate(startsOn)}`}
+            defaultValue={c.state === 'planned' ? toMajorString(money(BigInt(c.minor), base)) : ''}
+            onBlur={(e) => commit(row, startsOn, e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commit(row, startsOn, e.currentTarget.value);
+              }
+              // Esc возвращает прежнее значение: правка денег должна быть отменяемой одной клавишей.
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setEditing(null);
+              }
+            }}
+          />
+        </span>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        key={key}
+        className={
+          c.state === 'planned'
+            ? 'mgrid-cell mgrid-cell-btn'
+            : 'mgrid-cell mgrid-cell-off mgrid-cell-btn'
+        }
+        title={t(row.targetKind === 'category' ? 'plan.master.editCell' : 'plan.master.editFrom')}
+        onClick={() => setEditing(key)}
+      >
+        {c.state === 'planned' ? fmt(c.minor) : '—'}
+      </button>
+    );
+  };
 
   /*
    * Куда идти заполнять раздел. Доход и категории правятся на самом «Плане» (панели), остальное —
@@ -137,7 +242,7 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
                 <span className="mgrid-label">{r.name}</span>
                 {r.sourceCurrency !== base && <i className="dim"> {r.sourceCurrency}</i>}
               </span>
-              {r.cells.map((c, i) => cell(c, `${r.targetId}-${i}`))}
+              {r.cells.map((c, i) => editableCell(c, `${r.targetId}-${i}`, r, i))}
             </div>
           ))}
       </div>
