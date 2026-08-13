@@ -22,7 +22,7 @@ export function Landing() {
   return (
     <div className="landing">
       <header className="landing-head">
-        <span className="topbar-brand">multa</span>
+        <span className="topbar-brand">{t('brand.name')}</span>
         <Link className="act" to="/login">
           {t('landing.signIn')}
         </Link>

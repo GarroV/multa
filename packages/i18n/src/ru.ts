@@ -5,9 +5,6 @@ export const ru: Record<TranslationKey, string> = {
   // Бренд / общее
   'brand.name': 'multa',
   'common.next': 'Дальше',
-  'common.back': 'назад',
-  'common.skip': 'пропустить',
-  'common.done': 'готово',
   'account.export': 'Забрать данные',
   'account.export.hint':
     'Файл CSV со всеми тратами: дата, сумма, валюта, курс на дату, категория и заметка. Открывается в Excel, Numbers и Google Таблицах.',
@@ -82,13 +79,6 @@ export const ru: Record<TranslationKey, string> = {
   'income.amounts.percentSum': 'Проценты дают {sum}% от {gross}',
   'income.amounts.add': 'Добавить выплату',
   'income.amounts.mismatch': 'Период начинается {date}, но в этот день ничего не приходит.',
-  'income.extra.title': 'Есть ещё источники дохода?',
-  'income.extra.hint':
-    'Подработка, разовый гонорар или «когда как» — можно пропустить и добавить позже.',
-  'income.extra.sideGig': 'Подработка, каждую неделю',
-  'income.extra.oneOff': 'Разовый гонорар',
-  'income.extra.irregular': 'Приходит когда как',
-  'income.extra.irregularNote': 'Нерегулярный доход в план не идёт — только в факт.',
   'income.variable': 'плавает',
   'income.editNameOnly':
     'У этого источника правится только название: сумма задана процентом или ритм сложнее, чем поля этой формы. Остальное — новой строкой.',
@@ -116,20 +106,11 @@ export const ru: Record<TranslationKey, string> = {
   'income.cancelReceipt': 'отменить',
 
   // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
-  'onboarding.debts.title': 'Платишь кредиты или рассрочки?',
-  'onboarding.debts.subtitle':
-    'Добавь — план первым делом отложит каждый платёж. Можно пропустить.',
-  'onboarding.buckets.title': 'Тратишь в другой валюте?',
-  'onboarding.buckets.subtitle':
-    'Корзина размена: сколько дохода откладывать в другой валюте (аренда, жизнь). Можно пропустить.',
-  'onboarding.finish': 'К моему плану',
   'onboarding.skipAll': 'пропустить настройку',
 
   // Дашборд — пустой план периода
   'plan.empty.title': 'План пока чистый лист',
   'plan.empty.subtitle': 'Курс проложим, как добавишь доход и куда он идёт.',
-  'plan.hero.canSpend': 'МОЖНО ТРАТИТЬ',
-  'plan.hero.perDay': '/день',
   'plan.today.until': 'до {date} · осталось дней: {days}',
 
   // План периода — автосборка каскадом (Спринт 2)
@@ -297,10 +278,6 @@ export const ru: Record<TranslationKey, string> = {
   'plan.master.noRate': 'Без курса на сегодня и потому вне таблицы: {list}',
   'plan.master.hint':
     'Дальше текущего периода — проекция по сегодняшним правилам, а не утверждённый план. Правки — в разделах.',
-  'plan.summary.income': 'Доход периода',
-  'plan.money': 'Деньги периода',
-  'plan.summary.committed': 'Расписано',
-  'plan.summary.free': 'Свободно к концу периода',
   'plan.summary.perDay': 'На жизнь, в день',
   'plan.summary.toExchange': 'К размену',
   'plan.compressed.note':
@@ -378,7 +355,6 @@ export const ru: Record<TranslationKey, string> = {
   'fx.gave': 'Отдал',
   'fx.got': 'Получил',
   'fx.rate': 'Твой курс',
-  'fx.official': 'Официальный',
   'fx.spread': 'Спред',
   'fx.spreadUnknown': 'на эту дату курса нет',
   'fx.add': 'Записать размен',
@@ -398,15 +374,12 @@ export const ru: Record<TranslationKey, string> = {
   'fx.onlyOneProvider': 'Пока один обменник: сравнивать не с чем.',
   'fx.markProvider': 'Отмечай, где меняешь — тогда будет видно, у кого дешевле.',
   'nav.obligations': 'Обязательства',
-  'stats.title': 'Статистика',
   'stats.signals': 'СИГНАЛЫ',
   'stats.tone.risk': 'риск',
   'stats.tone.attention': 'внимание',
   'stats.tone.opportunity': 'возможность',
   'common.on': 'вкл',
   'common.off': 'выкл',
-  'stats.signal.compressed': 'План сжат: на всё сразу не хватает',
-  'stats.signal.overspent': 'Есть перерасход по категориям',
   'stats.locked': 'СВЯЗАНО ОБЯЗАТЕЛЬСТВАМИ',
   'stats.locked.sub': 'долги, корзины, накопления, цели · {amount}',
   'stats.planVsFact': 'ПЛАН ПРОТИВ ФАКТА',
@@ -420,7 +393,6 @@ export const ru: Record<TranslationKey, string> = {
   'stats.structure.fxRisk': 'валютный риск',
   'stats.byPeriods': 'КАТЕГОРИИ · {periods} ПЕРИОДОВ',
   'stats.plan': 'план',
-  'stats.median': 'медиана',
   'stats.verdict.stable': 'стабильно',
   'stats.verdict.raise': 'поднять план',
   'stats.verdict.lower': 'снизить план',
@@ -440,7 +412,6 @@ export const ru: Record<TranslationKey, string> = {
   // Обязательства
   'acc.title': 'СЧЕТА',
   'acc.total': 'ВСЕГО ДЕНЕГ',
-  'acc.byCurrency': 'по валютам',
   'acc.noRate': 'нет курса: {list}',
   'acc.empty': 'Счета не заведены — итог считать не из чего',
   'acc.kind.cash': 'наличные',
@@ -449,7 +420,6 @@ export const ru: Record<TranslationKey, string> = {
   'acc.kind.other': 'другое',
   'acc.archive': 'в архив',
   'acc.balance': 'Остаток',
-  'obl.title': 'Обязательства',
   'obl.debts': 'Долги',
   'obl.envelopes': 'Накопления',
   'obl.goals': 'Цели',
@@ -462,8 +432,6 @@ export const ru: Record<TranslationKey, string> = {
   'obl.paymentPer': 'за период',
   'obl.closeBy': 'Закрыть к дате',
   'obl.computed': 'Выйдет {amount} за период — {periods} платежей',
-  'obl.tooBig':
-    'Это больше, чем остаётся после обязательных ({free}). Долги не режутся, поэтому срежется всё остальное.',
   'obl.badDeadline': 'Срок должен быть позже ближайшей выплаты.',
   'obl.target': 'Цель',
   'obl.rule.fixed': 'фикс',
@@ -476,10 +444,8 @@ export const ru: Record<TranslationKey, string> = {
   'obl.badPercent': 'Процент не бывает больше 100',
 
   // Настройки
-  'settings.title': 'Настройки',
   'settings.currency': 'Базовая валюта',
   'settings.rhythm': 'Ритм планирования',
-  'settings.sources': 'Источники дохода',
   'set.behaviour': 'ПОВЕДЕНИЕ',
   'set.buffer': 'Буфер дневной цифры',
   'set.bufferHint': 'Часть остатка не входит в темп — чтобы дойти до выплаты с запасом.',
@@ -490,8 +456,6 @@ export const ru: Record<TranslationKey, string> = {
   'set.kind.category': 'категории',
   'set.medianPeriods': 'Периодов в медиане',
   'set.suggestRaises': 'Советовать поднимать заниженные статьи',
-  'set.rateSource': 'Источник курса',
-  'set.defaultSpread': 'Спред по умолчанию, б.п.',
   'set.defaultProvider': 'Где обычно меняешь',
   'plan.kpi.buffer': 'в буфере {amount}',
   'imp.title': 'ПЕРЕЕЗД С EXCEL',
@@ -551,13 +515,8 @@ export const ru: Record<TranslationKey, string> = {
     'Разовый приход, которого нет в источниках: подработка, возврат, подарок.',
   'spend.submitIncome': 'Записать приход',
   'plan.summary.extraIncome': 'Пришло вне плана',
-  'exec.confirm': 'Сделал',
   'exec.skip': 'Пропустить',
   'exec.status.confirmed': 'внесено',
-  'exec.status.partial': 'частично · осталось {amount}',
-  'exec.status.skipped': 'пропущено',
-  'exec.status.pending': 'не внесено',
-  'exec.hint': 'Отмечай, что реально перевёл — счёт ведёт план, а не ты.',
   'rev.title': 'ИСТОРИЯ ПРАВОК',
   'goal.freeze': 'заморозить',
   'goal.unfreeze': 'разморозить',
@@ -604,15 +563,9 @@ export const ru: Record<TranslationKey, string> = {
   'receipt.lowConfidence': 'В раскладке не уверен — проверь перед подтверждением.',
   'receipt.confirm': 'Подтвердить и записать',
   'receipt.failed': 'Не смог прочитать чек. Внеси сумму руками.',
-  'receipt.done': 'Записано',
-  'plan.summary.spent': 'Потрачено',
-  'plan.summary.remaining': 'Осталось на жизнь',
-  'plan.overspent.note':
-    'Вышли за план на {amount} — дневной темп на нуле. Можно перекинуть бюджет из другой категории.',
   'cat.spent': 'потрачено {amount}',
   'cat.remaining': 'осталось {amount}',
   'cat.overspent': 'перерасход {amount}',
 
   // Заглушки
-  'placeholder.soon': 'Скоро — Спринт 2',
 };

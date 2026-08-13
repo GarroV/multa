@@ -30,6 +30,24 @@ function parseMinor(value: string, ccy: string): string | null {
   }
 }
 
+/**
+ * Короткий пересказ того, как разобрана фраза: сумма с валютой, дата и категория.
+ *
+ * Пересказ, а не дамп полей: человеку важно поймать подмену — «понял 4,50 в рублях», когда он
+ * диктовал евро, — а не сверить json. Поэтому в строке ровно то, что чаще всего понимается неверно.
+ */
+function summaryOf(
+  p: { amountMinor: string; currency: string; occurredOn: string; categoryName?: string | null },
+  base: string,
+  locale: string,
+): string {
+  const amount = `${formatMinor(p.amountMinor, p.currency, locale)} ${p.currency}`;
+  const parts = [amount, formatDate(p.occurredOn)];
+  if (p.categoryName) parts.push(p.categoryName);
+  void base;
+  return parts.join(' · ');
+}
+
 function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale: string }) {
   const { t } = useI18n();
   const { data: categories = [] } = useCategories();
@@ -98,6 +116,8 @@ export function SpendEntry({
    * базовую жёстко, и распознанная валюта молча подменялась — 4,50 EUR превращались в 4,50 RUB.
    */
   const [currency, setCurrency] = useState(base);
+  /** Как поняли фразу — показываем человеку, а не держим при себе. */
+  const [understood, setUnderstood] = useState<string | null>(null);
   const voice = useVoiceCapture();
   const today = useToday();
   const parseVoice = useParseVoice();
@@ -151,6 +171,7 @@ export function SpendEntry({
           setKind(remote.kind);
           setAmount(toMajorString(money(BigInt(remote.amountMinor), remote.currency)));
           setCurrency(remote.currency);
+          setUnderstood(summaryOf(remote, base, locale));
           setOccurredOn(remote.occurredOn);
           setNote(remote.note ?? '');
           setCategoryId(remote.kind === 'income' ? undefined : (remote.categoryId ?? undefined));
@@ -161,6 +182,18 @@ export function SpendEntry({
     }
     setBadAmount(false);
     setKind(parsed.kind);
+    setUnderstood(
+      summaryOf(
+        {
+          amountMinor: parsed.amountMinor.toString(),
+          currency: parsed.currency,
+          occurredOn: parsed.occurredOn,
+          categoryName: parsed.categoryName,
+        },
+        base,
+        locale,
+      ),
+    );
     setAmount(toMajorString(money(parsed.amountMinor, parsed.currency)));
     setCurrency(parsed.currency);
     setOccurredOn(parsed.occurredOn);
@@ -266,6 +299,14 @@ export function SpendEntry({
             </button>
           </div>
           <span className="sub">{t('spend.smart.hint')}</span>
+          {/*
+            Что именно понято — вслух (#100). Разбор молча раскладывал поля, и подмена валюты или
+            даты была не видна: человек проверял сумму, а остальное принимал на веру. Строка
+            написана давно и всё это время лежала неиспользованной.
+          */}
+          {understood && (
+            <span className="sub dim">{t('spend.smart.parsed', { summary: understood })}</span>
+          )}
           {voice.state === 'denied' && (
             <span className="sub danger">{t('spend.voice.denied')}</span>
           )}

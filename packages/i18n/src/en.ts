@@ -7,9 +7,6 @@ export const en = {
   // Бренд / общее
   'brand.name': 'multa',
   'common.next': 'Next',
-  'common.back': 'back',
-  'common.skip': 'skip',
-  'common.done': 'done',
   'account.export': 'Take your data',
   'account.export.hint':
     'A CSV of every transaction: date, amount, currency, the rate on that date, category and note. Opens in Excel, Numbers and Google Sheets.',
@@ -85,12 +82,6 @@ export const en = {
   'income.amounts.percentSum': 'Percentages add up to {sum}% of {gross}',
   'income.amounts.add': 'Add payout',
   'income.amounts.mismatch': 'Period starts on {date}, but nothing arrives that day.',
-  'income.extra.title': 'Any other income?',
-  'income.extra.hint': 'Side gig, one-off fee, or irregular — optional, can be added later.',
-  'income.extra.sideGig': 'Side gig, weekly',
-  'income.extra.oneOff': 'One-off fee',
-  'income.extra.irregular': 'Comes irregularly',
-  'income.extra.irregularNote': 'Irregular income stays out of the plan — only recorded as fact.',
   'income.variable': 'floats',
   'income.editNameOnly':
     'Only the name is editable here: the amount is a percentage, or the rhythm is more than these fields can hold. Change the rest by adding a new source.',
@@ -118,19 +109,11 @@ export const en = {
   'income.cancelReceipt': 'undo',
 
   // Онбординг — шаг 3: долги; шаг 4: валютные корзины (оба пропускаемы)
-  'onboarding.debts.title': 'Any loans or installments?',
-  'onboarding.debts.subtitle': 'Add them and the plan reserves each payment first. Skippable.',
-  'onboarding.buckets.title': 'Spending in another currency?',
-  'onboarding.buckets.subtitle':
-    'A swap basket: how much of your income to set aside in another currency (rent, life). Skippable.',
-  'onboarding.finish': 'See my plan',
   'onboarding.skipAll': 'skip setup',
 
   // Дашборд — пустой план периода
   'plan.empty.title': 'Your plan is a blank page',
   'plan.empty.subtitle': 'Route set once you add income and where it goes.',
-  'plan.hero.canSpend': 'YOU CAN SPEND',
-  'plan.hero.perDay': '/day',
   'plan.today.until': 'until {date} · {days} days left',
 
   // План периода — автосборка каскадом (Спринт 2)
@@ -299,10 +282,6 @@ export const en = {
   'plan.master.noRate': 'No rate for today, so out of the table: {list}',
   'plan.master.hint':
     'Beyond the current period this is a projection from today’s rules, not an approved plan. Edit lines in their sections.',
-  'plan.summary.income': 'Income this period',
-  'plan.money': 'Money this period',
-  'plan.summary.committed': 'Committed',
-  'plan.summary.free': 'Free at period end',
   'plan.summary.perDay': 'To live on, per day',
   'plan.summary.toExchange': 'To exchange',
   'plan.compressed.note':
@@ -380,7 +359,6 @@ export const en = {
   'fx.gave': 'Gave',
   'fx.got': 'Got',
   'fx.rate': 'Your rate',
-  'fx.official': 'Official',
   'fx.spread': 'Spread',
   'fx.spreadUnknown': 'no official rate for that date',
   'fx.add': 'Log the exchange',
@@ -400,15 +378,12 @@ export const en = {
   'fx.onlyOneProvider': 'One exchange point so far — nothing to compare with.',
   'fx.markProvider': 'Note where you exchange and you will see who is cheaper.',
   'nav.obligations': 'Obligations',
-  'stats.title': 'Statistics',
   'stats.signals': 'SIGNALS',
   'stats.tone.risk': 'risk',
   'stats.tone.attention': 'attention',
   'stats.tone.opportunity': 'opportunity',
   'common.on': 'on',
   'common.off': 'off',
-  'stats.signal.compressed': 'Plan is compressed: not enough for everything at once',
-  'stats.signal.overspent': 'Some categories are overspent',
   'stats.locked': 'LOCKED IN',
   'stats.locked.sub': 'debts, baskets, savings, goals · {amount}',
   'stats.planVsFact': 'PLAN VS FACT',
@@ -422,7 +397,6 @@ export const en = {
   'stats.structure.fxRisk': 'currency risk',
   'stats.byPeriods': 'CATEGORIES · {periods} PERIODS',
   'stats.plan': 'plan',
-  'stats.median': 'median',
   'stats.verdict.stable': 'stable',
   'stats.verdict.raise': 'raise the plan',
   'stats.verdict.lower': 'lower the plan',
@@ -443,7 +417,6 @@ export const en = {
   // Обязательства
   'acc.title': 'ACCOUNTS',
   'acc.total': 'MONEY ON HAND',
-  'acc.byCurrency': 'by currency',
   'acc.noRate': 'no rate: {list}',
   'acc.empty': 'No accounts yet — nothing to total up',
   'acc.kind.cash': 'cash',
@@ -452,7 +425,6 @@ export const en = {
   'acc.kind.other': 'other',
   'acc.archive': 'archive',
   'acc.balance': 'Balance',
-  'obl.title': 'Obligations',
   'obl.debts': 'Debts',
   'obl.envelopes': 'Savings',
   'obl.goals': 'Goals',
@@ -465,8 +437,6 @@ export const en = {
   'obl.paymentPer': 'per period',
   'obl.closeBy': 'Close by',
   'obl.computed': 'That is {amount} per period — {periods} payments',
-  'obl.tooBig':
-    'That is more than what is left after the obligatory ones ({free}). Debts are never trimmed, so everything else gets cut.',
   'obl.badDeadline': 'The deadline must be later than the next payout.',
   'obl.target': 'Target',
   'obl.rule.fixed': 'fixed',
@@ -479,10 +449,8 @@ export const en = {
   'obl.badPercent': 'A percentage cannot exceed 100',
 
   // Настройки
-  'settings.title': 'Settings',
   'settings.currency': 'Base currency',
   'settings.rhythm': 'Planning rhythm',
-  'settings.sources': 'Income sources',
   'set.behaviour': 'BEHAVIOUR',
   'set.buffer': 'Daily figure buffer',
   'set.bufferHint': 'Part of what is left stays out of the pace — to reach payday with a margin.',
@@ -494,8 +462,6 @@ export const en = {
   'set.kind.category': 'categories',
   'set.medianPeriods': 'Periods in the median',
   'set.suggestRaises': 'Suggest raising underfunded lines',
-  'set.rateSource': 'Rate source',
-  'set.defaultSpread': 'Default spread, bp',
   'set.defaultProvider': 'Where you usually exchange',
   'plan.kpi.buffer': '{amount} in buffer',
   'imp.title': 'MOVE FROM EXCEL',
@@ -554,13 +520,8 @@ export const en = {
   'spend.subtitleIncome': 'A one-off that is not in your sources — a side gig, a refund, a gift.',
   'spend.submitIncome': 'Log the income',
   'plan.summary.extraIncome': 'Came in unplanned',
-  'exec.confirm': 'Done',
   'exec.skip': 'Skip',
   'exec.status.confirmed': 'done',
-  'exec.status.partial': 'partial · {amount} left',
-  'exec.status.skipped': 'skipped',
-  'exec.status.pending': 'not yet',
-  'exec.hint': 'Mark what you actually transferred — the plan keeps score, not you.',
   'rev.title': 'REVISION HISTORY',
   'goal.freeze': 'freeze',
   'goal.unfreeze': 'unfreeze',
@@ -606,17 +567,11 @@ export const en = {
   'receipt.lowConfidence': 'Not sure about the split — check it before confirming.',
   'receipt.confirm': 'Confirm and record',
   'receipt.failed': 'Could not read this receipt. Log the amount by hand.',
-  'receipt.done': 'Recorded',
-  'plan.summary.spent': 'Spent',
-  'plan.summary.remaining': 'Left to live on',
-  'plan.overspent.note':
-    'You are {amount} over plan — the daily pace is at zero. You can move budget from another category.',
   'cat.spent': 'spent {amount}',
   'cat.remaining': '{amount} left',
   'cat.overspent': 'over by {amount}',
 
   // Заглушки
-  'placeholder.soon': 'Coming — Sprint 2',
 } as const;
 
 export type TranslationKey = keyof typeof en;

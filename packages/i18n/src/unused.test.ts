@@ -8,8 +8,9 @@ import { ru } from './ru.ts';
  * Детектор мёртвых ключей (issue #105).
  *
  * Четыре пустых состояния были написаны в обеих локалях и не подключены ни к одному экрану:
- * `acc.empty`, `rev.empty`, `forecast.empty`, `plan.empty.subtitle`. Панели вместо приглашения к
- * действию просто исчезали, а тексты для них лежали мёртвыми — и заметить это было нечем.
+ * панели вместо приглашения к действию просто исчезали, а тексты для них лежали мёртвыми — и
+ * заметить это было нечем. Детектор нашёл ещё 41 такой ключ, оставшийся от прежних экранов; они
+ * удалены (#108), поэтому список-поблажка больше не нужен и проверка строгая.
  *
  * Тест ищет каждый ключ по исходникам веба как подстроку. Способ грубый, зато не ломается от
  * `t('a.b')` против `t(\`a.${x}\`)`: семейства динамических ключей вычитываются из кода.
@@ -42,76 +43,13 @@ function sourceText(dir: string): string {
   return out;
 }
 
-/**
- * Известный долг: ключи, оставшиеся от прежних экранов (issue #108). Список может только
- * уменьшаться — новый мёртвый ключ обязан ронять тест сразу, пока автор ещё помнит, зачем писал
- * текст. Замораживать находку списком честнее, чем выключать детектор до лучших времён.
- */
-const KNOWN_DEAD = new Set([
-  'acc.byCurrency',
-  'brand.name',
-  'common.back',
-  'common.done',
-  'common.skip',
-  'exec.confirm',
-  'exec.hint',
-  'exec.status.partial',
-  'exec.status.pending',
-  'exec.status.skipped',
-  'fx.official',
-  'income.extra.hint',
-  'income.extra.irregular',
-  'income.extra.irregularNote',
-  'income.extra.oneOff',
-  'income.extra.sideGig',
-  'income.extra.title',
-  'obl.title',
-  'obl.tooBig',
-  'onboarding.buckets.subtitle',
-  'onboarding.buckets.title',
-  'onboarding.debts.subtitle',
-  'onboarding.debts.title',
-  'onboarding.finish',
-  'placeholder.soon',
-  'plan.empty.subtitle',
-  'plan.hero.canSpend',
-  'plan.hero.perDay',
-  'plan.money',
-  'plan.overspent.note',
-  'plan.summary.committed',
-  'plan.summary.free',
-  'plan.summary.income',
-  'plan.summary.remaining',
-  'plan.summary.spent',
-  'receipt.done',
-  'set.defaultSpread',
-  'set.rateSource',
-  'settings.sources',
-  'settings.title',
-  'spend.smart.parsed',
-  'stats.median',
-  'stats.signal.compressed',
-  'stats.signal.overspent',
-  'stats.title',
-]);
-
 describe('словарь не копит мёртвые ключи', () => {
-  it('новых мёртвых ключей не появилось', () => {
+  it('мёртвых ключей нет', () => {
     const code = sourceText(WEB_SRC);
     const prefixes = dynamicPrefixes(code);
     const unused = Object.keys(ru).filter(
       (key) => !code.includes(key) && !prefixes.some((p) => key.startsWith(p)),
     );
-    expect(unused.filter((key) => !KNOWN_DEAD.has(key))).toEqual([]);
-  });
-
-  it('список долга не протух: всё в нём действительно мертво', () => {
-    // Иначе список превращается в свалку и перестаёт что-либо значить.
-    const code = sourceText(WEB_SRC);
-    const prefixes = dynamicPrefixes(code);
-    const alive = [...KNOWN_DEAD].filter(
-      (key) => code.includes(key) || prefixes.some((p) => key.startsWith(p)),
-    );
-    expect(alive).toEqual([]);
+    expect(unused).toEqual([]);
   });
 });

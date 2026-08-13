@@ -140,7 +140,7 @@ export function AppShell() {
   return (
     <div className="app-frame">
       <header className="topbar">
-        <span className="topbar-brand">multa</span>
+        <span className="topbar-brand">{t('brand.name')}</span>
         <nav className="tabs" aria-label={t('nav.plan')}>
           {NAV.filter((n) => !(n.ownerOnly && isMember)).map((n) => (
             <Link

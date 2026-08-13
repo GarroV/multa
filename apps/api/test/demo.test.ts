@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { app } from '../src/app.ts';
 import { anonymous, expectOk, onboarded, seedRate, type PlanDto } from './client.ts';
 
 /**
@@ -247,5 +248,55 @@ describe('вход в демо', () => {
     const guest = anonymous();
     await expectOk(await guest.post('/v1/demo/enter'));
     await expectOk(await guest.post('/v1/demo/reset'));
+  });
+});
+
+describe('почта демо зарезервирована (#86)', () => {
+  /*
+   * Демо-пользователь резолвится по равенству почты константе. На чистом развёртывании посторонний
+   * успевал зарегистрировать её первым: демо переставало работать вовсе (наш пароль не сходился с
+   * чужим аккаунтом), а попутно этому аккаунту переключался признак подтверждённой почты.
+   *
+   * Это не захват доступа, но отказ в обслуживании и правка чужого флага — и то и другое лечится
+   * тем, что занять почту нельзя.
+   */
+  test('зарегистрироваться на неё нельзя', async () => {
+    const res = await app.request('http://localhost:3000/v1/auth/sign-up/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Squatter',
+        email: 'demo@multa.local',
+        password: 'SquatterPass123!',
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ message: 'email_reserved' });
+  });
+
+  test('регистр не помогает: DEMO@Multa.local — та же почта', async () => {
+    const res = await app.request('http://localhost:3000/v1/auth/sign-up/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Squatter',
+        email: 'DEMO@Multa.local',
+        password: 'SquatterPass123!',
+      }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  test('обычная регистрация по-прежнему работает', async () => {
+    const res = await app.request('http://localhost:3000/v1/auth/sign-up/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Normal',
+        email: `normal-${Date.now()}@multa.local`,
+        password: 'NormalPass123!',
+      }),
+    });
+    expect(res.status).toBe(200);
   });
 });

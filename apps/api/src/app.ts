@@ -31,6 +31,7 @@ import {
 import { env } from './env.ts';
 import { fxFreshnessHours, getRate } from './fx/service.ts';
 import { hasActiveIncome } from './income/store.ts';
+import { DEMO_EMAIL } from './demo/seed.ts';
 import { logger } from './logger.ts';
 import {
   requireAuth,
@@ -116,7 +117,32 @@ if (process.env.NODE_ENV !== 'test' && process.env.RATE_LIMIT_DISABLED !== '1')
   app.use('/v1/*', rateLimit);
 
 // better-auth (email+password + TOTP) — на /v1/auth/*
-app.on(['POST', 'GET'], '/v1/auth/*', (c) => auth.handler(c.req.raw));
+/*
+ * Почта демо зарезервирована (issue #86).
+ *
+ * Демо-пользователь резолвится по равенству почты константе, и на ЧИСТОМ развёртывании посторонний
+ * успевал зарегистрировать её первым: демо переставало работать вовсе (наш пароль не сходился с
+ * чужим аккаунтом), а `ensureDemoUser` попутно переключал этому аккаунту признак подтверждённой
+ * почты. Это не захват доступа, но отказ в обслуживании и правка чужого флага.
+ *
+ * Проверка стоит ДО better-auth: он не знает про системные аккаунты, и учить его этому означало бы
+ * держать наше правило в чужой конфигурации.
+ */
+app.on(['POST', 'GET'], '/v1/auth/*', async (c) => {
+  if (c.req.method === 'POST' && c.req.path.includes('sign-up')) {
+    const raw = await c.req.raw.clone().text();
+    let email = '';
+    try {
+      email = String((JSON.parse(raw) as { email?: unknown }).email ?? '');
+    } catch {
+      // Не разобрали тело — пусть с ним разбирается better-auth, это не наша забота.
+    }
+    if (email.trim().toLowerCase() === DEMO_EMAIL) {
+      return c.json({ message: 'email_reserved' }, 422);
+    }
+  }
+  return auth.handler(c.req.raw);
+});
 
 app.use('*', sessionMiddleware);
 

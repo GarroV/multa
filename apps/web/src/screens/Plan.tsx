@@ -739,6 +739,11 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                     <span />
                     <span className="dim">{t('plan.empty.noPlan')}</span>
                   </div>
+                  {/* Вторая строка объясняет, ЧТО сделать: одна только констатация пустоты не ведёт. */}
+                  <div className="prow">
+                    <span />
+                    <span className="sub dim">{t('plan.empty.subtitle')}</span>
+                  </div>
                 </Panel>
               )}
 
