@@ -20,6 +20,35 @@ export const en = {
   'account.delete.action': 'Delete',
   'account.delete.confirm': 'Type {email} to confirm',
   'common.offline': 'Offline — showing cached data, changes will not save',
+  'landing.title': 'Income in one currency, life in another',
+  'landing.lead':
+    'Trackers record what you spent. Multa distributes what you earned: it splits each payout across obligations and categories, works out how much you can spend per day, and warns you before the money runs out.',
+  'landing.signIn': 'sign in',
+  'landing.demo': 'See the demo',
+  'landing.start': 'start your own',
+  'landing.demoNote':
+    'The demo needs no sign-up and comes filled with data. Touch anything: it resets itself.',
+  'landing.preview': 'A fragment of the plan screen',
+  'landing.kpi.perDay': 'Safe to spend per day',
+  'landing.kpi.left': '9 days until the 25th',
+  'landing.row.rent': 'Rent',
+  'landing.row.exchange': 'To exchange',
+  'landing.row.food': 'Groceries',
+  'landing.row.debt': 'Loan',
+  'landing.tag.due': 'due on the 10th',
+  'landing.tag.fx': 'at 106.4',
+  'landing.tag.debt': 'closes in March',
+  'landing.point.plan.title': 'A plan, not a report',
+  'landing.point.plan.body':
+    'Each payout is split for you: debts and currency obligations first, then savings and categories. If it does not add up, the plan compresses in a known order and tells you exactly what it trimmed.',
+  'landing.point.fx.title': 'Rates are remembered, not recalculated',
+  'landing.point.fx.body':
+    "Every operation keeps the rate of its own date. History is never rewritten, so «how much to exchange from this payout» is answered by fact rather than by today's board.",
+  'landing.point.facts.title': 'No need to log every purchase',
+  'landing.point.facts.body':
+    'Broad strokes, a phrase, a QR receipt or your voice. Tracking here is raw material for distribution, not the goal — so it does not have to be perfect.',
+  'landing.foot':
+    'Multa is a personal project. Data lives on its own server, there are no paid plans.',
   'common.cancel': 'Cancel',
 
   // Онбординг — шаг 1: базовая валюта

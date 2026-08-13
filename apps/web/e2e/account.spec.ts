@@ -10,7 +10,7 @@ import { API_URL } from './helpers.ts';
  */
 async function signUp(page: import('@playwright/test').Page): Promise<string> {
   const email = `account-e2e-${Date.now()}@multa.local`;
-  await page.goto('/');
+  await page.goto('/login');
   await page.locator('form.card input').nth(0).fill('Account E2E');
   await page.locator('form.card input').nth(1).fill(email);
   await page.locator('form.card input').nth(2).fill('SmokeTest123!');
@@ -51,7 +51,8 @@ test('данные скачиваются файлом, аккаунт удал�
   await expect(submit).toBeEnabled();
   await submit.click();
 
-  // Вернулись на вход, и сессии больше нет.
-  await expect(page.locator('form.card')).toBeVisible({ timeout: 20_000 });
+  // Вернулись на входную дверь продукта, и сессии больше нет. Именно лендинг, а не форма входа:
+  // человек только что перестал быть пользователем, предлагать ему сразу «войди» неуместно.
+  await expect(page.locator('.landing-title')).toBeVisible({ timeout: 20_000 });
   expect((await page.request.get(`${API_URL}/v1/me`)).status()).toBe(401);
 });

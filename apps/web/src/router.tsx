@@ -9,12 +9,22 @@ import { Settings } from './screens/Settings.tsx';
 
 const rootRoute = createRootRoute({ component: App });
 
+/*
+ * Корень больше не редиректит слепо (Спринт 6): у холодного посетителя должен быть лендинг, а не
+ * форма регистрации. Кому именно что показать — решает гейт в App: он единственный знает, есть ли
+ * сессия. Редирект остался бы гонкой с загрузкой `me`.
+ */
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/plan' });
-  },
+  component: () => null,
+});
+
+/** Вход отдельным адресом: с лендинга на него ведут кнопки, и он должен быть ссылкой. */
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  component: () => null,
 });
 
 // «Сегодня» слился с планом (issue #30): один плотный экран вместо обзора и деталей по отдельности.
@@ -68,6 +78,7 @@ const demoRoute = createRoute({ getParentRoute: () => rootRoute, path: '/demo', 
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  loginRoute,
   todayRoute,
   planRoute,
   statisticsRoute,

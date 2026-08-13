@@ -391,7 +391,7 @@ test.describe('демо-данные', () => {
  */
 test.describe('пустой аккаунт', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/login');
     const email = `visual-e2e-${Date.now()}@multa.local`;
     await page.locator('form.card input').nth(0).fill('Visual E2E');
     await page.locator('form.card input').nth(1).fill(email);

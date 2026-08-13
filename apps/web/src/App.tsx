@@ -1,9 +1,10 @@
-import { useRouterState } from '@tanstack/react-router';
+import { Navigate, useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { AppShell } from './AppShell.tsx';
 import { hasChosenLocale, useI18n } from './lib/i18n.tsx';
 import { useMe } from './lib/queries.ts';
 import { Demo } from './screens/Demo.tsx';
+import { Landing } from './screens/Landing.tsx';
 import { Login } from './screens/Login.tsx';
 import { Onboarding } from './screens/Onboarding.tsx';
 import { OnboardingCurrency } from './screens/OnboardingCurrency.tsx';
@@ -38,7 +39,14 @@ export function App() {
    * «посмотреть без регистрации» ломался при первом же чистом визите.
    */
   if (!me?.user && pathname === '/demo') return <Demo />;
-  if (!me?.user) return <Login />;
+  /*
+   * Холодный посетитель попадает на лендинг, а не на форму регистрации (Спринт 6). Раньше первое,
+   * что продукт говорил человеку, было «представься» — прежде чем объяснить, зачем он нужен.
+   * Вход остался отдельным адресом, чтобы с лендинга на него вела обычная ссылка.
+   */
+  if (!me?.user) return pathname === '/login' ? <Login /> : <Landing />;
+  // Залогиненного на корне и на входе отправляем в приложение: этих экранов для него больше нет.
+  if (pathname === '/' || pathname === '/login') return <Navigate to="/plan" replace />;
   if (!me.workspace) return <OnboardingCurrency />;
   // Онбординг закрыт, когда есть и ритм, и хотя бы один активный источник дохода —
   // либо когда пользователь осознанно его пропустил (тогда план пустой до ввода дохода).

@@ -15,7 +15,7 @@ import { API_URL } from './helpers.ts';
 test.use({ locale: 'en-US' });
 
 test('английский браузер получает английские категории (#104)', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/login');
   const email = `locale-e2e-${Date.now()}@multa.local`;
   await page.locator('form.card input').nth(0).fill('Locale E2E');
   await page.locator('form.card input').nth(1).fill(email);

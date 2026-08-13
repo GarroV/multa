@@ -17,7 +17,7 @@ test('новый человек попадает в план за два шаг�
    * увидел продукт, и ответы давались наугад. Теперь обязательный минимум — валюта и доход, а
    * объясняет экран сам, подсветкой блоков.
    */
-  await page.goto('/');
+  await page.goto('/login');
   const email = `tour-e2e-${Date.now()}@multa.local`;
   await page.locator('form.card input').nth(0).fill('Tour E2E');
   await page.locator('form.card input').nth(1).fill(email);
@@ -58,7 +58,7 @@ test('человек с ежедневным доходом проходит о�
    * платят», а доход у неё ежедневный — вопрос не про неё. Проверяем весь путь до цифры дня, а не
    * только наличие кнопки: важно, что план на таком доходе действительно собирается.
    */
-  await page.goto('/');
+  await page.goto('/login');
   const email = `daily-e2e-${Date.now()}@multa.local`;
   await page.locator('form.card input').nth(0).fill('Daily E2E');
   await page.locator('form.card input').nth(1).fill(email);
@@ -97,7 +97,7 @@ test('занятая почта объясняется по-человеческ
    */
   const email = `taken-${Date.now()}@multa.local`;
 
-  await page.goto('/');
+  await page.goto('/login');
   await page.locator('form.card input').nth(0).fill('Первый');
   await page.locator('form.card input').nth(1).fill(email);
   await page.locator('form.card input').nth(2).fill('SmokeTest123!');
@@ -108,7 +108,7 @@ test('занятая почта объясняется по-человеческ
 
   // Второй заход тем же адресом — из чистого контекста, как это делает другой человек.
   await page.context().clearCookies();
-  await page.goto('/');
+  await page.goto('/login');
   await page.locator('form.card input').nth(0).fill('Второй');
   await page.locator('form.card input').nth(1).fill(email);
   await page.locator('form.card input').nth(2).fill('SmokeTest123!');
