@@ -1,14 +1,19 @@
+import { convert, money, type Currency } from '@multa/core';
 import { and, eq } from 'drizzle-orm';
 import { isUuid } from '../http/ids.ts';
 import { Hono } from 'hono';
+import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
-import { currencyBuckets, debts, envelopes, goals } from '../db/schema/domain.ts';
+import { currencyBuckets, debts, envelopes, goals, transactions } from '../db/schema/domain.ts';
+import { getRate } from '../fx/service.ts';
+import { ensurePeriodForDate } from '../plan/assemble.ts';
 import { requireSection, requireWorkspace, type AppVariables } from '../middleware.ts';
 import {
   bucketCreateSchema,
   bucketPatchSchema,
   debtCreateSchema,
   debtPatchSchema,
+  repaymentSchema,
   envelopeCreateSchema,
   envelopePatchSchema,
   goalCreateSchema,
@@ -95,3 +100,70 @@ for (const { path, table, schema, patch } of ENTITIES) {
     return c.body(null, 204);
   });
 }
+
+/**
+ * Возврат по займу (issue #94): «Петя вернул 2 000».
+ *
+ * Это факт прихода денег, а не правка числа в карточке: остаток уменьшается И записывается
+ * транзакция дохода. Иначе деньги появились бы у человека на руках, но не в истории — и месячный
+ * итог разошёлся бы с тем, что реально пришло.
+ *
+ * Только для займов: у обычного долга «вернули» означает ровно противоположное движение денег, и
+ * пускать обе операции через одну ручку значит однажды перепутать знак.
+ */
+obligations.post('/debts/:id/repaid', requireSection('debts'), async (c) => {
+  const ws = c.get('workspace')!;
+  const id = c.req.param('id');
+  if (!isUuid(id)) return c.json({ error: 'not_found' }, 404);
+  const { amountMinor } = repaymentSchema.parse(await c.req.json());
+
+  const rows = await db
+    .select()
+    .from(debts)
+    .where(and(eq(debts.id, id), eq(debts.workspaceId, ws.id)))
+    .limit(1);
+  const loan = rows[0];
+  if (!loan) return c.json({ error: 'not_found' }, 404);
+  if (loan.direction !== 'owed_to_me') return c.json({ error: 'not_a_loan' }, 422);
+  // Больше остатка вернуть нельзя: остаток ушёл бы в минус и означал бы, что теперь должен я.
+  if (amountMinor > loan.remainingMinor) return c.json({ error: 'amount_exceeds_remaining' }, 422);
+
+  const occurredOn = today(ws.timezone);
+  const { periodId } = await ensurePeriodForDate(ws, occurredOn);
+  const snap =
+    loan.currency === ws.baseCurrency
+      ? null
+      : await getRate(loan.currency, ws.baseCurrency, occurredOn, ws.id);
+  if (loan.currency !== ws.baseCurrency && !snap) {
+    return c.json({ error: 'rate_unavailable' }, 404);
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(debts)
+      .set({
+        remainingMinor: loan.remainingMinor - amountMinor,
+        // Возврат закрывает заём так же, как выплата закрывает долг: строка кончилась.
+        ...(loan.remainingMinor - amountMinor === 0n ? { closedAt: new Date() } : {}),
+      })
+      .where(eq(debts.id, loan.id));
+    await tx.insert(transactions).values({
+      workspaceId: ws.id,
+      periodId,
+      kind: 'income',
+      amountMinor,
+      currency: loan.currency,
+      baseAmountMinor: snap
+        ? convert(money(amountMinor, loan.currency as Currency), snap).minor
+        : amountMinor,
+      rate: snap ? snap.rate : '1',
+      rateSource: snap ? snap.source : 'base',
+      rateDate: snap ? snap.date : occurredOn,
+      occurredOn,
+      source: 'manual',
+      note: loan.name,
+    });
+  });
+
+  return c.json({ ok: true, remainingMinor: (loan.remainingMinor - amountMinor).toString() });
+});

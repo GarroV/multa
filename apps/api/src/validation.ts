@@ -330,10 +330,18 @@ export const debtCreateSchema = z.object({
   principalMinor: minor,
   remainingMinor: minor,
   paymentMinor: minor,
+  /**
+   * Кто кому должен (issue #94). По умолчанию обычный долг: старые строки и старые клиенты не
+   * должны менять смысл от появления поля.
+   */
+  direction: z.enum(['owed_by_me', 'owed_to_me']).default('owed_by_me'),
   amountSteps: amountStepsSchema,
   dueDate: z.string().optional(),
   counterparty: z.string().optional(),
 });
+
+/** Возврат по займу (issue #94): сумма прихода в валюте займа. */
+export const repaymentSchema = z.object({ amountMinor: positiveMinor });
 
 export const envelopeCreateSchema = z.object({
   name: z.string().min(1),

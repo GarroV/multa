@@ -153,27 +153,46 @@ export const payPeriods = pgTable(
   ],
 );
 
-export const debts = pgTable('debts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id')
-    .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  currency: ccy('currency').notNull(),
-  principalMinor: bigint('principal_minor', { mode: 'bigint' }).notNull(),
-  remainingMinor: bigint('remaining_minor', { mode: 'bigint' }).notNull(),
-  paymentMinor: bigint('payment_minor', { mode: 'bigint' }).notNull(),
-  dueDate: date('due_date'),
-  /**
-   * Ступени суммы платежа: «с такой-то даты столько-то» (запрос владельца 06.08.2026).
-   * Пустой список = сумма не меняется, поэтому старые строки остаются валидными.
-   * Правило «сколько действует на дату» — `amountOn` в @multa/core, один источник на всех.
-   */
-  amountSteps: jsonb('amount_steps'),
-  counterparty: text('counterparty'),
-  agreedRate: numeric('agreed_rate', { precision: 20, scale: 10 }),
-  closedAt: timestamp('closed_at', { withTimezone: true }),
-});
+export const debts = pgTable(
+  'debts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    currency: ccy('currency').notNull(),
+    principalMinor: bigint('principal_minor', { mode: 'bigint' }).notNull(),
+    remainingMinor: bigint('remaining_minor', { mode: 'bigint' }).notNull(),
+    paymentMinor: bigint('payment_minor', { mode: 'bigint' }).notNull(),
+    dueDate: date('due_date'),
+    /**
+     * Ступени суммы платежа: «с такой-то даты столько-то» (запрос владельца 06.08.2026).
+     * Пустой список = сумма не меняется, поэтому старые строки остаются валидными.
+     * Правило «сколько действует на дату» — `amountOn` в @multa/core, один источник на всех.
+     */
+    amountSteps: jsonb('amount_steps'),
+    /**
+     * Кто кому должен (issue #94). `owed_by_me` — обычный долг, деньги уходят; `owed_to_me` — заём,
+     * деньги должны прийти.
+     *
+     * Одно поле вместо второй таблицы: у займа те же колонки — сумма, остаток, срок, контрагент, — а
+     * четвёртая почти такая же таблица гарантированно разошлась бы поведением с остальными тремя.
+     *
+     * Но в каскад заём не попадает НИКОГДА: иначе раздача начала бы откладывать деньги на возврат
+     * чужого долга, то есть резервировать то, чего у человека нет, и цифра дня уменьшалась бы вместо
+     * роста. Числа сошлись бы, смысл был бы перевёрнут — самая тихая из возможных ошибок.
+     */
+    direction: text('direction').notNull().default('owed_by_me'),
+    counterparty: text('counterparty'),
+    agreedRate: numeric('agreed_rate', { precision: 20, scale: 10 }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+  },
+  (t) => [
+    /* Значение вне пары молча превратило бы заём в долг — то есть перевернуло бы знак денег. */
+    check('debts_direction_ck', sql`${t.direction} in ('owed_by_me','owed_to_me')`),
+  ],
+);
 
 export const envelopes = pgTable(
   'envelopes',

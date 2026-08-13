@@ -1,4 +1,4 @@
-import { fromMajor, paymentToClose, type WeekendRule } from '@multa/core';
+import { fromMajor, paymentToClose, type Currency, type WeekendRule } from '@multa/core';
 import { periodsUntil } from '../lib/income.ts';
 import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
@@ -18,6 +18,7 @@ import {
   useCreateEntity,
   useDeleteEntity,
   useEntities,
+  useRepayLoan,
   useMe,
   useSaveAccount,
   type Bucket,
@@ -227,10 +228,193 @@ function AccountsSection({ base }: SectionProps) {
   );
 }
 
+/**
+ * Займы: деньги, которые должны вернуть мне (issue #94).
+ *
+ * Отдельным разделом, а не строкой среди долгов: там деньги уходят, здесь приходят, и в одной
+ * колонке это сложилось бы с разными знаками. В раздачу заём не входит вовсе — сервер его из
+ * каскада исключает, — поэтому здесь нет ни платежа за период, ни доли выплаты.
+ *
+ * Возврат вводится суммой, а не кнопкой «закрыть»: возвращают частями чаще, чем целиком.
+ */
+function LoansSection({ base }: SectionProps) {
+  const { t, locale } = useI18n();
+  const { data: all = [], isError, refetch } = useEntities<Debt>('debts');
+  const data = all.filter((d) => d.direction === 'owed_to_me');
+  const create = useCreateEntity('debts');
+  const del = useDeleteEntity('debts');
+  const repay = useRepayLoan();
+
+  const [name, setName] = useState('');
+  const [ccy, setCcy] = useState(base);
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  /** Какому займу вводим возврат: поле раскрывается под строкой, как правка у соседей. */
+  const [repaying, setRepaying] = useState<string | null>(null);
+  const [back, setBack] = useState('');
+
+  const add = () => {
+    if (!name.trim()) return setError(t('obl.needName'));
+    let minor: string;
+    try {
+      minor = fromMajor(amount.trim().replace(',', '.'), ccy as Currency).minor.toString();
+    } catch {
+      return setError(t('spend.badAmount'));
+    }
+    setError(null);
+    create.mutate(
+      {
+        name: name.trim(),
+        currency: ccy,
+        direction: 'owed_to_me',
+        principalMinor: minor,
+        remainingMinor: minor,
+        // Платежа за период у займа нет: его никто не откладывает, он просто ждёт возврата.
+        paymentMinor: '0',
+      },
+      {
+        onSuccess: () => {
+          setName('');
+          setAmount('');
+        },
+      },
+    );
+  };
+
+  const sendBack = (id: string, currency: string) => {
+    let minor: string;
+    try {
+      minor = fromMajor(back.trim().replace(',', '.'), currency as Currency).minor.toString();
+    } catch {
+      return setError(t('spend.badAmount'));
+    }
+    setError(null);
+    repay.mutate(
+      { id, amountMinor: minor },
+      {
+        onSuccess: () => {
+          setRepaying(null);
+          setBack('');
+        },
+      },
+    );
+  };
+
+  return (
+    <Section
+      label={t('obl.loans')}
+      accent="lime"
+      isError={isError}
+      onRetry={() => void refetch()}
+      formError={error}
+      mutationError={create.isError || del.isError || repay.isError}
+      rows={
+        data.length === 0 ? (
+          <div className="prow">
+            <span />
+            <span className="dim">{t('obl.loans.empty')}</span>
+            <span />
+            <span />
+          </div>
+        ) : (
+          data.map((d) => (
+            <div key={d.id}>
+              <div className="prow">
+                <span className="prow-day" aria-hidden />
+                <span className="prow-name">
+                  <span>{d.name}</span>
+                  {d.currency !== base && <Tag tone="vio">{d.currency}</Tag>}
+                </span>
+                <span className="prow-num">
+                  <b>
+                    {formatMinor(d.remainingMinor, d.currency, locale)} {d.currency}
+                  </b>
+                </span>
+                <button type="button" className="act" onClick={() => setRepaying(d.id)}>
+                  {t('obl.loans.repaid')}
+                </button>
+                <button
+                  type="button"
+                  className="act"
+                  aria-label={t('common.delete')}
+                  onClick={() => del.mutate(d.id)}
+                >
+                  ✕
+                </button>
+              </div>
+              {repaying === d.id && (
+                <div className="prow">
+                  <span className="prow-day" aria-hidden />
+                  <span className="prow-bar prow-bar-full">
+                    <span className="form-row">
+                      <input
+                        className="field num field-sm"
+                        inputMode="decimal"
+                        autoFocus
+                        aria-label={t('obl.loans.repaid')}
+                        placeholder={t('obl.remaining')}
+                        value={back}
+                        onChange={(e) => setBack(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendBack(d.id, d.currency)}
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={repay.isPending}
+                        onClick={() => sendBack(d.id, d.currency)}
+                      >
+                        {t('common.save')}
+                      </button>
+                      <button type="button" className="act" onClick={() => setRepaying(null)}>
+                        {t('common.cancel')}
+                      </button>
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+          ))
+        )
+      }
+      form={
+        <>
+          <input
+            className="field grow"
+            placeholder={t('obl.loans.who')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <CurrencySelect
+            value={ccy}
+            onChange={setCcy}
+            label={t('common.currency')}
+            className="field mono field-ccy-wide"
+          />
+          <input
+            className="field num field-sm"
+            inputMode="decimal"
+            placeholder={t('obl.remaining')}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <button type="button" className="btn" disabled={create.isPending} onClick={add}>
+            {t('common.add')}
+          </button>
+        </>
+      }
+    />
+  );
+}
+
 function DebtsSection({ base }: SectionProps) {
   const { t, locale } = useI18n();
   const today = useToday();
-  const { data = [], isError, refetch } = useEntities<Debt>('debts');
+  const { data: all = [], isError, refetch } = useEntities<Debt>('debts');
+  /*
+   * Займы живут в той же таблице, но в этом разделе им не место: там деньги уходят, здесь приходят.
+   * Показать их вместе значило бы сложить в одну колонку числа с разным знаком (#94).
+   */
+  const data = all.filter((d) => d.direction !== 'owed_to_me');
   const create = useCreateEntity('debts');
   const del = useDeleteEntity('debts');
   // Какую строку правим: правка раскрывается под ней, как редактор категорий.
@@ -930,6 +1114,8 @@ export function Obligations() {
         <div className="col">
           {isSectionVisible('account') && !isMember && <AccountsSection base={base} />}
           <DebtsSection base={base} />
+          {/* Займы рядом с долгами: та же сущность, обратный знак денег (#94). */}
+          <LoansSection base={base} />
           {isSectionVisible('goal') && <GoalsSection base={base} />}
         </div>
         <div className="col">

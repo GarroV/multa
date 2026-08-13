@@ -319,7 +319,14 @@ async function resolveObligations(
     db
       .select()
       .from(debts)
-      .where(and(eq(debts.workspaceId, ws.id), sql`${debts.closedAt} is null`)),
+      .where(
+        and(
+          eq(debts.workspaceId, ws.id),
+          sql`${debts.closedAt} is null`,
+          // Заём в раздачу не идёт: иначе каскад откладывал бы деньги на возврат чужого долга (#94).
+          sql`${debts.direction} = 'owed_by_me'`,
+        ),
+      ),
     db
       .select()
       .from(currencyBuckets)

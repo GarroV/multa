@@ -176,6 +176,8 @@ export interface Debt {
   /** Ступени суммы платежа: «с такой-то даты столько-то» (issue про меняющийся платёж). */
   amountSteps: { from: string; amountMinor: string }[] | null;
   counterparty: string | null;
+  /** Кто кому должен: `owed_to_me` — заём, деньги ждут возврата и в раздачу не идут (#94). */
+  direction: 'owed_by_me' | 'owed_to_me';
 }
 export interface Envelope {
   id: string;
@@ -215,6 +217,24 @@ export type EntityName = 'debts' | 'envelopes' | 'goals' | 'buckets';
 
 export function useEntities<T>(name: EntityName) {
   return useQuery({ queryKey: [name], retry: false, queryFn: () => api<T[]>(`/v1/${name}`) });
+}
+
+/**
+ * Возврат по займу (#94). Приход денег, а не правка карточки: сервер уменьшает остаток и пишет
+ * транзакцию, поэтому обновляем и списки, и план — месячный итог меняется вместе с остатком.
+ */
+export function useRepayLoan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, amountMinor }: { id: string; amountMinor: string }) =>
+      api(`/v1/debts/${id}/repaid`, { method: 'POST', body: JSON.stringify({ amountMinor }) }),
+    onSuccess: () => {
+      // Ключ списка — само имя сущности (см. useEntities), а не пара ['entities', name].
+      void qc.invalidateQueries({ queryKey: ['debts'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
 }
 
 export function useCreateEntity(name: EntityName) {
