@@ -41,15 +41,23 @@ test('список свой, а не системный, и подпись ви�
 test('переключение вида ритма не сдвигает строку', async ({ page }) => {
   const panel = await openIncomeEditor(page);
   const trigger = panel.locator('.sel-trigger').first();
-  const before = await trigger.boundingBox();
 
+  /*
+   * Меряем смещение от левого края панели, а не в окне. Абсолютные координаты в общем демо двигают
+   * соседние сценарии: они добавляют и убирают строки в том же воркспейсе, и проверка падала не от
+   * вёрстки, а от чужой записи. Жалоба была про горизонтальный сдвиг в ряду — его и меряем.
+   */
+  const offsetInRow = async (): Promise<number> => {
+    const [t, p] = [await trigger.boundingBox(), await panel.boundingBox()];
+    return Math.round((t?.x ?? 0) - (p?.x ?? 0));
+  };
+
+  const before = await offsetInRow();
   await trigger.click();
   await page.locator('.sel-item', { hasText: /Every day|Каждый день/ }).click();
 
-  const after = await trigger.boundingBox();
   // Раньше исчезавшее поле «число» перестраивало ряд, и открытая выпадашка оказывалась в новом месте.
-  expect(Math.abs((after?.x ?? 0) - (before?.x ?? 0))).toBeLessThanOrEqual(1);
-  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((await offsetInRow()) - before)).toBeLessThanOrEqual(1);
 });
 
 test('список работает с клавиатуры и возвращает фокус', async ({ page }) => {

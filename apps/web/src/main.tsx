@@ -3,6 +3,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { OfflineBar } from './components/OfflineBar.tsx';
 import { I18nProvider } from './lib/i18n.tsx';
 import { router } from './router.tsx';
 import { applyTheme, initialTheme } from './lib/theme.ts';
@@ -45,6 +46,8 @@ createRoot(rootEl).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <I18nProvider>
+          {/* Выше гейта: без сети гейт показывает вход, и полоса внутри оболочки не появлялась. */}
+          <OfflineBar />
           <RouterProvider router={router} />
         </I18nProvider>
       </QueryClientProvider>
