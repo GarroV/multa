@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { I18nProvider } from './lib/i18n.tsx';
 import { router } from './router.tsx';
 import { applyTheme, initialTheme } from './lib/theme.ts';
@@ -24,10 +25,16 @@ if (!rootEl) throw new Error('#root не найден');
 
 createRoot(rootEl).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <RouterProvider router={router} />
-      </I18nProvider>
-    </QueryClientProvider>
+    {/*
+      Граница снаружи провайдеров: упасть может и словарь, и клиент запросов, и тогда экран ошибки
+      внутри них не отрисовался бы вовсе — остался бы прежний белый лист.
+    */}
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <I18nProvider>
+          <RouterProvider router={router} />
+        </I18nProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

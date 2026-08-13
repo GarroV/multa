@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { App } from './App.tsx';
+import { ErrorScreen, reportError } from './components/ErrorBoundary.tsx';
 import { Demo } from './screens/Demo.tsx';
 import { Statistics } from './screens/Statistics.tsx';
 import { Obligations } from './screens/Obligations.tsx';
@@ -76,7 +77,17 @@ const routeTree = rootRoute.addChildren([
   demoRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+/**
+ * Ошибка внутри маршрута до внешней границы не доходит — роутер ловит её сам и по умолчанию
+ * показывает свой отладочный экран «Something went wrong». Человеку он ничего не объясняет, а
+ * отчёт никуда не уходит; ставим свой.
+ */
+function RouteError({ error }: { error: Error }) {
+  reportError(error, window.location.pathname);
+  return <ErrorScreen />;
+}
+
+export const router = createRouter({ routeTree, defaultErrorComponent: RouteError });
 
 declare module '@tanstack/react-router' {
   interface Register {

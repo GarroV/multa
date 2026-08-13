@@ -1,4 +1,4 @@
-import { money, toCsv, toMajorString, type Currency, type TargetKind } from '@multa/core';
+import { money, scrubPii, toCsv, toMajorString, type Currency, type TargetKind } from '@multa/core';
 import { isUuid } from './http/ids.ts';
 import { rateLimit } from './http/rateLimit.ts';
 import { desc, eq } from 'drizzle-orm';
@@ -245,6 +245,29 @@ app.get('/v1/export/transactions.csv', requireWorkspace, async (c) => {
       'content-disposition': 'attachment; filename="multa-transactions.csv"',
     },
   });
+});
+
+/**
+ * Приём ошибок фронта (Спринт 6, «Sentry без PII»).
+ *
+ * Sentry SaaS не берём: профиль нулевой стоимости запрещает платные сервисы и вторые ключи, а
+ * docs/03-architecture.md прямо предусматривает «self-hosted или пока без него». Своя ручка даёт
+ * то же, ради чего Sentry и нужен: ошибка не умирает в консоли посетителя, а доезжает до логов,
+ * где её видно.
+ *
+ * Ручка нарочно тупая: принимает текст, чистит от личного и пишет в лог. Ни хранения, ни разбора —
+ * иначе это отдельный продукт, а нам нужно перестать быть слепыми.
+ */
+app.post('/v1/client-errors', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as {
+    message?: unknown;
+    where?: unknown;
+  } | null;
+  const message = typeof body?.message === 'string' ? body.message : '';
+  if (!message.trim()) return c.json({ error: 'empty' }, 400);
+  const where = typeof body?.where === 'string' ? scrubPii(body.where) : 'unknown';
+  logger.error(`client error at ${where}`, scrubPii(message));
+  return c.json({ ok: true });
 });
 
 app.delete('/v1/me', requireAuth, async (c) => {
