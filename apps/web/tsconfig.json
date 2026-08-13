@@ -3,7 +3,8 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    /* Матчеры jest-dom подключены в vitest.setup.ts — типы должны знать о них тоже (#17). */
+    "types": ["vite/client", "@testing-library/jest-dom"],
     "outDir": "dist"
   },
   "include": ["src"]

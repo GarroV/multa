@@ -9,5 +9,7 @@ export default defineConfig({
     environment: 'jsdom',
     environmentOptions: { jsdom: { url: 'http://multa.example.test' } },
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Общая подготовка компонентных тестов: матчеры про смысл и уборка DOM между ними (#17).
+    setupFiles: ['./vitest.setup.ts'],
   },
 });
