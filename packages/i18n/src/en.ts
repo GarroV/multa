@@ -217,7 +217,7 @@ export const en = {
   'signal.act.freezeGoal': 'Freeze the contribution',
   'signal.act.open': 'Open',
   'signal.metric.days': '{days} days',
-  'rec.title': 'RECURRING PAYMENTS',
+  'rec.title': 'Recurring payments',
   'rec.name': 'Name',
   'rec.amount': 'Amount',
   'rec.firstOn': 'First time',
@@ -415,7 +415,7 @@ export const en = {
   'nav.settings': 'Settings',
 
   // Обязательства
-  'acc.title': 'ACCOUNTS',
+  'acc.title': 'Accounts',
   'acc.total': 'MONEY ON HAND',
   'acc.noRate': 'no rate: {list}',
   'acc.empty': 'No accounts yet — nothing to total up',
@@ -425,6 +425,9 @@ export const en = {
   'acc.kind.other': 'other',
   'acc.archive': 'archive',
   'acc.balance': 'Balance',
+  'obl.loans.amount': 'How much is owed',
+  'acc.kind': 'Account type',
+  'obl.rule.how': 'How to calculate',
   'obl.loans': 'Owed to me',
   'obl.loans.empty': 'You have not lent anything',
   'obl.loans.who': 'Who owes',

@@ -203,7 +203,8 @@ function AccountsSection({ base }: SectionProps) {
           <div className="form-row">
             <Select
               className="field field-choice"
-              label={t('acc.title')}
+              // Подпись поля, а не раздела: «ACCOUNTS» не отличало одно от другого (#112).
+              label={t('acc.kind')}
               value={kind}
               onChange={(next) => setKind(next as typeof kind)}
               options={(['cash', 'card', 'savings', 'other'] as const).map((k) => ({
@@ -393,7 +394,8 @@ function LoansSection({ base }: SectionProps) {
           <input
             className="field num field-sm"
             inputMode="decimal"
-            placeholder={t('obl.remaining')}
+            // Не «осталось выплатить»: платить тут не мне, это сумма к возврату (#112).
+            placeholder={t('obl.loans.amount')}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
@@ -782,7 +784,8 @@ function EnvelopesSection({ base }: SectionProps) {
           <div className="form-row">
             <Select
               className="field field-choice"
-              label={t('obl.rule.fixed')}
+              // Подпись поля, а не текущего значения: «fixed» звучало как «fixed, fixed» (#112).
+              label={t('obl.rule.how')}
               value={ruleKind}
               onChange={(next) => setRuleKind(next as 'fixed' | 'percent')}
               options={[

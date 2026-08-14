@@ -213,7 +213,7 @@ export const ru: Record<TranslationKey, string> = {
   'signal.act.freezeGoal': 'Заморозить взнос',
   'signal.act.open': 'Открыть',
   'signal.metric.days': '{days} дн.',
-  'rec.title': 'РЕГУЛЯРНЫЕ ПЛАТЕЖИ',
+  'rec.title': 'Регулярные платежи',
   'rec.name': 'Название',
   'rec.amount': 'Сумма',
   'rec.firstOn': 'Первый раз',
@@ -410,7 +410,7 @@ export const ru: Record<TranslationKey, string> = {
   'nav.settings': 'Настройки',
 
   // Обязательства
-  'acc.title': 'СЧЕТА',
+  'acc.title': 'Счета',
   'acc.total': 'ВСЕГО ДЕНЕГ',
   'acc.noRate': 'нет курса: {list}',
   'acc.empty': 'Счета не заведены — итог считать не из чего',
@@ -420,6 +420,9 @@ export const ru: Record<TranslationKey, string> = {
   'acc.kind.other': 'другое',
   'acc.archive': 'в архив',
   'acc.balance': 'Остаток',
+  'obl.loans.amount': 'Сколько должны',
+  'acc.kind': 'Тип счёта',
+  'obl.rule.how': 'Как считать',
   'obl.loans': 'Должны мне',
   'obl.loans.empty': 'Никому не одалживал',
   'obl.loans.who': 'Кто должен',
