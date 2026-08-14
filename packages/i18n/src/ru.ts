@@ -525,6 +525,8 @@ export const ru: Record<TranslationKey, string> = {
   'spend.amount': 'Сколько',
   'spend.category': 'Куда',
   'spend.noCategory': 'Без категории',
+  'spend.note': 'Заметка',
+  'spend.note.hint': 'например «кофе на вынос»',
   'spend.date': 'Когда',
   'spend.submit': 'Записать',
   'spend.recent': 'Траты периода',

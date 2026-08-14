@@ -377,10 +377,13 @@ export function SpendEntry({
             />
           </div>
           <div className="stack-sm stack-grow">
-            <span className="micro">{t('common.name')}</span>
+            {/* Это заметка к трате, а не название: «кофе на вынос», а не «Кофе». Плейсхолдер «—»
+                ничего не говорил, у поля не было своего имени для экранного читателя. */}
+            <span className="micro">{t('spend.note')}</span>
             <input
               className="field"
-              placeholder="—"
+              aria-label={t('spend.note')}
+              placeholder={t('spend.note.hint')}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}

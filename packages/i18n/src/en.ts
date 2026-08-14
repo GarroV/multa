@@ -531,6 +531,8 @@ export const en = {
   'spend.amount': 'How much',
   'spend.category': 'Where',
   'spend.noCategory': 'No category',
+  'spend.note': 'Note',
+  'spend.note.hint': 'e.g. “coffee to go”',
   'spend.date': 'When',
   'spend.submit': 'Log it',
   'spend.recent': 'Spends this period',
