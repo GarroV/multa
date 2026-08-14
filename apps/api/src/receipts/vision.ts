@@ -132,7 +132,14 @@ export async function recognizeReceipt(imageUrl: string): Promise<VisionReceipt 
             role: 'user',
             content: [
               { type: 'text', text: 'Извлеки итог, валюту, дату, магазин и позиции этого чека.' },
-              { type: 'image_url', image_url: { url: imageUrl } },
+              /*
+               * `detail: 'low'` — сознательный выбор цены против точности. На низкой детализации
+               * картинка стоит фиксированно мало вместо разбиения на плитки, а чек — крупный
+               * печатный текст на белом: именно тот случай, где высокое разрешение не нужно.
+               * Если окажется, что позиции читаются плохо, поднимем обратно — но уже по факту, а
+               * не заранее «на всякий случай».
+               */
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
             ],
           },
         ],
@@ -147,7 +154,21 @@ export async function recognizeReceipt(imageUrl: string): Promise<VisionReceipt 
       logger.warn('vision: OpenAI ответил ошибкой', { status: res.status });
       return null;
     }
-    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const body = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+    /*
+     * Расход токенов в лог (вопрос владельца 14.08.2026: «дорого ли будет нейронкой?»).
+     *
+     * Отвечать на такой вопрос по памяти нельзя: цену определяет число токенов картинки, а оно
+     * зависит от её размера и уровня детализации — то есть от наших же настроек. Логируем факт,
+     * чтобы после первого десятка чеков цена была замером, а не оценкой.
+     */
+    logger.info('vision: разбор чека', {
+      promptTokens: body.usage?.prompt_tokens ?? null,
+      completionTokens: body.usage?.completion_tokens ?? null,
+    });
     const content = body.choices?.[0]?.message?.content;
     if (!content) return null;
     return parseVisionPayload(content);
