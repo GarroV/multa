@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePatchSettings, useSettings } from '../lib/queries.ts';
 import { Hint } from './ui/Hint.tsx';
@@ -22,7 +23,18 @@ export function CurrencySettings() {
   const { t } = useI18n();
   const { data } = useSettings();
   const patch = usePatchSettings();
+  const [draft, setDraft] = useState('');
   if (!data) return null;
+
+  const list = data.currency.list;
+  const save = (next: string[]) => patch.mutate({ currency: { list: next } });
+  const addCode = () => {
+    // Трёхбуквенный код — единственная проверка на клиенте: справочник валют живёт в ядре, и
+    // дублировать его здесь значило бы завести второй список, который однажды отстанет.
+    if (draft.length !== 3 || list.includes(draft)) return;
+    save([...list, draft]);
+    setDraft('');
+  };
 
   return (
     <Panel
@@ -30,6 +42,59 @@ export function CurrencySettings() {
       accent="cyan"
       tools={patch.isError ? <Tag tone="mag">{t('common.error')}</Tag> : undefined}
     >
+      {/*
+        Список валют воркспейса (запрос владельца 06.08.2026: «заложи на будущее список валют
+        задавать в настройках»). Настройка хранилась с самого начала и читалась выпадашками, но
+        задать её было негде — то есть у всех был один и тот же зашитый набор.
+
+        Полный справочник ISO сюда не годится: в списке из ста семидесяти позиций нужную ищут
+        дольше, чем набирают руками. Поэтому человек собирает свой набор из тех валют, между
+        которыми живёт.
+      */}
+      <div className="prow">
+        <span className="prow-day" aria-hidden />
+        <span className="prow-name">
+          <span>{t('set.currency.list')}</span>
+          <Hint text={t('set.currency.list.hint')} />
+        </span>
+        <span className="prow-bar prow-bar-full">
+          <span className="row row-wrap">
+            {list.map((code) => (
+              <span className="chip" key={code}>
+                {code}
+                <button
+                  type="button"
+                  className="chip-x"
+                  aria-label={`${t('common.delete')} ${code}`}
+                  // Последнюю не убираем: воркспейс без единой валюты не сможет ничего записать.
+                  disabled={list.length <= 1 || patch.isPending}
+                  onClick={() => save(list.filter((c) => c !== code))}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            <input
+              className="field mono field-ccy"
+              aria-label={t('set.currency.add')}
+              placeholder="EUR"
+              maxLength={3}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && addCode()}
+            />
+            <button
+              type="button"
+              className="act"
+              disabled={draft.length !== 3 || list.includes(draft) || list.length >= 12}
+              onClick={addCode}
+            >
+              {t('common.add')}
+            </button>
+          </span>
+        </span>
+      </div>
+
       <div className="prow">
         <span className="prow-day" aria-hidden />
         <span className="prow-name">

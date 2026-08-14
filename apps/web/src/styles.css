@@ -2568,3 +2568,28 @@ a {
 .mgrid-input:focus {
   outline: none;
 }
+
+/*
+ * Крестик внутри чипа валюты. Отдельная кнопка, а не клик по всему чипу: чип с кодом валюты
+ * выглядит как ярлык, и удаление по нажатию на него было бы неожиданным — особенно необратимое
+ * рядом с соседними.
+ */
+.chip-x {
+  margin-left: 6px;
+  padding: 0 2px;
+  font: inherit;
+  line-height: 1;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.chip-x:hover:not(:disabled) {
+  color: var(--over);
+}
+
+.chip-x:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

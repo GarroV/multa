@@ -450,6 +450,10 @@ export const ru: Record<TranslationKey, string> = {
   // Настройки
   'settings.currency': 'Базовая валюта',
   'set.currency.title': 'Валюта и курс',
+  'set.currency.list': 'Валюты воркспейса',
+  'set.currency.list.hint':
+    'Из чего выбирать в формах. Полный справочник сюда не годится: в списке из ста семидесяти валют нужную ищут дольше, чем набирают. Оставь те, между которыми живёшь.',
+  'set.currency.add': 'Добавить валюту',
   'set.currency.source': 'Источник курса',
   'set.currency.source.cbr': 'ЦБ РФ',
   'set.currency.source.ecb': 'ЕЦБ',

@@ -455,6 +455,10 @@ export const en = {
   // Настройки
   'settings.currency': 'Base currency',
   'set.currency.title': 'Currency and rates',
+  'set.currency.list': 'Workspace currencies',
+  'set.currency.list.hint':
+    'What the forms offer. The full ISO list is useless here: finding one of a hundred and seventy takes longer than typing it. Keep the ones you live between.',
+  'set.currency.add': 'Add a currency',
   'set.currency.source': 'Rate source',
   'set.currency.source.cbr': 'CBR',
   'set.currency.source.ecb': 'ECB',
