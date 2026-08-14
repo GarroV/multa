@@ -291,3 +291,38 @@ describe('мастер-сетка', () => {
     expect(after.footer.perDayMinor).toEqual(before.footer.perDayMinor);
   });
 });
+
+describe('цифра дня текущего столбца сходится с планом', () => {
+  /*
+   * На «Плане» и в мастер-сетке цифра дня показывалась разной для одного и того же периода: план
+   * делит остаток на жизнь на ОСТАВШИЕСЯ дни с учётом уже потраченного, а сетка делила всю жизнь на
+   * всю длину периода. Два экрана, два числа за один день — от этого перестают верить продукту.
+   *
+   * Для будущих столбцов сеточная формула правильная (весь период впереди, факта нет). Расходиться
+   * не должен только текущий столбец — он про «сегодня», и «сегодня» одно.
+   *
+   * Найдено осмотром механики на проде 14.08.2026.
+   */
+  test('первый столбец сетки равен цифре дня плана', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const food = await categoryId(client, 'Продукты');
+    await expectOk(
+      await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '2000000' }),
+    );
+    // Трата: план учтёт её в остатке на жизнь, и цифра дня сдвинется — сетка обязана сдвинуться так же.
+    await expectOk(
+      await client.post('/v1/transactions', {
+        amountMinor: '300000',
+        currency: 'RUB',
+        categoryId: food,
+      }),
+      201,
+    );
+
+    const plan = await getPlan(client);
+    const grid = await expectOk<{ footer: { perDayMinor: string[] } }>(
+      await client.get('/v1/plan/grid?periods=4'),
+    );
+    expect(grid.footer.perDayMinor[0]).toBe(plan.canSpendPerDayMinor);
+  });
+});

@@ -153,6 +153,11 @@ async function plannedByPeriod(
   return new Map(rows.map((r) => [`${r.startsOn}:${r.targetId}`, r.plannedMinor]));
 }
 
+/** Заменяет нулевой (текущий) столбец значением с «Плана», оставляя будущие как есть. */
+function withCurrent(cells: string[], current: string): string[] {
+  return cells.length === 0 ? cells : [current, ...cells.slice(1)];
+}
+
 export async function getPlanGrid(
   ws: Workspace,
   asOf: string,
@@ -547,8 +552,15 @@ export async function getPlanGrid(
       ...(privateGroup ? [privateGroup] : []),
     ],
     footer: {
-      freeMinor: cellsToStrings(grid.footer.freeMinor),
-      perDayMinor: cellsToStrings(grid.footer.perDayMinor),
+      freeMinor: withCurrent(cellsToStrings(grid.footer.freeMinor), plan.freeMinor),
+      /*
+       * Первый столбец подвала — ровно с «Плана», не из сеточной сборки. Сетка делит всю жизнь на
+       * всю длину периода; план — остаток на жизнь на ОСТАВШИЕСЯ дни, с учётом уже потраченного.
+       * Для будущих столбцов сеточная формула верна (весь период впереди, факта нет), а текущий
+       * обязан совпадать с «Планом» до копейки — иначе два экрана показывают за один день разное
+       * (найдено осмотром механики 14.08.2026).
+       */
+      perDayMinor: withCurrent(cellsToStrings(grid.footer.perDayMinor), plan.canSpendPerDayMinor),
       toExchangeMinor: cellsToStrings(grid.footer.toExchangeMinor),
       toExchangeByCurrency: grid.footer.toExchangeByCurrency.map((x) => ({
         currency: x.currency,
