@@ -369,6 +369,8 @@ export function SpendEntry({
             <input
               className="field num"
               type="date"
+              // Текст рядом — не подпись: без aria-label читатель объявит поле безымянным.
+              aria-label={t('spend.date')}
               value={occurredOn}
               max={today}
               onChange={(e) => setOccurredOn(e.target.value)}

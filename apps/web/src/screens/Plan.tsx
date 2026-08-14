@@ -460,7 +460,15 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               <span className={`kpi-value${BigInt(plan.remainingLivingMinor) < 0n ? ' over' : ''}`}>
                 {withCcy(plan.remainingLivingMinor)}
               </span>
-              <Bar share={spentShare} tone={BigInt(plan.overspentMinor) > 0n ? 'mag' : 'cyan'} />
+              <Bar
+                share={spentShare}
+                tone={BigInt(plan.overspentMinor) > 0n ? 'mag' : 'cyan'}
+                // Без подписи экранный читатель объявляет «изображение» и молчит о том, что на нём.
+                label={t('spend.spentOfPlan', {
+                  spent: `${formatMinor(plan.spentLivingMinor, base, locale)} ${base}`,
+                  plan: `${formatMinor(plan.livingMinor, base, locale)} ${base}`,
+                })}
+              />
               <span className="kpi-sub">
                 {t('spend.spentOfPlan', {
                   spent: fmt(plan.spentLivingMinor),
