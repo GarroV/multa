@@ -302,6 +302,24 @@ export async function seedDemo(userId: string): Promise<string> {
       paymentMinor: 1_200_000n,
       counterparty: 'Tinkoff',
     },
+    /*
+     * Заём (#94): деньги, которые должны вернуть. В демо он обязателен — без него смотрящий не
+     * увидит, что раздел вообще есть, и решит, что продукт умеет только долги.
+     *
+     * Показывает главное свойство: платёж за период нулевой, потому что заём никто не откладывает.
+     * В каскад он не входит и цифру дня не уменьшает — на экране это видно тем, что «Должны мне»
+     * стоит отдельным разделом, а не строкой среди долгов.
+     */
+    {
+      workspaceId,
+      name: 'Lent to Marko',
+      currency: 'EUR',
+      direction: 'owed_to_me',
+      principalMinor: 40_000n,
+      remainingMinor: 25_000n,
+      paymentMinor: 0n,
+      counterparty: 'Marko',
+    },
   ]);
 
   await db.insert(envelopes).values([

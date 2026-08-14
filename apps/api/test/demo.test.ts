@@ -251,6 +251,29 @@ describe('вход в демо', () => {
   });
 });
 
+describe('демо показывает займы (#94)', () => {
+  /*
+   * Часть Definition of Done из правила про демо: новая фича обязана быть видна в демо, иначе
+   * смотрящий решит, что продукт её не умеет. Заём при этом не должен трогать раздачу — ровно то,
+   * ради чего он вынесен из каскада.
+   */
+  test('в демо есть заём, и он не забирает деньги из плана', async () => {
+    const client = await anonymous();
+    await expectOk(await client.post('/v1/demo/enter'));
+
+    const debts = await expectOk<{ name: string; direction: string; paymentMinor: string }[]>(
+      await client.get('/v1/debts'),
+    );
+    const loan = debts.find((d) => d.direction === 'owed_to_me');
+    expect(loan).toBeDefined();
+    // Платёж за период нулевой: заём никто не откладывает, его ждут.
+    expect(loan!.paymentMinor).toBe('0');
+
+    const plan = await expectOk<PlanDto>(await client.get('/v1/plan/current'));
+    expect(plan.allocations.some((a) => a.name === loan!.name)).toBe(false);
+  });
+});
+
 describe('почта демо зарезервирована (#86)', () => {
   /*
    * Демо-пользователь резолвится по равенству почты константе. На чистом развёртывании посторонний

@@ -14,6 +14,8 @@ create table workspaces (
     check (payday_weekend_rule in ('as-is','before','after')),  -- перенос выплаты с выходного; влияет на границы
   onboarding_skipped boolean not null default false,            -- «пропустить настройку»: в приложение с пустым планом
   settings jsonb,                   -- настройки поведения (#49): буфер темпа, порядок сжатия, горизонт медианы; форма — в zod-схеме
+  onboarding_completed_at timestamptz,  -- момент первого завершения; НЕ перезаписывается, иначе это не воронка
+  last_active_on date,              -- последняя активность: пишется при чтении плана, не чаще раза в сутки
   created_at timestamptz not null default now()
 );
 -- Ожидаемый доход периода здесь НЕ живёт: он считается по income_sources и хранится в pay_periods.
@@ -101,6 +103,8 @@ create table debts (
   remaining_minor bigint not null,
   payment_minor bigint not null,     -- платеж за период
   due_date date,                     -- расчетная дата закрытия
+  amount_steps jsonb,                -- «с такой-то даты платёж другой»; правило в core/amountOn
+  direction text not null default 'owed_by_me',  -- owed_to_me = заём: в каскад НЕ идёт (#94)
   counterparty text,
   agreed_rate numeric(20,10),        -- договорный курс для p2p-долгов
   closed_at timestamptz
@@ -259,6 +263,9 @@ create table recurring_items (     -- расходы и взносы; доход
   starts_on date,            -- первая дата платежа: до неё событий нет
   ends_on date,              -- отменённая подписка перестаёт быть событием, но остаётся в истории
   show_on_map boolean not null default true,  -- метка на карте периода; событие в прогнозе остаётся
+  amount_steps jsonb,        -- «с такой-то даты сумма другая»: интернет 2 500 до октября, потом 4 000
+  reserve boolean not null default false,  -- откладывать в этом периоде под платёж следующего
+                             -- (выключено по умолчанию: иначе деньги посчитались бы дважды)
   next_on date,              -- НЕ ЧИТАЕТСЯ ни одним хендлером (техдолг, не оживлять вслепую)
   escalation jsonb,          -- {percent: 10, from: '2026-06-01'} — аренда растет; тоже не читается
   active boolean not null default true
@@ -278,6 +285,8 @@ create table import_batches (     -- пачка импорта: нужна, чт
 create index import_batches_ws_idx on import_batches (workspace_id, created_at);
 -- transactions: import_batch_id uuid references import_batches on delete set null,
 --               import_key text  -- отпечаток строки исходной таблицы, unique (workspace_id, import_key)
+--               client_key text  -- ключ попытки записи из офлайн-очереди; unique (workspace_id, client_key):
+--                                -- повтор отправки не создаёт вторую трату
 
 create table fx_rates (
   source text not null,      -- 'cbr' | 'ecb' | 'frankfurter' (только публичные источники)
