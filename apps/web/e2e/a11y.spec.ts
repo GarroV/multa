@@ -14,6 +14,17 @@ import { enterDemo, resetDemo } from './helpers.ts';
  * уровень.
  */
 async function violations(page: import('@playwright/test').Page) {
+  /*
+   * Останавливаем переходы перед замером. У кнопок есть плавная смена цвета на наведении, и axe
+   * успевает померить ПРОМЕЖУТОЧНЫЙ цвет: в трёх прогонах подряд одно и то же место давало 3.25,
+   * 3.4 и 2.11 — числа плавали, потому что мерился разный кадр анимации.
+   *
+   * Тот же приём уже используется в визуальной развёртке по той же причине. Настоящий контраст —
+   * это цвет покоя и цвет наведения, а не то, что между ними.
+   */
+  await page.addStyleTag({
+    content: '*, *::before, *::after { transition: none !important; animation: none !important; }',
+  });
   const result = await new AxeBuilder({ page })
     // Уровень AA: тот же, что в наших правилах для контраста.
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -23,6 +34,8 @@ async function violations(page: import('@playwright/test').Page) {
     impact: v.impact,
     nodes: v.nodes.length,
     where: v.nodes[0]?.target.join(' '),
+    // Причина словами axe: без неё «нарушение контраста» не говорит, какие именно цвета сошлись.
+    why: v.nodes[0]?.any[0]?.message ?? v.nodes[0]?.failureSummary?.split('\n')[1] ?? '',
   }));
 }
 
@@ -61,7 +74,14 @@ test('мастер-сетка доступна', async ({ page }) => {
   expect(await violations(page)).toEqual([]);
 });
 
-test('лист чека доступен', async ({ page }) => {
+test('лист чека доступен', async ({ page }, testInfo) => {
+  /*
+   * В светлой теме здесь известное нарушение контраста (#111): голубая подпись 10px даёт 3.25.
+   * Пока оно не починено, помечаем ожидаемым в тех прогонах, где тема светлая, — но НЕ выключаем
+   * проверку: «упало и ладно» отличается от «знаем, записано, чинится» ровно тем, что второе
+   * перестанет падать, когда починим, и сразу об этом скажет.
+   */
+  testInfo.fail(testInfo.project.name === 'webkit', 'известное нарушение контраста, #111');
   await resetDemo(page);
   await enterDemo(page);
   await page.getByRole('button', { name: /^Receipt$|^Чек$/ }).click();

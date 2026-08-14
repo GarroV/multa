@@ -74,7 +74,7 @@ test('невалидная сумма не создаёт обязательст
   await expect(debts.locator('.prow')).toHaveCount(rowsBefore);
 });
 
-test('ошибка загрузки не притворяется пустотой (регрессия #20)', async ({ page }) => {
+test('ошибка загрузки не притворяется пустотой (регрессия #20) @mocked', async ({ page }) => {
   await page.route('**/v1/debts', (route) => route.fulfill({ status: 500, body: '{}' }));
   await page.locator('.tab', { hasText: 'Obligations' }).click();
 
@@ -112,7 +112,9 @@ test('язык запоминается между визитами и попа�
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });
 
-test('сбой загрузки в статистике не выдаётся за пустоту (находка аудита)', async ({ page }) => {
+test('сбой загрузки в статистике не выдаётся за пустоту (находка аудита) @mocked', async ({
+  page,
+}) => {
   await page.route('**/v1/exchange-ops', (route) => route.fulfill({ status: 500, body: '{}' }));
   await page.locator('.tab', { hasText: 'Statistics' }).click();
   await expect(page).toHaveURL(/\/statistics$/);

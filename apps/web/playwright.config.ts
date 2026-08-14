@@ -33,7 +33,41 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    /*
+     * Safari и Firefox гоняют не весь набор, а критические пути (web/testing.md требует три
+     * браузера). Полный прогон втрое — двадцать минут на правку кнопки: столько ждать не будут, и
+     * проверку однажды выключат целиком. Здесь лучше меньше, но всегда.
+     *
+     * Что именно: вход и онбординг, запись траты, план и таблица, доступность. Это места, где
+     * браузеры расходятся по-настоящему — поля дат, портал выпадашки, форматирование чисел.
+     */
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+      testMatch: /(flows|onboarding|demo|a11y|select)\.spec\.ts/,
+      /*
+       * Сценарии с подменой ответа API в Safari и Firefox не гоняются: перехват кросс-доменного
+       * запроса там не срабатывает вовсе (проверено — ноль перехватов при живом запросе), и тест
+       * падал бы из-за инструмента, а не из-за продукта. Отрисовка ошибки от браузера не зависит,
+       * её достаточно проверить в одном.
+       */
+      grepInvert: /подмен[аы] ответа|@mocked/,
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /(flows|onboarding|demo|a11y|select)\.spec\.ts/,
+      /*
+       * Сценарии с подменой ответа API в Safari и Firefox не гоняются: перехват кросс-доменного
+       * запроса там не срабатывает вовсе (проверено — ноль перехватов при живом запросе), и тест
+       * падал бы из-за инструмента, а не из-за продукта. Отрисовка ошибки от браузера не зависит,
+       * её достаточно проверить в одном.
+       */
+      grepInvert: /подмен[аы] ответа|@mocked/,
+    },
+  ],
   webServer: [
     {
       command: `node -e "process.exit(0)" && pnpm --filter @multa/api exec tsx src/migrate.ts && pnpm --filter @multa/api exec tsx src/server.ts`,
