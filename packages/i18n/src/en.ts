@@ -495,7 +495,7 @@ export const en = {
     'Never show more signals than this: a list nobody finishes reading does not help.',
   'set.medianPeriods': 'Periods in the median',
   'set.suggestRaises': 'Suggest raising underfunded lines',
-  'set.defaultProvider': 'Where you usually exchange',
+  'set.defaultProvider': 'Default place to exchange',
   'plan.kpi.buffer': '{amount} in buffer',
   'imp.title': 'MOVE FROM EXCEL',
   'imp.pick': 'Choose a file',

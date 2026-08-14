@@ -108,7 +108,7 @@ export function ImportExcel({ base }: { base: string }) {
         <span className="prow-day" aria-hidden />
         <span className="prow-name">
           <input
-            className="field grow"
+            className="field field-file"
             type="file"
             accept=".xlsx"
             aria-label={t('imp.pick')}

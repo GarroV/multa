@@ -489,7 +489,7 @@ export const ru: Record<TranslationKey, string> = {
     'Больше этого числа сигналов на экран не выводим: список, который не дочитывают, не помогает.',
   'set.medianPeriods': 'Периодов в медиане',
   'set.suggestRaises': 'Советовать поднимать заниженные статьи',
-  'set.defaultProvider': 'Где обычно меняешь',
+  'set.defaultProvider': 'Где обычно меняю',
   'plan.kpi.buffer': 'в буфере {amount}',
   'imp.title': 'ПЕРЕЕЗД С EXCEL',
   'imp.pick': 'Выбрать файл',
