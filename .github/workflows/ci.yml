@@ -67,7 +67,9 @@ jobs:
         run: PGPASSWORD=multa_dev_password psql -h localhost -U multa -d multa_test -c 'CREATE DATABASE multa_e2e OWNER multa'
 
       - name: Install browser
-        run: pnpm --filter @multa/web exec playwright install --with-deps chromium
+        # Три браузера, как требуют правила: Safari и Firefox гоняют критические пути.
+        # Ставить их надо явно — иначе прогон падает не тестом, а отсутствием бинаря.
+        run: pnpm --filter @multa/web exec playwright install --with-deps chromium webkit firefox
 
       - name: E2E (browser)
         run: pnpm --filter @multa/web test:e2e
