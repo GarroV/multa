@@ -473,6 +473,19 @@ export const en = {
   'set.kind.goal': 'goals',
   'set.kind.envelope': 'savings',
   'set.kind.category': 'categories',
+  'set.signals': 'When to warn',
+  'set.signal.burnThresholdDays': 'Pace: days ahead',
+  'set.signal.burnThresholdDays.hint':
+    'How many days before the period ends to say the current pace will not last. Fewer means fewer interruptions, but less room to react.',
+  'set.signal.runwayWarnDays': 'Runway: warn under',
+  'set.signal.runwayWarnDays.hint':
+    'How many days of life on current balances counts as worrying. Measured across all money, not one period.',
+  'set.signal.lockedWarnPct': 'Money locked, %',
+  'set.signal.lockedWarnPct.hint':
+    'The share of money committed to obligations and savings past which it is worth saying that little is left free.',
+  'set.signal.maxSignals': 'How many to show',
+  'set.signal.maxSignals.hint':
+    'Never show more signals than this: a list nobody finishes reading does not help.',
   'set.medianPeriods': 'Periods in the median',
   'set.suggestRaises': 'Suggest raising underfunded lines',
   'set.defaultProvider': 'Where you usually exchange',

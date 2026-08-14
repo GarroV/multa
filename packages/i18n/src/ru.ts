@@ -467,6 +467,19 @@ export const ru: Record<TranslationKey, string> = {
   'set.kind.goal': 'цели',
   'set.kind.envelope': 'накопления',
   'set.kind.category': 'категории',
+  'set.signals': 'Когда предупреждать',
+  'set.signal.burnThresholdDays': 'Темп: за сколько дней',
+  'set.signal.burnThresholdDays.hint':
+    'За сколько дней до конца периода сказать, что при таком темпе денег не хватит. Меньше — реже дёргаем, но и времени на манёвр остаётся меньше.',
+  'set.signal.runwayWarnDays': 'Запас хода: тревога от',
+  'set.signal.runwayWarnDays.hint':
+    'Сколько дней жизни на текущих остатках считать поводом для тревоги. Считается по всем деньгам, а не по одному периоду.',
+  'set.signal.lockedWarnPct': 'Связано денег, %',
+  'set.signal.lockedWarnPct.hint':
+    'Доля денег, ушедшая в обязательства и накопления, после которой стоит сказать: свободного почти не осталось.',
+  'set.signal.maxSignals': 'Сколько показывать',
+  'set.signal.maxSignals.hint':
+    'Больше этого числа сигналов на экран не выводим: список, который не дочитывают, не помогает.',
   'set.medianPeriods': 'Периодов в медиане',
   'set.suggestRaises': 'Советовать поднимать заниженные статьи',
   'set.defaultProvider': 'Где обычно меняешь',
