@@ -149,6 +149,8 @@ export function ReceiptEntry({
               <input
                 className="field"
                 type="file"
+                // Текст над полем подписью не является: без aria-label оно безымянное на слух.
+                aria-label={t('receipt.photo')}
                 accept="image/*"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];

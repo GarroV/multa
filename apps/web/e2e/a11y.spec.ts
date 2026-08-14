@@ -42,6 +42,33 @@ test('план доступен', async ({ page }) => {
   expect(await violations(page)).toEqual([]);
 });
 
+test('статистика доступна', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.goto('/statistics');
+  expect(await violations(page)).toEqual([]);
+});
+
+test('мастер-сетка доступна', async ({ page }) => {
+  /*
+   * Таблица — отдельный риск: у неё свои роли, и правимые ячейки стали кнопками. Кнопка без
+   * различимого имени в таблице из шести колонок делает её нечитаемой на слух.
+   */
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.goto('/plan?view=table');
+  await expect(page.locator('.mgrid')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
+test('лист чека доступен', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.getByRole('button', { name: /^Receipt$|^Чек$/ }).click();
+  await expect(page.locator('.sheet')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
 test('лист ввода траты доступен', async ({ page }) => {
   /*
    * Формы — самое опасное место: поле без подписи выглядит нормально и полностью непригодно для
