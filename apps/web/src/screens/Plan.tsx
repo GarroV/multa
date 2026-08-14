@@ -417,18 +417,24 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               пусто у него или раздел не существует. Текст для этого случая написан, показываем его
               на месте цифры — прочерк вместо суммы честнее пустоты.
             */}
-            {isSectionVisible('account') && balances.data && (
+            {/*
+              Блок держит своё место с первого кадра, даже пока остатки не пришли (замер CLS
+              14.08.2026). Он приходит отдельным запросом, и появление пятой колонки пересобирало
+              сетку: четыре соседних блока съезжали вбок ровно тогда, когда человек начинал читать
+              цифру дня. Прочерк вместо суммы честнее прыжка.
+            */}
+            {isSectionVisible('account') && (
               <Kpi label={t('acc.total')} slot="money">
                 <span className="kpi-value">
-                  {balances.data.totalMinor === null
+                  {!balances.data || balances.data.totalMinor === null
                     ? '—'
                     : `${formatMinor(balances.data.totalMinor, base, locale)} ${base}`}
                 </span>
                 <div className="kpi-rows">
-                  {balances.data.byCurrency.length === 0 && (
+                  {balances.data?.byCurrency.length === 0 && (
                     <div className="dim">{t('acc.empty')}</div>
                   )}
-                  {balances.data.byCurrency.map((b) => (
+                  {(balances.data?.byCurrency ?? []).map((b) => (
                     <div key={b.currency}>
                       <span>
                         {formatMinor(b.minor, b.currency, locale)} {b.currency}
@@ -443,9 +449,9 @@ function PlanBody({ plan }: { plan: PlanDto }) {
                     </div>
                   ))}
                 </div>
-                {balances.data.unresolved.length > 0 && (
+                {(balances.data?.unresolved.length ?? 0) > 0 && (
                   <span className="kpi-sub st-warn">
-                    {t('acc.noRate', { list: balances.data.unresolved.join(', ') })}
+                    {t('acc.noRate', { list: (balances.data?.unresolved ?? []).join(', ') })}
                   </span>
                 )}
               </Kpi>
@@ -781,6 +787,22 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   );
 }
 
+/** Полоса KPI-заглушек: держит геометрию экрана, пока план не пришёл (замер CLS 14.08.2026). */
+function KpiSkeleton({ label }: { label: string }) {
+  return (
+    <div className="dense dense-plan">
+      <div className="kpi-strip" aria-busy="true" aria-label={label}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div className="kpi" key={i}>
+            <span className="micro dim">·</span>
+            <span className="kpi-value dim">—</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Plan() {
   const { t } = useI18n();
   /*
@@ -801,7 +823,16 @@ export function Plan() {
   const patchSettings = usePatchSettings();
   const [tourClosed, setTourClosed] = useState(false);
   const { data: plan, isLoading, error, refetch } = usePlan(true, asMember);
-  if (isLoading) return <Centered>{t('common.loading')}</Centered>;
+  /*
+   * Пока план грузится, полоса KPI занимает своё место заглушками (замер 14.08.2026: CLS плана
+   * 0,044, весь сдвиг — её появление). Раньше экран показывал «загружается» по центру, а потом
+   * сверху вставлялась полоса и толкала всё вниз — ровно в тот момент, когда человек начинал
+   * читать цифру дня.
+   *
+   * Не «скелетон ради модного вида»: место под цифры удерживается ровно того размера, каким оно
+   * будет, поэтому появление данных ничего не двигает.
+   */
+  if (isLoading) return <KpiSkeleton label={t('common.loading')} />;
   // Дохода ещё нет (обучение пропущено) — не ошибка, а пустой лист с дорогой в настройки.
   if (isOnboardingIncomplete(error)) return <NoIncomeYet />;
   if (error) {
