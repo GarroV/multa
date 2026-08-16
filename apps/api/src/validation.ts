@@ -364,6 +364,9 @@ export const debtCreateSchema = z.object({
     .max(12)
     .optional()
     .default([]),
+  /** Окно платежей (issue #117): в какие периоды долг вообще берёт деньги. Границы включительные. */
+  paysFrom: isoDate.nullish(),
+  paysUntil: isoDate.nullish(),
   dueDate: z.string().optional(),
   counterparty: z.string().optional(),
 });

@@ -444,6 +444,13 @@ function DebtsSection({ base }: SectionProps) {
    * суммой, найти его в списке и открыть правку — ради того, что человек знал с самого начала.
    */
   const [splitOpen, setSplitOpen] = useState(false);
+  /*
+   * Окно платежей: «платим с ноября по февраль» (issue #117). До этого выражалось только правкой
+   * ячеек таблицы — ноль сейчас, сумма с ноября, ноль с марта: работает, но догадаться нельзя.
+   */
+  const [windowOpen, setWindowOpen] = useState(false);
+  const [paysFrom, setPaysFrom] = useState('');
+  const [paysUntil, setPaysUntil] = useState('');
   const [bySource, setBySource] = useState<Record<string, string>>({});
   const sources = useIncomeSources();
   const [name, setName] = useState('');
@@ -517,6 +524,8 @@ function DebtsSection({ base }: SectionProps) {
         remainingMinor: principal,
         paymentMinor: pay,
         ...(split.length > 0 ? { paymentsBySource: split } : {}),
+        ...(windowOpen && paysFrom ? { paysFrom } : {}),
+        ...(windowOpen && paysUntil ? { paysUntil } : {}),
       },
       {
         onSuccess: () => {
@@ -525,6 +534,8 @@ function DebtsSection({ base }: SectionProps) {
           setPayment('');
           setCloseBy('');
           setBySource({});
+          setPaysFrom('');
+          setPaysUntil('');
         },
       },
     );
@@ -690,6 +701,11 @@ function DebtsSection({ base }: SectionProps) {
                 {t('obl.split')}
               </button>
             )}
+            {!windowOpen && (
+              <button type="button" className="act" onClick={() => setWindowOpen(true)}>
+                {t('obl.window')}
+              </button>
+            )}
             <button type="button" className="btn" disabled={create.isPending} onClick={add}>
               {t('common.add')}
             </button>
@@ -709,6 +725,26 @@ function DebtsSection({ base }: SectionProps) {
                 />
               ))}
               <Hint text={t('obl.split.hint')} />
+            </div>
+          )}
+          {windowOpen && (
+            <div className="form-row obl-window">
+              <span className="micro">{t('obl.window')}</span>
+              <input
+                className="field"
+                type="date"
+                aria-label={t('obl.window.from')}
+                value={paysFrom}
+                onChange={(e) => setPaysFrom(e.target.value)}
+              />
+              <input
+                className="field"
+                type="date"
+                aria-label={t('obl.window.until')}
+                value={paysUntil}
+                onChange={(e) => setPaysUntil(e.target.value)}
+              />
+              <Hint text={t('obl.window.hint')} />
             </div>
           )}
           {/* Считаем вслух: человек должен увидеть взнос до того, как нажмёт «добавить». */}

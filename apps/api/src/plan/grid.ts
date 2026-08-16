@@ -273,13 +273,19 @@ export async function getPlanGrid(
      * здесь однажды уже развела план и таблицу по цифре дня — второй раз наступать не будем.
      */
     const byIndex =
-      steps.length === 0 && bySource.length === 0
+      steps.length === 0 && bySource.length === 0 && !d.paysFrom && !d.paysUntil
         ? undefined
         : periods.map(
             (p: PayPeriod, i: number) =>
               toBase(
                 debtPaymentForPeriod(
-                  { paymentMinor: d.paymentMinor, steps, bySource },
+                  {
+                    paymentMinor: d.paymentMinor,
+                    steps,
+                    bySource,
+                    paysFrom: d.paysFrom,
+                    paysUntil: d.paysUntil,
+                  },
                   sourcesByPeriod[i] ?? [],
                   p.startsOn,
                 ),

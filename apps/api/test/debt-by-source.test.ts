@@ -192,3 +192,58 @@ test('разбивку можно задать сразу при заведен�
   // Общий платёж нулевой, и без разбивки долг бы вовсе не попал в план.
   expect(debtIn(plan)).toBeDefined();
 });
+
+/*
+ * Окно платежей (issue #117, вопрос владельца: «как выбрать период, допустим, что долг у меня в
+ * плане с ноября по февраль?»).
+ *
+ * Проверяем сквозной путь: вне окна долг не берёт денег ни в плане, ни в мастер-таблице. Одного
+ * теста ядра тут мало — расхождение между двумя экранами уже случалось.
+ */
+test('вне окна платежей долг не берёт денег ни в плане, ни в таблице', async () => {
+  const { client } = await withTwoSources();
+  const plan = await getPlan(client);
+  // Окно целиком в прошлом: и текущий период, и все будущие колонки обязаны показать ноль.
+  await expectOk(
+    await client.post('/v1/debts', {
+      name: 'Старый кредит',
+      currency: 'RUB',
+      principalMinor: '8000000',
+      remainingMinor: '8000000',
+      paymentMinor: '2000000',
+      paysFrom: '2020-01-01',
+      paysUntil: '2020-12-31',
+    }),
+    201,
+  );
+
+  expect(debtIn(await getPlan(client))).toBeUndefined();
+
+  const grid = await expectOk<{
+    groups: { kind: string; rows: { cells: { minor: string }[] }[] }[];
+  }>(await client.get('/v1/plan/grid?periods=6'));
+  const debtRows = grid.groups.find((g) => g.kind === 'debt')?.rows ?? [];
+  for (const row of debtRows) {
+    expect(new Set(row.cells.map((c) => c.minor))).toEqual(new Set(['0']));
+  }
+  expect(plan.period.startsOn > '2020-12-31').toBe(true);
+});
+
+test('внутри окна долг платит как обычно', async () => {
+  const { client } = await withTwoSources();
+  const plan = await getPlan(client);
+  // Окно с запасом вокруг сегодняшнего периода: границы включительные, край не должен отсекать.
+  await expectOk(
+    await client.post('/v1/debts', {
+      name: 'Сбер',
+      currency: 'RUB',
+      principalMinor: '8000000',
+      remainingMinor: '8000000',
+      paymentMinor: '2000000',
+      paysFrom: plan.period.startsOn,
+      paysUntil: '2030-12-31',
+    }),
+    201,
+  );
+  expect(debtIn(await getPlan(client))).toBe('2000000');
+});

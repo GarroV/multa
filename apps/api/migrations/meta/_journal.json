@@ -169,6 +169,13 @@
       "when": 1787200000000,
       "tag": "0023_debt_payments_by_source",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787300000000,
+      "tag": "0024_debt_pay_window",
+      "breakpoints": true
     }
   ]
 }

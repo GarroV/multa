@@ -108,3 +108,69 @@ describe('платёж по долгу за период', () => {
     expect(payment).toBe(700000n);
   });
 });
+
+/**
+ * Окно платежей: «платим с ноября по февраль» (issue #117, вопрос владельца 16.08.2026).
+ *
+ * До этого выразить это можно было только правкой ячеек таблицы — ноль сейчас, сумма с ноября,
+ * ноль с марта. Работает, но догадаться нельзя, и три действия там, где смысл один.
+ */
+describe('окно платежей по долгу', () => {
+  const rule = { paymentMinor: 1000000n, steps: [], bySource: [] };
+
+  it('до начала окна долг не платится', () => {
+    const payment = debtPaymentForPeriod(
+      { ...rule, paysFrom: '2026-11-01' },
+      [ADVANCE],
+      '2026-10-25',
+    );
+    expect(payment).toBe(0n);
+  });
+
+  it('внутри окна платится как обычно', () => {
+    const payment = debtPaymentForPeriod(
+      { ...rule, paysFrom: '2026-11-01', paysUntil: '2027-02-28' },
+      [ADVANCE],
+      '2026-12-10',
+    );
+    expect(payment).toBe(1000000n);
+  });
+
+  it('после конца окна не платится', () => {
+    const payment = debtPaymentForPeriod(
+      { ...rule, paysFrom: '2026-11-01', paysUntil: '2027-02-28' },
+      [ADVANCE],
+      '2027-03-10',
+    );
+    expect(payment).toBe(0n);
+  });
+
+  it('границы окна включительно: в первый и последний день платим', () => {
+    // «По февраль» человек понимает как «февраль включительно», а не «до февраля».
+    const window = { ...rule, paysFrom: '2026-11-01', paysUntil: '2027-02-28' };
+    expect(debtPaymentForPeriod(window, [ADVANCE], '2026-11-01')).toBe(1000000n);
+    expect(debtPaymentForPeriod(window, [ADVANCE], '2027-02-28')).toBe(1000000n);
+  });
+
+  it('окно закрывает и разбивку по выплатам, а не только общую сумму', () => {
+    /*
+     * Иначе получилось бы, что «платим до февраля» действует на один способ задания суммы и не
+     * действует на другой — и долг продолжал бы тянуть деньги в марте.
+     */
+    const payment = debtPaymentForPeriod(
+      {
+        paymentMinor: 0n,
+        steps: [],
+        bySource: [{ sourceId: SALARY, amountMinor: 1500000n }],
+        paysUntil: '2027-02-28',
+      },
+      [SALARY],
+      '2027-03-10',
+    );
+    expect(payment).toBe(0n);
+  });
+
+  it('без окна поведение прежнее', () => {
+    expect(debtPaymentForPeriod(rule, [ADVANCE], '2030-01-01')).toBe(1000000n);
+  });
+});

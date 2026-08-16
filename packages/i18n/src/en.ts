@@ -456,6 +456,11 @@ export const en = {
   'obl.goals': 'Goals',
   'obl.buckets': 'Currency baskets',
   'obl.name': 'Name',
+  'obl.window': 'Pay from… to…',
+  'obl.window.from': 'Pay from',
+  'obl.window.until': 'Pay until',
+  'obl.window.hint':
+    'Which periods the debt takes money in. Both ends are inclusive; leave one empty for no limit on that side.',
   'obl.split': 'Split across payouts',
   'obl.split.hint':
     'How much goes out of each payout. Empty means nothing goes out of that one. Once set, the single payment is no longer used.',

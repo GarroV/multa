@@ -120,3 +120,33 @@ test('разбивка, заданная при заведении, доезжа
     { sourceId: expect.any(String), amountMinor: '700000' },
   ]);
 });
+
+/*
+ * Окно платежей задаётся в форме (issue #117, вопрос владельца: «как выбрать период, допустим, что
+ * долг у меня в плане с ноября по февраль?»). Раньше это делалось правкой трёх ячеек таблицы.
+ */
+test('долг можно завести с окном «платим с… по…»', async ({ page }) => {
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  await panel.getByPlaceholder(/^Название$|^Name$/).fill('Рассрочка');
+  await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('40000');
+  await panel.getByPlaceholder(/^Платёж$|^Payment$/).fill('10000');
+  await panel.getByRole('button', { name: /Платим с… по…|Pay from… to…/ }).click();
+  await panel.getByLabel(/^Платим с$|^Pay from$/).fill('2026-11-01');
+  await panel.getByLabel(/^Платим по$|^Pay until$/).fill('2027-02-28');
+  await panel.getByRole('button', { name: /^Добавить$|^Add$/ }).click();
+
+  await expect(panel.getByText('Рассрочка')).toBeVisible({ timeout: 15_000 });
+
+  // Окно должно доехать до долга, а не остаться в форме.
+  const debts = await page.evaluate(async (api: string) => {
+    const res = await fetch(`${api}/v1/debts`, { credentials: 'include' });
+    return (await res.json()) as { name: string; paysFrom: string; paysUntil: string }[];
+  }, API_URL);
+  const created = debts.find((d) => d.name === 'Рассрочка');
+  expect([created?.paysFrom, created?.paysUntil]).toEqual(['2026-11-01', '2027-02-28']);
+});

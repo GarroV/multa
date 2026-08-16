@@ -438,6 +438,9 @@ async function resolveObligations(
         paymentMinor: d.paymentMinor,
         steps: parseAmountSteps(d.amountSteps),
         bySource: parsePaymentsBySource(d.paymentsBySource),
+        // Окно платежей (issue #117): вне его долг денег не берёт вовсе.
+        paysFrom: d.paysFrom,
+        paysUntil: d.paysUntil,
       },
       payingSourceIds,
       on,

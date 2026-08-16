@@ -20,6 +20,14 @@ export interface DebtPaymentRule {
   readonly steps: readonly AmountStep[];
   /** Разбивка по источникам: сколько уходит с каждой конкретной выплаты. */
   readonly bySource: readonly { readonly sourceId: string; readonly amountMinor: bigint }[];
+  /**
+   * Окно платежей: «платим с ноября по февраль» (issue #117).
+   *
+   * Границы ВКЛЮЧИТЕЛЬНЫЕ: «по февраль» человек понимает как «февраль тоже», а не «до февраля».
+   * Пусто — платим всегда, как было до появления окна.
+   */
+  readonly paysFrom?: string | null;
+  readonly paysUntil?: string | null;
 }
 
 /**
@@ -34,6 +42,14 @@ export function debtPaymentForPeriod(
   sourceIdsInPeriod: readonly string[],
   onDate: string,
 ): bigint {
+  /*
+   * Окно проверяем ПЕРВЫМ и для обоих способов задать сумму. Иначе вышло бы, что «платим до
+   * февраля» действует на общую сумму и не действует на разбивку по выплатам — и долг продолжал бы
+   * тянуть деньги в марте, причём молча.
+   */
+  if (rule.paysFrom && onDate < rule.paysFrom) return 0n;
+  if (rule.paysUntil && onDate > rule.paysUntil) return 0n;
+
   if (rule.bySource.length === 0) return amountOn(rule.paymentMinor, rule.steps, onDate);
 
   /*
