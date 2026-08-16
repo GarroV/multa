@@ -66,8 +66,13 @@ export const requireWorkspace = createMiddleware<{ Variables: AppVariables }>(as
 
   if (!ws) return c.json({ error: 'no_workspace', message: 'complete onboarding first' }, 409);
 
-  if (role === 'member' && c.req.method !== 'GET') {
-    // Участник может предложить правку (отдельная задача), но не записать её сам.
+  if (role === 'member' && c.req.method !== 'GET' && c.req.path !== '/v1/proposals') {
+    /*
+     * Участник предлагает правку, но не записывает её сам (issue #83). Исключение ровно одно и
+     * задано точным путём, а не префиксом: `/v1/proposals/:id/accept` под него намеренно НЕ
+     * подпадает — решает только владелец. Список разрешённого, а не запрещённого, как и всё
+     * остальное в этой проверке.
+     */
     return c.json({ error: 'read_only_member' }, 403);
   }
 
@@ -106,6 +111,8 @@ const SHARING_AWARE = [
   '/v1/workspace/members',
   /** Пороги и предпочтения воркспейса — денег в них нет. */
   '/v1/workspace/settings',
+  /** Предложения правок: участник видит свои, владелец — все; чужих воркспейсов не видно (#83). */
+  '/v1/proposals',
 ] as const;
 
 /** Списки разделов: у них свой сторож `requireSection`, который знает режим раздела. */

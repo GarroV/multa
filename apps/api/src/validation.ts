@@ -509,6 +509,12 @@ export const gridCellSchema = z.object({
   plannedMinor: minor,
 });
 
+/**
+ * Предложение правки от участника (issue #83). Форма повторяет `gridCellSchema`: принятие
+ * выполняет ту же операцию, и расхождение форм означало бы вторую дорогу к деньгам.
+ */
+export const proposalCreateSchema = gridCellSchema;
+
 /** Запрос вариантов пересборки: какой строке и сколько нужно добавить. */
 export const rebalanceQuerySchema = z.object({
   targetId: z.string().uuid(),

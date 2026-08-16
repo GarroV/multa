@@ -445,6 +445,44 @@ export const exchangeOps = pgTable('exchange_ops', {
  * Правило продукта: правит строку только её владелец. Участник видит воркспейс по матрице
  * видимости, но ничего в нём не меняет — это держит middleware, а не доверие к клиенту (правило 7).
  */
+/**
+ * Предложения правок от участника совместного доступа (issue #83).
+ *
+ * Правит строку только владелец — это правило продукта, а не ограничение реализации. Поэтому
+ * участник не пишет в план, а создаёт предложение: у него свой жизненный цикл (создано →
+ * принято/отклонено), автор, цель и предлагаемое значение.
+ *
+ * Форма цели повторяет `gridCellSchema` намеренно: принятие выполняет ровно ту же операцию, что
+ * обычная правка ячейки, и никакой второй дороги к деньгам не появляется.
+ */
+export const editProposals = pgTable(
+  'edit_proposals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** Кто предложил. Остаётся в истории после ухода участника, поэтому без каскадного удаления. */
+    authorId: text('author_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    targetKind: text('target_kind').notNull(),
+    targetId: uuid('target_id').notNull(),
+    /** Период, которому адресована правка: «столько-то с этой даты», как в ячейке таблицы. */
+    startsOn: date('starts_on').notNull(),
+    plannedMinor: bigint('planned_minor', { mode: 'bigint' }).notNull(),
+    status: text('status').notNull().default('pending'),
+    createdAt: createdAt(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedBy: text('resolved_by').references(() => user.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    check('edit_proposals_status_ck', sql`${t.status} in ('pending','accepted','rejected')`),
+    check('edit_proposals_kind_ck', sql`${t.targetKind} in ('category','debt','envelope','goal')`),
+    index('edit_proposals_ws_status_idx').on(t.workspaceId, t.status),
+  ],
+);
+
 export const workspaceMembers = pgTable(
   'workspace_members',
   {

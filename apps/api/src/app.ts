@@ -73,6 +73,7 @@ import { forecastRoute } from './routes/forecast.ts';
 import { sharingRoute } from './routes/sharing.ts';
 import { signalsRoute } from './routes/signals.ts';
 import { receiptsRoute } from './routes/receipts.ts';
+import { proposalsRoute } from './routes/proposals.ts';
 import { recurringRoute } from './routes/recurring.ts';
 import { transactionsRoute } from './routes/transactions.ts';
 import { today } from './clock.ts';
@@ -816,6 +817,9 @@ app.route('/v1', receiptsRoute);
 
 // Регулярные платежи вне обязательств (#21): /v1/recurring-items
 app.route('/v1', recurringRoute);
+
+// Предложения правок от участника (#83): /v1/proposals
+app.route('/v1', proposalsRoute);
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400);
