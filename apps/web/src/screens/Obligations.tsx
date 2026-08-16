@@ -636,8 +636,14 @@ function DebtsSection({ base }: SectionProps) {
               строка под один переключатель — половина формы ради редкого случая.
             */}
             <label className="row row-check">
+              {/*
+                Своё имя и своя область нажатия (#112, пункт 5). Оборачивающий label формально даёт
+                доступное имя — поэтому автоматическая проверка и молчала, — но сам флажок был 13px:
+                пальцем по нему промахиваются, а в списке элементов он читался безымянным.
+              */}
               <input
                 type="checkbox"
+                aria-label={t('obl.closeBy')}
                 checked={mode === 'deadline'}
                 onChange={(e) => setMode(e.target.checked ? 'deadline' : 'payment')}
               />

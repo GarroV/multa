@@ -121,3 +121,35 @@ test('настройки доступны', async ({ page }) => {
   await page.goto('/settings');
   expect(await violations(page)).toEqual([]);
 });
+
+/*
+ * Флажок «закрыть к дате» без собственного имени (#112, пункт 5).
+ *
+ * Он работает через оборачивающий `label`, поэтому axe молчит — формально доступное имя есть. Но
+ * ширина у него 13px: на узком экране и на сенсорном попасть по нему сложно, а увеличить область
+ * нажатия одним лишь `label` нельзя, пока сам флажок не назван и не увеличен.
+ *
+ * Проверяем оба свойства: имя у элемента своё, и он не меньше 24px — минимума, ниже которого
+ * промахиваются пальцем.
+ */
+test('переключатели формы названы и достаточно крупные, чтобы попасть', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.goto('/obligations');
+  await page.locator('input[type=checkbox]').first().waitFor();
+  const boxes = page.locator('input[type=checkbox]');
+  const count = await boxes.count();
+  expect(count).toBeGreaterThan(0);
+
+  for (let i = 0; i < count; i++) {
+    const box = boxes.nth(i);
+    const name = await box.evaluate(
+      (el) => el.getAttribute('aria-label') ?? el.getAttribute('title') ?? '',
+    );
+    expect(name.length, `флажок #${i} без собственного имени`).toBeGreaterThan(0);
+
+    const size = await box.boundingBox();
+    expect(size!.width, `ширина флажка #${i}`).toBeGreaterThanOrEqual(24);
+    expect(size!.height, `высота флажка #${i}`).toBeGreaterThanOrEqual(24);
+  }
+});
