@@ -345,7 +345,11 @@ test('долг можно завести по сроку — взнос посч
   await page.goto('/obligations');
 
   const panel = page.locator('.panel', { hasText: /DEBTS|ДОЛГИ/i }).first();
-  await panel.getByRole('checkbox').first().check();
+  /*
+   * Режим включается переключателем, а не флажком: три необязательные настройки формы сведены к
+   * одной породе (замечание владельца о разнобое, 16.08.2026).
+   */
+  await panel.getByRole('button', { name: /^Закрыть к дате$|^Close by$/ }).click();
   await panel.getByPlaceholder(/^Name$|^Название$/).fill('Кредитка');
   await panel.getByPlaceholder(/Left to pay|Осталось/).fill('300000');
   await panel.locator('input[type=date]').first().fill('2027-05-10');

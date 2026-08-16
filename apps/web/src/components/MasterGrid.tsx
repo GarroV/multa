@@ -432,19 +432,26 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
           выплатах дважды в месяц 12 периодов это полгода, при ежемесячных — год. Сколько именно
           получилось, видно по датам в шапке.
         */}
+        {/*
+          Сегмент, а не россыпь кнопок: выбор взаимоисключающий, и общий контур говорит об этом
+          сам. Компонент в продукте уже был (тема, язык) — переключатель горизонта его сначала
+          проигнорировал, и получилась третья порода органов управления на том же экране.
+        */}
         <span className="row row-8">
           <span className="micro">{t('plan.master.horizon')}</span>
-          {[6, 12, 24].map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={n === horizon ? 'act act-on' : 'act'}
-              aria-pressed={n === horizon}
-              onClick={() => setHorizon(n)}
-            >
-              {n}
-            </button>
-          ))}
+          <span className="seg" role="group" aria-label={t('plan.master.horizon')}>
+            {[6, 12, 24].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className="seg-btn"
+                aria-pressed={n === horizon}
+                onClick={() => setHorizon(n)}
+              >
+                {n}
+              </button>
+            ))}
+          </span>
         </span>
       </div>
     </div>

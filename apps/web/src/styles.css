@@ -1096,6 +1096,41 @@ a {
   background: rgba(var(--cyan-rgb), 0.16);
 }
 
+/*
+ * Переключатель формы: «Закрыть к дате», «Разбить по выплатам», «Платим с… по…».
+ *
+ * Одна порода на все необязательные настройки формы (замечание владельца 16.08.2026: «тут чекбокс,
+ * там кнопка, весь интерфейс вразнобой»). До этого в одном ряду стояли флажок 24px, две капслочные
+ * кнопки 22px/10px и обычная кнопка 28px/13px — четыре высоты и два начертания, глазу не за что
+ * зацепиться.
+ *
+ * Ростом и шрифтом совпадает с полем ввода: рядом с ним он и стоит.
+ */
+.toggle {
+  font: inherit;
+  color: var(--text-mid);
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toggle:hover {
+  color: var(--text-hi);
+}
+/* Включённое состояние видно без наведения: это состояние, а не подсветка курсора. */
+.toggle[aria-pressed='true'] {
+  color: var(--cyan-ink);
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+.toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
+}
+
 /* --- Строка ведомости --- */
 .prow {
   display: grid;
@@ -1392,6 +1427,11 @@ a {
   border-color: color-mix(in oklab, var(--cyan-hi) 82%, var(--ink));
 }
 .seg-btn {
+  /*
+   * Минимум под палец: у сегмента горизонта подписи в один знак («6»), и клетка выходила 23px —
+   * ниже принятых 24. Поймано проверкой «ни одна кнопка не обрезана до огрызка» на узком экране.
+   */
+  min-width: 28px;
   font: inherit;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -2709,9 +2749,4 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-/* Выбранный горизонт виден без наведения: это состояние, а не наведение. */
-.act-on {
-  color: var(--text-hi);
-  border-color: var(--accent);
 }

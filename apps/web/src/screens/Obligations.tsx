@@ -671,41 +671,43 @@ function DebtsSection({ base }: SectionProps) {
               />
             )}
             {/*
-              Флажок стоит в строке с полями, а не над ней: он переключает соседнее поле, и целая
-              строка под один переключатель — половина формы ради редкого случая.
+              Три необязательные настройки формы — одной породы (замечание владельца 16.08.2026).
+              Раньше первая была флажком, две другие капслочными кнопками: четыре высоты в одном
+              ряду. Теперь это переключатели ростом с поле ввода, и включённое состояние видно по
+              рамке, а не по галочке.
             */}
-            <label className="row row-check">
-              {/*
-                Своё имя и своя область нажатия (#112, пункт 5). Оборачивающий label формально даёт
-                доступное имя — поэтому автоматическая проверка и молчала, — но сам флажок был 13px:
-                пальцем по нему промахиваются, а в списке элементов он читался безымянным.
-              */}
-              <input
-                type="checkbox"
-                aria-label={t('obl.closeBy')}
-                checked={mode === 'deadline'}
-                onChange={(e) => setMode(e.target.checked ? 'deadline' : 'payment')}
-              />
-              <span className="sub">{t('obl.closeBy')}</span>
-              {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
-              <Hint text={t('obl.formHint')} />
-            </label>
+            <button
+              type="button"
+              className="toggle"
+              aria-pressed={mode === 'deadline'}
+              onClick={() => setMode(mode === 'deadline' ? 'payment' : 'deadline')}
+            >
+              {t('obl.closeBy')}
+            </button>
+            {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
+            <Hint text={t('obl.formHint')} />
             {/*
               Разбивка платежа по выплатам (issue #117). За кнопкой: у большинства долгов сумма
               одна на все выплаты, и лишние поля здесь — шум. Но задать её надо уметь СРАЗУ, а не
               после: иначе человек заводит долг, ищет его в списке и открывает правку ради того,
               что знал с самого начала.
             */}
-            {!splitOpen && (
-              <button type="button" className="act" onClick={() => setSplitOpen(true)}>
-                {t('obl.split')}
-              </button>
-            )}
-            {!windowOpen && (
-              <button type="button" className="act" onClick={() => setWindowOpen(true)}>
-                {t('obl.window')}
-              </button>
-            )}
+            <button
+              type="button"
+              className="toggle"
+              aria-pressed={splitOpen}
+              onClick={() => setSplitOpen(!splitOpen)}
+            >
+              {t('obl.split')}
+            </button>
+            <button
+              type="button"
+              className="toggle"
+              aria-pressed={windowOpen}
+              onClick={() => setWindowOpen(!windowOpen)}
+            >
+              {t('obl.window')}
+            </button>
             <button type="button" className="btn" disabled={create.isPending} onClick={add}>
               {t('common.add')}
             </button>

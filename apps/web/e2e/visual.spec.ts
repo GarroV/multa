@@ -564,3 +564,38 @@ test('органы управления остаются плотными', asyn
    */
   expect(sizes.field, 'поле не должно стать нечитаемым').toBeGreaterThanOrEqual(24);
 });
+
+/*
+ * Органы управления одной строки — одной породы (замечание владельца 16.08.2026: «тут чекбокс,
+ * там кнопка, весь интерфейс вразнобой»).
+ *
+ * Замер до правки в форме долга: поля 28px, флажок 24px, две капслочные кнопки 22px/10px и главная
+ * кнопка 28px/13px. Четыре высоты и два начертания в одном ряду — глазу не за что зацепиться, и
+ * форма выглядит собранной из случайных деталей.
+ *
+ * Проверяем не красоту, а сопоставимость: всё, что стоит в ряду, одного роста.
+ */
+test('в одном ряду формы все органы управления одного роста', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  const heights = await panel.evaluate((p) => {
+    const rows = p.querySelectorAll('.panel-foot .form-row');
+    const last = rows[rows.length - 1] as HTMLElement;
+    return [...last.querySelectorAll('button, input')]
+      .map((el) => Math.round(el.getBoundingClientRect().height))
+      .filter((h) => h > 0);
+  });
+
+  expect(heights.length).toBeGreaterThan(3);
+  // Разброс в 2px прощаем рамкам и округлению; больше — уже разные породы элементов.
+  expect(
+    Math.max(...heights) - Math.min(...heights),
+    `высоты: ${heights.join(', ')}`,
+  ).toBeLessThanOrEqual(2);
+});

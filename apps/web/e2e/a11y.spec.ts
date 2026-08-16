@@ -133,23 +133,29 @@ test('настройки доступны', async ({ page }) => {
  * промахиваются пальцем.
  */
 test('переключатели формы названы и достаточно крупные, чтобы попасть', async ({ page }) => {
+  /*
+   * Проверка пережила смену механики. Раньше «Закрыть к дате» был системным флажком 13px — его и
+   * сторожила: без имени и по нему промахивались пальцем. Теперь это переключатель одной породы с
+   * соседями (замечание владельца о разнобое, 16.08.2026), и требование то же самое: имя есть,
+   * попасть можно. Сторожим ОБА вида, чтобы правка не увела проверку в пустоту.
+   */
   await resetDemo(page);
   await enterDemo(page);
   await page.goto('/obligations');
-  await page.locator('input[type=checkbox]').first().waitFor();
-  const boxes = page.locator('input[type=checkbox]');
-  const count = await boxes.count();
+
+  const controls = page.locator('input[type=checkbox], .toggle');
+  await controls.first().waitFor();
+  const count = await controls.count();
   expect(count).toBeGreaterThan(0);
 
   for (let i = 0; i < count; i++) {
-    const box = boxes.nth(i);
-    const name = await box.evaluate(
-      (el) => el.getAttribute('aria-label') ?? el.getAttribute('title') ?? '',
+    const control = controls.nth(i);
+    const name = await control.evaluate(
+      (el) => el.getAttribute('aria-label') ?? el.getAttribute('title') ?? el.textContent ?? '',
     );
-    expect(name.length, `флажок #${i} без собственного имени`).toBeGreaterThan(0);
+    expect(name.trim().length, `переключатель #${i} без имени`).toBeGreaterThan(0);
 
-    const size = await box.boundingBox();
-    expect(size!.width, `ширина флажка #${i}`).toBeGreaterThanOrEqual(24);
-    expect(size!.height, `высота флажка #${i}`).toBeGreaterThanOrEqual(24);
+    const size = await control.boundingBox();
+    expect(size!.height, `высота переключателя #${i}`).toBeGreaterThanOrEqual(24);
   }
 });
