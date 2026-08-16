@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { fromMajor, toMajorString, money, type Currency } from '@multa/core';
 import { useI18n } from '../lib/i18n.tsx';
-import { usePatchEntity, type EntityName } from '../lib/queries.ts';
+import { useIncomeSources, usePatchEntity, type EntityName } from '../lib/queries.ts';
 import { Hint } from './ui/Hint.tsx';
 
 /**
@@ -26,6 +26,17 @@ export interface EditField {
   readonly value: string;
 }
 
+/**
+ * Сумма для ввода: то же число, без дорисованной дробной части.
+ *
+ * `toMajorString` всегда печатает разряды до конца — «20 000» превращается в «20000.00». В таблице
+ * это уже правили (владелец заметил, что цифры меняются на глазах при входе в ячейку); в форме
+ * лишние нули так же лишние, и продукт не должен показывать одно и то же число двумя способами.
+ */
+function forInput(minor: string, currency: string): string {
+  return toMajorString(money(BigInt(minor), currency as Currency)).replace(/\.0+$/, '');
+}
+
 export function ObligationEdit({
   entity,
   id,
@@ -33,6 +44,7 @@ export function ObligationEdit({
   currency,
   fields,
   steps: initialSteps,
+  paymentsBySource,
   onDone,
 }: {
   entity: EntityName;
@@ -45,6 +57,11 @@ export function ObligationEdit({
    * долга платёж меняется (банк пересчитал, ставка сменилась), у корзины сумма задаётся заново.
    */
   steps?: readonly { from: string; amountMinor: string }[] | null;
+  /**
+   * Разбивка платежа по выплатам (issue #117): сколько уходит с аванса, сколько с зарплаты.
+   * Передаётся только долгам — у корзины и цели одной выплаты не бывает.
+   */
+  paymentsBySource?: readonly { sourceId: string; amountMinor: string }[] | null;
   onDone: () => void;
 }) {
   const { t } = useI18n();
@@ -52,17 +69,25 @@ export function ObligationEdit({
   const [draftName, setDraftName] = useState(name);
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      fields.map((f) => [
-        f.key,
-        f.kind === 'minor' ? toMajorString(money(BigInt(f.value), currency as Currency)) : f.value,
-      ]),
+      fields.map((f) => [f.key, f.kind === 'minor' ? forInput(f.value, currency) : f.value]),
     ),
   );
   const [error, setError] = useState<string | null>(null);
+  /*
+   * Разбивка по выплатам (issue #117). Открыта сразу, если она уже задана: прятать за кнопкой
+   * собственную настройку человека значило бы скрыть от него то, что он сам завёл.
+   */
+  const [splitOpen, setSplitOpen] = useState((paymentsBySource ?? []).length > 0);
+  const sources = useIncomeSources(paymentsBySource !== undefined);
+  const [bySource, setBySource] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (paymentsBySource ?? []).map((p) => [p.sourceId, forInput(p.amountMinor, currency)]),
+    ),
+  );
   const [steps, setSteps] = useState(() =>
     (initialSteps ?? []).map((step) => ({
       from: step.from,
-      amount: toMajorString(money(BigInt(step.amountMinor), currency as Currency)),
+      amount: forInput(step.amountMinor, currency),
     })),
   );
 
@@ -102,6 +127,28 @@ export function ObligationEdit({
       }
       body.amountSteps = parsed;
     }
+
+    if (paymentsBySource !== undefined && splitOpen) {
+      const split: { sourceId: string; amountMinor: string }[] = [];
+      for (const source of sources.data ?? []) {
+        const raw = (bySource[source.id] ?? '').trim().replace(',', '.');
+        // Пустое поле — «с этой выплаты не платим», а не ноль: это разные вещи.
+        if (!raw) continue;
+        try {
+          split.push({
+            sourceId: source.id,
+            amountMinor: fromMajor(raw, currency as Currency).minor.toString(),
+          });
+        } catch {
+          return setError(t('spend.badAmount'));
+        }
+      }
+      /*
+       * Пустую разбивку не отправляем вовсе: сервер понял бы её как «долг не платится ни с чего»,
+       * и платёж молча стал бы нулевым.
+       */
+      if (split.length > 0) body.paymentsBySource = split;
+    }
     setError(null);
     patch.mutate({ id, body }, { onSuccess: onDone });
   };
@@ -138,6 +185,38 @@ export function ObligationEdit({
           </span>
           {/* Валюта показана, но не правится — см. комментарий к компоненту. */}
           <span className="sub dim">{currency}</span>
+
+          {/*
+            Разбивка платежа по выплатам (issue #117). За кнопкой, а не всегда на виду: у
+            большинства долгов сумма одна на все выплаты, и четыре лишних поля в такой форме —
+            шум. Открывший её видит по полю на каждый источник дохода воркспейса.
+          */}
+          {paymentsBySource !== undefined && !splitOpen && (
+            <button type="button" className="act" onClick={() => setSplitOpen(true)}>
+              {t('obl.split')}
+            </button>
+          )}
+          {paymentsBySource !== undefined && splitOpen && (
+            <>
+              <span className="row row-6">
+                <span className="sub dim">{t('obl.split')}</span>
+                <Hint text={t('obl.split.hint')} />
+              </span>
+              {(sources.data ?? []).map((source) => (
+                <span className="form-row" key={source.id}>
+                  <span className="sub grow">{source.label}</span>
+                  <input
+                    className="field num field-sm"
+                    inputMode="decimal"
+                    aria-label={source.label}
+                    placeholder="—"
+                    value={bySource[source.id] ?? ''}
+                    onChange={(e) => setBySource({ ...bySource, [source.id]: e.target.value })}
+                  />
+                </span>
+              ))}
+            </>
+          )}
           {initialSteps !== undefined && (
             <>
               <span className="row row-6">

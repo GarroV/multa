@@ -451,6 +451,9 @@ export const ru: Record<TranslationKey, string> = {
   'obl.goals': 'Цели',
   'obl.buckets': 'Валютные корзины',
   'obl.name': 'Название',
+  'obl.split': 'Разбить по выплатам',
+  'obl.split.hint':
+    'Сколько уходит с каждой выплаты. Пустое поле — с этой выплаты не платим. Задано хотя бы одно — общий платёж больше не используется.',
   'obl.payment': 'Платёж',
   'obl.remaining': 'Осталось',
   'obl.formHint':

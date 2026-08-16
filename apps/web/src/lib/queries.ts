@@ -176,6 +176,11 @@ export interface Debt {
   /** Ступени суммы платежа: «с такой-то даты столько-то» (issue про меняющийся платёж). */
   amountSteps: { from: string; amountMinor: string }[] | null;
   counterparty: string | null;
+  /**
+   * Разбивка платежа по выплатам (issue #117): сколько уходит с аванса, сколько с зарплаты.
+   * Пусто или null — одна сумма на все выплаты, как было до разбивки.
+   */
+  paymentsBySource: { sourceId: string; amountMinor: string }[] | null;
   /** Кто кому должен: `owed_to_me` — заём, деньги ждут возврата и в раздачу не идут (#94). */
   direction: 'owed_by_me' | 'owed_to_me';
 }

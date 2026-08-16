@@ -578,6 +578,7 @@ function DebtsSection({ base }: SectionProps) {
                     currency={d.currency}
                     // Платёж по долгу меняется: банк пересчитал, ставка сменилась, договорились иначе.
                     steps={d.amountSteps}
+                    paymentsBySource={d.paymentsBySource ?? []}
                     fields={[
                       {
                         key: 'paymentMinor',
