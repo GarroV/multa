@@ -18,6 +18,7 @@ import {
   useCreateEntity,
   useDeleteEntity,
   useEntities,
+  useIncomeSources,
   useRepayLoan,
   useMe,
   useSaveAccount,
@@ -437,6 +438,14 @@ function DebtsSection({ base }: SectionProps) {
   const del = useDeleteEntity('debts');
   // Какую строку правим: правка раскрывается под ней, как редактор категорий.
   const [editing, setEditing] = useState<string | null>(null);
+  /*
+   * Разбивка платежа прямо при заведении (замечание владельца 16.08.2026: «какой долг на правку?
+   * как сразу задать-то?»). Раньше она жила только в редакторе: приходилось завести долг с одной
+   * суммой, найти его в списке и открыть правку — ради того, что человек знал с самого начала.
+   */
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [bySource, setBySource] = useState<Record<string, string>>({});
+  const sources = useIncomeSources();
   const [name, setName] = useState('');
   const [ccy, setCcy] = useState(base);
   const [amount, setAmount] = useState('');
@@ -487,6 +496,18 @@ function DebtsSection({ base }: SectionProps) {
           : toMinor(payment, ccy);
     if (pay === null)
       return setError(mode === 'deadline' ? t('obl.badDeadline') : t('spend.badAmount'));
+
+    // Пустое поле — «с этой выплаты не платим», а не ноль; пустая разбивка не отправляется вовсе.
+    const split: { sourceId: string; amountMinor: string }[] = [];
+    if (splitOpen) {
+      for (const source of sources.data ?? []) {
+        const raw = (bySource[source.id] ?? '').trim();
+        if (!raw) continue;
+        const minor = toMinor(raw, ccy);
+        if (minor === null) return setError(t('spend.badAmount'));
+        split.push({ sourceId: source.id, amountMinor: minor });
+      }
+    }
     setError(null);
     create.mutate(
       {
@@ -495,6 +516,7 @@ function DebtsSection({ base }: SectionProps) {
         principalMinor: principal,
         remainingMinor: principal,
         paymentMinor: pay,
+        ...(split.length > 0 ? { paymentsBySource: split } : {}),
       },
       {
         onSuccess: () => {
@@ -502,6 +524,7 @@ function DebtsSection({ base }: SectionProps) {
           setAmount('');
           setPayment('');
           setCloseBy('');
+          setBySource({});
         },
       },
     );
@@ -656,10 +679,38 @@ function DebtsSection({ base }: SectionProps) {
               {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
               <Hint text={t('obl.formHint')} />
             </label>
+            {/*
+              Разбивка платежа по выплатам (issue #117). За кнопкой: у большинства долгов сумма
+              одна на все выплаты, и лишние поля здесь — шум. Но задать её надо уметь СРАЗУ, а не
+              после: иначе человек заводит долг, ищет его в списке и открывает правку ради того,
+              что знал с самого начала.
+            */}
+            {!splitOpen && (
+              <button type="button" className="act" onClick={() => setSplitOpen(true)}>
+                {t('obl.split')}
+              </button>
+            )}
             <button type="button" className="btn" disabled={create.isPending} onClick={add}>
               {t('common.add')}
             </button>
           </div>
+          {splitOpen && (
+            <div className="form-row obl-split">
+              <span className="micro">{t('obl.split')}</span>
+              {(sources.data ?? []).map((source) => (
+                <input
+                  key={source.id}
+                  className="field num field-sm"
+                  inputMode="decimal"
+                  aria-label={source.label}
+                  placeholder={source.label}
+                  value={bySource[source.id] ?? ''}
+                  onChange={(e) => setBySource({ ...bySource, [source.id]: e.target.value })}
+                />
+              ))}
+              <Hint text={t('obl.split.hint')} />
+            </div>
+          )}
           {/* Считаем вслух: человек должен увидеть взнос до того, как нажмёт «добавить». */}
           {mode === 'deadline' && computed && (
             <span className="sub dim">

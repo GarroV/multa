@@ -61,3 +61,62 @@ test('заём заводится, не трогает цифру дня и во
       .first(),
   ).toContainText('3', { timeout: 15_000 });
 });
+
+/*
+ * Разбивка платежа задаётся сразу при заведении долга (замечание владельца 16.08.2026: «какой долг
+ * на правку? как сразу задать-то?»).
+ *
+ * До этого разбивка жила только в правке: чтобы разбить платёж, надо было завести долг с одной
+ * суммой, найти его в списке и открыть редактор — ради того, что человек знал с самого начала.
+ */
+test('долг можно завести сразу с разными суммами по выплатам', async ({ page }) => {
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  await panel.getByPlaceholder(/^Название$|^Name$/).fill('Сбер');
+  // Остаток обязателен: долг без суммы к выплате — не долг.
+  await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('80000');
+  await panel.getByRole('button', { name: /Разбить по выплатам|Split across payouts/ }).click();
+
+  // По полю на каждый источник дохода воркспейса — их в демо больше одного.
+  const fields = panel.locator('.obl-split input');
+  await expect.poll(() => fields.count()).toBeGreaterThan(1);
+  await fields.nth(0).fill('5000');
+  await fields.nth(1).fill('15000');
+
+  await panel.getByRole('button', { name: /^Добавить$|^Add$/ }).click();
+  await expect(panel.getByText('Сбер')).toBeVisible({ timeout: 15_000 });
+});
+
+/*
+ * Заведённая разбивка должна дойти до плана, а не остаться в форме: именно это и было целью.
+ * Отдельная проверка, потому что первая версия теста ловила лишь появление строки в списке — а
+ * строка появилась бы и с потерянной разбивкой.
+ */
+test('разбивка, заданная при заведении, доезжает до долга', async ({ page }) => {
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  await panel.getByPlaceholder(/^Название$|^Name$/).fill('Тинькофф');
+  await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('60000');
+  await panel.getByRole('button', { name: /Разбить по выплатам|Split across payouts/ }).click();
+  await panel.locator('.obl-split input').first().fill('7000');
+  await panel.getByRole('button', { name: /^Добавить$|^Add$/ }).click();
+
+  await expect(panel.getByText('Тинькофф')).toBeVisible({ timeout: 15_000 });
+  // Спрашиваем сам API: показанная строка появилась бы и с потерянной разбивкой.
+  const debts = await page.evaluate(async (api: string) => {
+    const res = await fetch(`${api}/v1/debts`, { credentials: 'include' });
+    return (await res.json()) as { name: string; paymentsBySource: unknown }[];
+  }, API_URL);
+  const created = debts.find((d) => d.name === 'Тинькофф');
+  expect(created?.paymentsBySource).toEqual([
+    { sourceId: expect.any(String), amountMinor: '700000' },
+  ]);
+});

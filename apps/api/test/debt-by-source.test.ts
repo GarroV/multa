@@ -156,3 +156,39 @@ describe('платёж по долгу с разных выплат', () => {
     expect(new Set(amounts)).toEqual(new Set(['0', '1500000']));
   });
 });
+
+/*
+ * Разбивку должно быть можно задать СРАЗУ при заведении (замечание владельца 16.08.2026: «какой
+ * долг на правку? как сразу задать-то?»).
+ *
+ * Иначе путь такой: завести долг с одной суммой, найти его в списке, открыть правку, разбить — и
+ * всё это ради того, что человек знал с самого начала. Проверяем, что создание принимает разбивку
+ * и она сразу работает в плане.
+ */
+test('разбивку можно задать сразу при заведении долга', async () => {
+  const { client, advanceId, salaryId } = await withTwoSources();
+  const created = await expectOk<{ id: string; paymentsBySource: unknown }>(
+    await client.post('/v1/debts', {
+      name: 'Сбер',
+      currency: 'RUB',
+      principalMinor: '8000000',
+      remainingMinor: '8000000',
+      paymentMinor: '0',
+      paymentsBySource: [
+        { sourceId: advanceId, amountMinor: '500000' },
+        { sourceId: salaryId, amountMinor: '1500000' },
+      ],
+    }),
+    201,
+  );
+
+  // Ответ на создание уже несёт разбивку: клиенту не нужен второй запрос, чтобы её увидеть.
+  expect(created.paymentsBySource).toEqual([
+    { sourceId: advanceId, amountMinor: '500000' },
+    { sourceId: salaryId, amountMinor: '1500000' },
+  ]);
+
+  const plan = await getPlan(client);
+  // Общий платёж нулевой, и без разбивки долг бы вовсе не попал в план.
+  expect(debtIn(plan)).toBeDefined();
+});
