@@ -362,7 +362,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
           })}
         </div>
       )}
-      <div className="mgrid-note mgrid-foot">
+      <div className="mgrid-note mgrid-hint">
         {/*
           Участнику нужен ответ на его правку (issue #83): предложение план не меняет, и без этой
           строки экран выглядит так, будто ввод не сработал — человек повторит его ещё раз.
