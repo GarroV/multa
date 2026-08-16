@@ -378,30 +378,42 @@ function LoansSection({ base }: SectionProps) {
         )
       }
       form={
+        /*
+         * Та же раскладка, что у соседних разделов: первый ряд — название и валюта, второй — то,
+         * что отличает раздел, и «Добавить» (замечание владельца 16.08.2026: «почему у долгов и
+         * регулярных платежей окна по разному идут, хотя по факту они почти одинаковые»).
+         *
+         * Здесь обёртки ряда не было вовсе, поэтому в узкой колонке поля вставали друг под друга
+         * четырьмя этажами, тогда как рядом такая же форма умещалась в две строки.
+         */
         <>
-          <input
-            className="field grow"
-            placeholder={t('obl.loans.who')}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <CurrencySelect
-            value={ccy}
-            onChange={setCcy}
-            label={t('common.currency')}
-            className="field mono field-ccy-wide"
-          />
-          <input
-            className="field num field-sm"
-            inputMode="decimal"
-            // Не «осталось выплатить»: платить тут не мне, это сумма к возврату (#112).
-            placeholder={t('obl.loans.amount')}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <button type="button" className="btn" disabled={create.isPending} onClick={add}>
-            {t('common.add')}
-          </button>
+          <div className="form-row">
+            <input
+              className="field grow"
+              placeholder={t('obl.loans.who')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <CurrencySelect
+              value={ccy}
+              onChange={setCcy}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
+            />
+          </div>
+          <div className="form-row">
+            <input
+              className="field num field-sm"
+              inputMode="decimal"
+              // Не «осталось выплатить»: платить тут не мне, это сумма к возврату (#112).
+              placeholder={t('obl.loans.amount')}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <button type="button" className="btn" disabled={create.isPending} onClick={add}>
+              {t('common.add')}
+            </button>
+          </div>
         </>
       }
     />

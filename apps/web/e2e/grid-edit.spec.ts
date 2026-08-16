@@ -120,3 +120,31 @@ test('вход в ячейку не переписывает показанно�
   // Разделители разрядов при вводе не нужны, но лишних нулей после точки быть не должно.
   expect(value).toBe(shown.replace(/[\s, ]/g, ''));
 });
+
+/*
+ * Заведение строки прямо в таблице (запрос владельца 16.08.2026: «если я хочу добавить долг то
+ * меня перекидывает на окно обязательств. так быть не должно»).
+ *
+ * Раньше плюс был ссылкой на «Обязательства» — человек терял из виду ту самую таблицу, ради
+ * которой пришёл. Проверяем оба свойства: экран не меняется, и строка действительно появляется.
+ */
+test('долг заводится из таблицы, не уводя с экрана', async ({ page }) => {
+  const url = page.url();
+  const debts = page.locator('.mgrid-row-head', { hasText: /ДОЛГИ|DEBTS/i }).first();
+  await debts.getByRole('button', { name: /Добавить строку|Add a row/i }).click();
+
+  const form = page.locator('.mgrid-addform');
+  await expect(form).toBeVisible();
+  expect(page.url()).toBe(url);
+
+  await form.getByLabel(/^Название$|^Name$/).fill('Кредит на технику');
+  await form.getByLabel(/^Осталось$|^Left to pay$/).fill('30000');
+  await form.getByLabel(/^Платёж$|^Payment$/).fill('5000');
+  await form.getByRole('button', { name: /^Добавить$|^Add$/ }).click();
+
+  // Строка появляется в самой таблице, а не «где-то в разделе».
+  await expect(page.locator('.mgrid-row-item', { hasText: 'Кредит на технику' })).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(page.url()).toBe(url);
+});

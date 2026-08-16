@@ -183,58 +183,70 @@ export function RecurringPayments({ base }: { base: string }) {
       label={t('rec.title')}
       accent="amber"
       foot={
-        <div className="form-row">
-          <input
-            className="field grow"
-            placeholder={t('rec.name')}
-            aria-label={t('rec.name')}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            className="field num field-sm"
-            inputMode="decimal"
-            placeholder="0"
-            aria-label={t('rec.amount')}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          {/*
-            Валюта платежа (issue #115). Раньше её молча подставляли базовой, хотя вся остальная
-            цепочка валюту поддерживает — и «аренда 500» в Сербии уходила как 500 в базовой, без
-            единого признака ошибки на экране. По умолчанию базовая: частый случай не должен
-            требовать лишнего клика, но и молчать о выборе нельзя.
-          */}
-          <CurrencySelect
-            value={currency}
-            onChange={setCurrency}
-            label={t('spend.currency')}
-            className="field field-ccy-wide"
-          />
-          <input
-            className="field num"
-            type="date"
-            aria-label={t('rec.firstOn')}
-            value={firstOn}
-            onChange={(e) => {
-              setFirstOn(e.target.value || today);
-              // Варианты повтора зависят от даты: старый выбор к новой дате уже не относится.
-              setRuleIndex(0);
-            }}
-          />
-          <Select
-            className="field grow"
-            label={t('rec.repeat')}
-            value={String(ruleIndex)}
-            onChange={(next) => setRuleIndex(Number(next))}
-            options={rules.map((rule, i) => ({ value: String(i), label: ruleLabel(rule) }))}
-          />
-          <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
-            {create.isPending ? t('common.loading') : t('rec.add')}
-          </button>
-          {invalid && <span className="sub danger">{t('spend.badAmount')}</span>}
-          {create.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
-        </div>
+        /*
+         * Раскладка та же, что у разделов обязательств: первый ряд — название и валюта, второй —
+         * то, что отличает раздел, и «Добавить» (замечание владельца 16.08.2026: «почему у долгов
+         * и регулярных платежей окна по разному идут, хотя по факту они почти одинаковые»).
+         *
+         * Здесь всё стояло одной строкой из пяти полей — рядом с двухрядными соседями это читалось
+         * как другая форма, хотя суть одна: что, в какой валюте, сколько и по какому правилу.
+         */
+        <>
+          <div className="form-row">
+            <input
+              className="field grow"
+              placeholder={t('rec.name')}
+              aria-label={t('rec.name')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            {/*
+              Валюта платежа (issue #115). Раньше её молча подставляли базовой, хотя вся остальная
+              цепочка валюту поддерживает — и «аренда 500» в Сербии уходила как 500 в базовой, без
+              единого признака ошибки на экране. По умолчанию базовая: частый случай не должен
+              требовать лишнего клика, но и молчать о выборе нельзя.
+            */}
+            <CurrencySelect
+              value={currency}
+              onChange={setCurrency}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
+            />
+          </div>
+          <div className="form-row">
+            <input
+              className="field num field-sm"
+              inputMode="decimal"
+              placeholder="0"
+              aria-label={t('rec.amount')}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <input
+              className="field num"
+              type="date"
+              aria-label={t('rec.firstOn')}
+              value={firstOn}
+              onChange={(e) => {
+                setFirstOn(e.target.value || today);
+                // Варианты повтора зависят от даты: старый выбор к новой дате уже не относится.
+                setRuleIndex(0);
+              }}
+            />
+            <Select
+              className="field grow"
+              label={t('rec.repeat')}
+              value={String(ruleIndex)}
+              onChange={(next) => setRuleIndex(Number(next))}
+              options={rules.map((rule, i) => ({ value: String(i), label: ruleLabel(rule) }))}
+            />
+            <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
+              {create.isPending ? t('common.loading') : t('rec.add')}
+            </button>
+            {invalid && <span className="sub danger">{t('spend.badAmount')}</span>}
+            {create.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
+          </div>
+        </>
       }
     >
       {items.length === 0 && (

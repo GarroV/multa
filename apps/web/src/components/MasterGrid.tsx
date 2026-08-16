@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import { fromMajor, money, toMajorString } from '@multa/core';
 import { formatDate, formatMinor } from '../lib/format.ts';
+import { GridAddRow } from './GridAddRow.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   useEditGridCell,
@@ -58,6 +58,8 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
    * рендере с данными хуков становилось больше, чем на рендере загрузки. Экран уходил в белый лист.
    */
   const [editing, setEditing] = useState<string | null>(null);
+  /* Какой раздел сейчас заводит строку: форма раскрывается под его шапкой, по одной за раз. */
+  const [adding, setAdding] = useState<string | null>(null);
   const edit = useEditGridCell(periods);
   const isMember = useIsMember();
 
@@ -237,16 +239,24 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
             {g.informational && (
               <span className="dim mgrid-note-inline">{t('plan.master.notInTotals')}</span>
             )}
-            {/* Пустой раздел — не украшение, а приглашение: строку заводят в своём разделе. */}
-            {g.rows.length === 0 && SECTION_HREF[g.kind] && (
-              <Link
+            {/*
+              Плюс заводит строку прямо здесь (запрос владельца 16.08.2026: «если я хочу добавить
+              долг то меня перекидывает на окно обязательств. так быть не должно»).
+              Раньше это была ссылка на другой экран — человек терял из виду ту самую таблицу,
+              ради которой пришёл. Плюс есть у любого раздела, не только у пустого: заводить
+              вторую строку так же нормально, как первую.
+            */}
+            {SECTION_HREF[g.kind] && !isMember && (
+              <button
+                type="button"
                 className="act act-icon mgrid-add"
-                to={SECTION_HREF[g.kind]}
                 aria-label={t('plan.master.addRow')}
                 title={t('plan.master.addRow')}
+                aria-expanded={adding === g.kind}
+                onClick={() => setAdding(adding === g.kind ? null : g.kind)}
               >
                 <IconPlus />
-              </Link>
+              </button>
             )}
           </span>
           {g.totals.map((v, i) => (
@@ -255,6 +265,15 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
             </span>
           ))}
         </div>
+        {/*
+          Форма живёт под шапкой раздела, а не в отдельном окне: заведённая строка появляется тут
+          же, следующей, и сразу видно, что она сделала с итогами периода.
+        */}
+        {adding === g.kind && (
+          <div className="mgrid-row mgrid-row-add">
+            <GridAddRow kind={g.kind} base={base} onDone={() => setAdding(null)} />
+          </div>
+        )}
         {open &&
           g.rows.map((r) => (
             <div className="mgrid-row mgrid-row-item" key={r.targetId}>

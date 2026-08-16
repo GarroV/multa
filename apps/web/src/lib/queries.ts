@@ -242,7 +242,16 @@ export function useCreateEntity(name: EntityName) {
   return useMutation({
     mutationFn: (body: unknown) =>
       api(`/v1/${name}`, { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [name] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [name] });
+      /*
+       * План и мастер-таблица тоже поменялись: новый долг или накопление участвуют в каскаде с
+       * первого же периода. Раньше сбрасывался только список сущностей — этого хватало, пока
+       * заводили из разделов и возвращались на план заново. Заведение прямо в таблице вскрыло
+       * дыру: строка создавалась, а таблица показывала прежние итоги до перезагрузки.
+       */
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
   });
 }
 
