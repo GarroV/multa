@@ -1,0 +1,1 @@
+ALTER TABLE "debts" ADD COLUMN "payments_by_source" jsonb;

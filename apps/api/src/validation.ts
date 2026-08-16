@@ -349,6 +349,21 @@ export const debtCreateSchema = z.object({
    */
   direction: z.enum(['owed_by_me', 'owed_to_me']).default('owed_by_me'),
   amountSteps: amountStepsSchema,
+  /**
+   * Разбивка платежа по источникам дохода (запрос владельца 16.08.2026). Пустой список или
+   * отсутствие поля = прежнее поведение: одна сумма на период.
+   */
+  paymentsBySource: z
+    .array(
+      z.object({
+        sourceId: z.string().uuid(),
+        // Строкой, как в ступенях: bigint в jsonb не сериализуется, и это падает уже на вставке.
+        amountMinor: minor.transform((v) => v.toString()),
+      }),
+    )
+    .max(12)
+    .optional()
+    .default([]),
   dueDate: z.string().optional(),
   counterparty: z.string().optional(),
 });

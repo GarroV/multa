@@ -162,6 +162,13 @@
       "when": 1787100000000,
       "tag": "0022_edit_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787200000000,
+      "tag": "0023_debt_payments_by_source",
+      "breakpoints": true
     }
   ]
 }

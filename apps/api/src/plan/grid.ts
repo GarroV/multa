@@ -1,5 +1,6 @@
 import {
   amountOn,
+  debtPaymentForPeriod,
   convert,
   recurringDueIn,
   normalizeSteps,
@@ -32,6 +33,7 @@ import { getRate } from '../fx/service.ts';
 import { listSources } from '../income/store.ts';
 import type { Workspace } from '../middleware.ts';
 import { settingsOf } from '../settings/store.ts';
+import { parsePaymentsBySource } from './assemble.ts';
 import { SHARING_SECTION_OF } from './sharing.ts';
 import type { ShareMode } from '../validation.ts';
 import { getCurrentPlan } from './assemble.ts';
@@ -247,6 +249,16 @@ export async function getPlanGrid(
     rows.push({ targetKind, targetId, name, sourceCurrency, perPeriodMinor, ...extra });
   };
 
+  /*
+   * Источники дохода по колонкам: нужны долгам с разбивкой платежа («5 000 с аванса, 15 000 с
+   * зарплаты»). Считаем один раз на весь горизонт, а не на каждый долг.
+   */
+  const sourcesByPeriod = periods.map((p: PayPeriod) => [
+    ...new Set(
+      incomeEventsIn(sources, p, ws.paydayWeekendRule as WeekendRule).map((e) => e.sourceId),
+    ),
+  ]);
+
   for (const d of debtRows) {
     const remaining = toBase(d.remainingMinor, d.currency);
     /*
@@ -255,11 +267,24 @@ export async function getPlanGrid(
      * и 4 000 с октября, а не одним числом на весь горизонт.
      */
     const steps = parseAmountSteps(d.amountSteps);
+    const bySource = parsePaymentsBySource(d.paymentsBySource);
+    /*
+     * Колонка считается тем же правилом ядра, что и план (`debtPaymentForPeriod`). Своя формула
+     * здесь однажды уже развела план и таблицу по цифре дня — второй раз наступать не будем.
+     */
     const byIndex =
-      steps.length === 0
+      steps.length === 0 && bySource.length === 0
         ? undefined
         : periods.map(
-            (p: PayPeriod) => toBase(amountOn(d.paymentMinor, steps, p.startsOn), d.currency) ?? 0n,
+            (p: PayPeriod, i: number) =>
+              toBase(
+                debtPaymentForPeriod(
+                  { paymentMinor: d.paymentMinor, steps, bySource },
+                  sourcesByPeriod[i] ?? [],
+                  p.startsOn,
+                ),
+                d.currency,
+              ) ?? 0n,
           );
     push('debt', d.id, d.name, d.currency, d.paymentMinor, {
       ...(remaining !== null ? { remainingMinor: remaining } : {}),

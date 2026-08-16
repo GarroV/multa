@@ -13,6 +13,7 @@
 
 import {
   amountOn,
+  debtPaymentForPeriod,
   assemblePlan,
   exponentOf,
   roundExchangeUp,
@@ -316,6 +317,11 @@ async function resolveObligations(
   period: { startsOn: string; endsOn: string },
   /** Цели с осознанным пропуском взноса в этом периоде (issue #54) — в каскад не попадают. */
   frozenGoals: ReadonlySet<string> = new Set(),
+  /**
+   * Источники дохода, чьи выплаты приходят в этот период. Нужны долгам с разбивкой платежа: «5 000
+   * с аванса, 15 000 с зарплаты» (запрос владельца 16.08.2026).
+   */
+  payingSourceIds: readonly string[] = [],
 ): Promise<{ resolved: ResolvedItem[]; unresolved: UnresolvedItem[] }> {
   const base = ws.baseCurrency;
   const [debtRows, bucketRows, envelopeRows, goalRows, reservedRecurring] = await Promise.all([
@@ -422,7 +428,20 @@ async function resolveObligations(
      * Правило одно на всех — `amountOn` в ядре, — иначе план и мастер-сетка однажды показали бы по
      * одной строке разные числа, и верить перестали бы обоим.
      */
-    const payment = amountOn(d.paymentMinor, parseAmountSteps(d.amountSteps), on);
+    /*
+     * Разбивка по источникам (16.08.2026) сильнее ступеней: они отвечают на разные вопросы —
+     * «сколько с какого-то момента» против «сколько с какой выплаты», — и складывать их значило бы
+     * заплатить дважды. Правило целиком в ядре, чтобы план, сетка и прогноз считали одинаково.
+     */
+    const payment = debtPaymentForPeriod(
+      {
+        paymentMinor: d.paymentMinor,
+        steps: parseAmountSteps(d.amountSteps),
+        bySource: parsePaymentsBySource(d.paymentsBySource),
+      },
+      payingSourceIds,
+      on,
+    );
     await push('debt', d.id, d.name, d.currency, payment);
   }
   for (const b of bucketRows)
@@ -538,6 +557,22 @@ export function parseAmountSteps(raw: unknown): { from: string; amountMinor: big
     out.push({ from: step.from, amountMinor: BigInt(step.amountMinor) });
   }
   return normalizeSteps(out);
+}
+
+/**
+ * Разбивка платежа по источникам из БД. Мусор молча пропускаем — как и в ступенях: строка с кривым
+ * значением не должна валить сборку всего плана, но и подставлять вместо неё ноль нельзя.
+ */
+export function parsePaymentsBySource(raw: unknown): { sourceId: string; amountMinor: bigint }[] {
+  if (!Array.isArray(raw)) return [];
+  const out: { sourceId: string; amountMinor: bigint }[] = [];
+  for (const item of raw) {
+    const entry = item as { sourceId?: unknown; amountMinor?: unknown };
+    if (typeof entry?.sourceId !== 'string' || entry.sourceId === '') continue;
+    if (typeof entry.amountMinor !== 'string' || !/^\d+$/.test(entry.amountMinor)) continue;
+    out.push({ sourceId: entry.sourceId, amountMinor: BigInt(entry.amountMinor) });
+  }
+  return out;
 }
 
 export interface IncomeEventDto {
@@ -831,6 +866,8 @@ async function assembleForPeriod(
     asOf,
     period,
     frozenGoals,
+    // Чьи выплаты приходят в этом периоде: долг с разбивкой берёт сумму именно с них.
+    [...new Set(income.events.map((e) => e.sourceId))],
   );
   const cats = await loadCategoryBudgets(periodId);
   // Правки человека по обязательствам этого периода: пересборка списала часть взноса с цели.
