@@ -320,9 +320,17 @@ describe('цифра дня текущего столбца сходится с 
     );
 
     const plan = await getPlan(client);
-    const grid = await expectOk<{ footer: { perDayMinor: string[] } }>(
-      await client.get('/v1/plan/grid?periods=4'),
-    );
+    const grid = await expectOk<{
+      footer: { perDayMinor: string[]; freeMinor: string[]; toExchangeMinor: string[] };
+    }>(await client.get('/v1/plan/grid?periods=4'));
+
+    /*
+     * Проверяем ВЕСЬ подвал текущего столбца, а не одну цифру дня. Баг был про перДень, но природа
+     * его — «первый столбец сетки обязан равняться плану»; свободно и к размену считаются там же и
+     * разъедутся так же, если однажды кто-то тронет сборку. Одна проверка на весь класс.
+     */
     expect(grid.footer.perDayMinor[0]).toBe(plan.canSpendPerDayMinor);
+    expect(grid.footer.freeMinor[0]).toBe(plan.freeMinor);
+    expect(grid.footer.toExchangeMinor[0]).toBe(plan.toExchangeMinor);
   });
 });
