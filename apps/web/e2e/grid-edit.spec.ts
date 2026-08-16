@@ -76,3 +76,47 @@ test('Esc отменяет правку, ничего не записав', asyn
 
   await expect(row.locator('.mgrid-cell').nth(2)).toHaveText(before);
 });
+
+/*
+ * Ячейка не должна дёргаться в момент, когда в неё вошли (жалоба владельца 16.08.2026: «зачем
+ * скачет поле?»).
+ *
+ * Замер до правки: колонка расширялась с 92 до 184px — ровно вдвое, потому что дорожка задана
+ * `minmax(92px, max-content)`, а `max-content` пустого input'а это его собственная ширина по
+ * умолчанию (двадцать символов). Поле выезжало на соседний столбец. Высота при этом падала с 36
+ * до 22px: обёртка обнуляла отступы ячейки, а поле их не возвращало.
+ *
+ * Проверяем геометрию, а не пиксель-в-пиксель картинку: строка обязана сохранить и ширину, и
+ * высоту, иначе таблица прыгает под курсором при каждом входе в ячейку.
+ */
+test('вход в ячейку не меняет её размеры', async ({ page }) => {
+  const row = page.locator('.mgrid-row', { hasText: 'Groceries' }).first();
+  const cell = row.locator('.mgrid-cell-btn').nth(2);
+  const before = await cell.boundingBox();
+
+  await cell.click();
+  const input = row.locator('.mgrid-input');
+  await expect(input).toBeVisible();
+  const after = await input.boundingBox();
+
+  // Допуск в 2px: рамка поля и антиалиасинг дают доли пикселя, а не скачок.
+  expect(Math.abs(after!.width - before!.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(after!.height - before!.height)).toBeLessThanOrEqual(2);
+});
+
+/*
+ * Значение тоже не должно меняться на глазах: показанный «0» превращался в «0.00», а «133 980» —
+ * в «133980.00». Человек видит скачок цифр там, где ничего не произошло. Дробную часть показываем
+ * только когда она есть.
+ */
+test('вход в ячейку не переписывает показанное число', async ({ page }) => {
+  const row = page.locator('.mgrid-row', { hasText: 'Groceries' }).first();
+  const cell = row.locator('.mgrid-cell-btn').nth(2);
+  const shown = (await cell.innerText()).trim();
+
+  await cell.click();
+  const value = await row.locator('.mgrid-input').inputValue();
+
+  // Разделители разрядов при вводе не нужны, но лишних нулей после точки быть не должно.
+  expect(value).toBe(shown.replace(/[\s, ]/g, ''));
+});

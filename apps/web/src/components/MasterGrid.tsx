@@ -102,6 +102,16 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
   };
 
   const fmt = (minor: string) => formatMinor(minor, base, locale);
+
+  /**
+   * Значение для правки: то же число, что человек видел, без дорисованной дробной части.
+   *
+   * `toMajorString` всегда печатает разряды до конца («0» становится «0.00», «133 980» —
+   * «133980.00»), и в момент входа в ячейку цифры менялись на глазах, хотя ничего не произошло.
+   * Разделители разрядов при вводе не нужны — их и не было, — а вот лишние нули убираем.
+   */
+  const editableMajor = (minor: string) =>
+    toMajorString(money(BigInt(minor), base)).replace(/\.0+$/, '');
   const columns = data.periods.length;
 
   const cell = (c: GridCellDto, key: string) => (
@@ -142,8 +152,15 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
             className="mgrid-input"
             inputMode="decimal"
             autoFocus
+            /*
+             * size={1} — не косметика, а единственное, что держит колонку на месте. Дорожка задана
+             * `minmax(92px, max-content)`, и `max-content` у поля это его собственная ширина по
+             * умолчанию — двадцать символов, то есть 184px. Колонка расширялась ровно вдвое, и поле
+             * выезжало на соседнюю. Ширину задаёт CSS (100%), поэтому маленький size ничего не режет.
+             */
+            size={1}
             aria-label={`${row.name} · ${formatDate(startsOn)}`}
-            defaultValue={c.state === 'planned' ? toMajorString(money(BigInt(c.minor), base)) : ''}
+            defaultValue={c.state === 'planned' ? editableMajor(c.minor) : ''}
             onBlur={(e) => commit(row, startsOn, e.currentTarget.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {

@@ -2562,9 +2562,17 @@ a {
   padding: 0;
 }
 
-/* Поле повторяет геометрию ячейки: иначе строка дёргается в момент, когда в неё начали вводить. */
+/*
+ * Поле повторяет геометрию ячейки: иначе строка дёргается в момент, когда в неё начали вводить.
+ *
+ * Раньше это было только обещанием в комментарии. Обёртка `.mgrid-cell-edit` обнуляет отступы
+ * ячейки (7px/10px), а поле ставило свои 0/4px — строка на входе в ячейку худела с 36 до 22px.
+ * Теперь поле возвращает те же отступы, а `border-box` учитывает рамку внутри, а не поверх.
+ */
 .mgrid-input {
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   font: inherit;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -2572,7 +2580,7 @@ a {
   background: var(--bg-void);
   border: 1px solid var(--accent);
   border-radius: 4px;
-  padding: 0 4px;
+  padding: 7px 10px;
 }
 
 .mgrid-input:focus {
