@@ -712,7 +712,12 @@ function DebtsSection({ base }: SectionProps) {
           </div>
           {splitOpen && (
             <div className="form-row obl-split">
-              <span className="micro">{t('obl.split')}</span>
+              {/*
+                Подпись — знаком вопроса, а не заголовком в полстроки: раздел уже назван кнопкой,
+                которой его открыли, и повторять то же самое крупным текстом значит тратить строку
+                на пересказ (замечание владельца о крупноте, 16.08.2026).
+              */}
+              <Hint text={t('obl.split.hint')} />
               {(sources.data ?? []).map((source) => (
                 <input
                   key={source.id}
@@ -724,12 +729,11 @@ function DebtsSection({ base }: SectionProps) {
                   onChange={(e) => setBySource({ ...bySource, [source.id]: e.target.value })}
                 />
               ))}
-              <Hint text={t('obl.split.hint')} />
             </div>
           )}
           {windowOpen && (
             <div className="form-row obl-window">
-              <span className="micro">{t('obl.window')}</span>
+              <Hint text={t('obl.window.hint')} />
               <input
                 className="field"
                 type="date"
@@ -744,7 +748,6 @@ function DebtsSection({ base }: SectionProps) {
                 value={paysUntil}
                 onChange={(e) => setPaysUntil(e.target.value)}
               />
-              <Hint text={t('obl.window.hint')} />
             </div>
           )}
           {/* Считаем вслух: человек должен увидеть взнос до того, как нажмёт «добавить». */}

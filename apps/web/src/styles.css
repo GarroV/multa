@@ -188,8 +188,13 @@ body {
   background: var(--bg-void);
   color: var(--text-hi);
   font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.45;
+  /*
+   * 13px, а не 14 (замечание владельца 16.08.2026: «всё слишком крупное»). Шкала дизайн-системы
+   * (docs/06-design-system §Типографика) идёт 12.5 / 13.5 / 15; интерфейс стоял на верхней ступени,
+   * из-за чего рабочая ведомость читалась как приложение для чтения с дивана.
+   */
+  font-size: 13px;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   /* Табличные цифры глобально: суммы сравнивают взглядом по колонке. */
   font-variant-numeric: tabular-nums;
@@ -233,7 +238,7 @@ body {
   background: var(--bg-raised);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 4px 12px;
   cursor: pointer;
   transition:
     background 120ms ease,
@@ -282,7 +287,8 @@ body {
   background: var(--bg-void);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  padding: 6px 10px;
+  /* 4px по вертикали вместо 6: высота органа управления 28px вместо 34 при том же шрифте. */
+  padding: 4px 10px;
 }
 .field:focus {
   outline: none;
@@ -1095,9 +1101,13 @@ a {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
-  min-height: 34px;
-  padding: 6px 14px;
+  gap: 8px;
+  /*
+   * 30px вместо 34: нижняя граница диапазона дизайн-системы (32–36 с рамкой) вместо верхней.
+   * На экране обязательств это возвращает две-три строки в поле зрения без прокрутки.
+   */
+  min-height: 30px;
+  padding: 3px 14px;
   border-bottom: 1px solid var(--line);
 }
 .prow:last-child {

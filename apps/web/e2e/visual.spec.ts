@@ -524,3 +524,43 @@ test('кнопки листа ввода не растягиваются во в
   const box = await submit.boundingBox();
   expect(box!.height, 'кнопка «Записать» растянулась по высоте ряда').toBeLessThan(60);
 });
+
+/*
+ * Плотность интерфейса (замечание владельца 16.08.2026: «всё слишком крупное, как для бабушек»).
+ *
+ * Дизайн-система (docs/06-design-system §Плотность с дисциплиной) требует строк 32–36px и шкалы
+ * до 13.5px, а код стоял на самом рыхлом краю: базовый шрифт 14px, поля и кнопки 34px, строки 36px.
+ * Формально в допуске, на деле — интерфейс для чтения с дивана, а не рабочий инструмент.
+ *
+ * Проверка держит верхнюю границу: разъехаться обратно легко, заметить это на глаз — нет.
+ */
+test('органы управления остаются плотными', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.goto('/obligations');
+  await page.locator('.panel').first().waitFor();
+
+  const sizes = await page.evaluate(() => {
+    const at = (sel: string) => {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      return el ? Math.round(el.getBoundingClientRect().height) : 0;
+    };
+    return {
+      field: at('.field'),
+      button: at('.btn'),
+      row: at('.prow'),
+      font: Number.parseFloat(getComputedStyle(document.body).fontSize),
+    };
+  });
+
+  expect(sizes.field, 'высота поля').toBeLessThanOrEqual(30);
+  expect(sizes.button, 'высота кнопки').toBeLessThanOrEqual(30);
+  expect(sizes.row, 'высота строки').toBeLessThanOrEqual(32);
+  expect(sizes.font, 'базовый шрифт').toBeLessThanOrEqual(13);
+
+  /*
+   * Нижняя граница тоже нужна: ужать до нечитаемого так же плохо, как раздуть. 24px — принятый
+   * минимум для попадания пальцем, и мы его уже держим у флажков.
+   */
+  expect(sizes.field, 'поле не должно стать нечитаемым').toBeGreaterThanOrEqual(24);
+});
