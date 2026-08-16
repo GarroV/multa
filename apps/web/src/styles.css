@@ -1980,11 +1980,39 @@ a {
   color: var(--text-dim);
   text-transform: uppercase;
 }
-.mgrid-now {
-  /* Текстовый вариант акцента: «сейчас» набрано мелко, и чистый --accent давал в светлой 4.06. */
+/*
+ * Полоса месяцев над колонками периодов (запрос владельца 16.08.2026).
+ *
+ * Заменила подпись «сейчас» у даты: свечение говорит то же самое, но не занимает место в ячейке и
+ * читается с одного взгляда на всю таблицу, а не при чтении конкретной колонки.
+ */
+.mgrid-row-months {
+  border-bottom: 0;
+}
+.mgrid-month {
+  padding: 6px 10px 2px;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  text-align: center;
+  /* Разделитель между месяцами, а не между периодами: он и делает группировку видимой. */
+  border-left: 1px solid color-mix(in oklab, var(--line) 45%, transparent);
+}
+.mgrid-month:first-of-type {
+  border-left: 0;
+}
+/*
+ * Текущий месяц. Свечение внутрь, а не рамка: рамка спорила бы с линиями таблицы, а мягкая заливка
+ * тем же акцентом, что у активной вкладки, читается как «вы здесь».
+ */
+.mgrid-month-now {
   color: var(--cyan-ink);
-  font-style: normal;
-  margin-left: 6px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--accent) 14%, transparent),
+    transparent
+  );
+  box-shadow: inset 0 1px 0 var(--accent);
 }
 .mgrid-row-sub .mgrid-name {
   padding-left: 26px;

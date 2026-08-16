@@ -230,3 +230,41 @@ test('строки подвала стоят друг под другом, а н
     prev = box;
   }
 });
+
+/*
+ * Полоса месяцев над колонками (запрос владельца 16.08.2026).
+ *
+ * Проверяем не красоту, а два обещания: полоса месяца накрывает ровно свои колонки периодов, и
+ * подсвечен ровно один месяц — текущий. Ошибка в арифметике полос сдвинула бы всю шапку, и таблица
+ * показывала бы август над сентябрьскими деньгами.
+ */
+test('месяцы стоят над своими колонками, текущий подсвечен', async ({ page }) => {
+  const months = page.locator('.mgrid-month');
+  await months.first().waitFor();
+
+  const cells = page.locator('.mgrid-row-periods .mgrid-cell');
+  const columns = await cells.count();
+
+  /*
+   * Проверяем геометрией, а не значением `grid-column`: браузер отдаёт вычисленный номер линии, а
+   * не «span 2», и разбор строки давал неверные числа. Ширины же врать не умеют.
+   */
+  const bandWidth = await months.evaluateAll((els) =>
+    els.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0),
+  );
+  const cellWidth = await cells.evaluateAll((els) =>
+    els.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0),
+  );
+  expect(Math.abs(bandWidth - cellWidth), 'полосы месяцев не накрывают колонки').toBeLessThan(2);
+
+  // Группировка действительно произошла: месяцев меньше, чем периодов.
+  expect(await months.count()).toBeLessThan(columns);
+
+  // Подсвечен ровно один месяц.
+  await expect(page.locator('.mgrid-month-now')).toHaveCount(1);
+
+  // Левый край полосы совпадает с левым краем её первой колонки — иначе шапка «съезжает».
+  const firstMonth = await months.first().boundingBox();
+  const firstCell = await cells.first().boundingBox();
+  expect(Math.abs(firstMonth!.x - firstCell!.x)).toBeLessThanOrEqual(1);
+});

@@ -12,6 +12,7 @@ import {
 } from '../lib/queries.ts';
 import { IconPlus } from './ui/icons.tsx';
 import { useIsMember } from '../lib/role.ts';
+import { useToday } from '../lib/useToday.ts';
 import { isSectionVisible } from '../lib/sections.ts';
 
 /**
@@ -48,6 +49,41 @@ const GROUP_LABEL = {
   recurring: 'plan.groups.recurring',
 } as const;
 
+/**
+ * Полосы месяцев над колонками периодов: подряд идущие периоды одного месяца сливаются в одну
+ * ячейку шапки.
+ *
+ * Месяц берётся по дате НАЧАЛА периода. Период может перевалить через границу месяца (с 25.08 по
+ * 09.09), и относить его к тому месяцу, в котором он начался, — то же самое, что делает человек,
+ * говоря «выплата за август».
+ *
+ * Чистая функция, а не выкладка внутри разметки: границы месяцев — арифметика, и проверять её надо
+ * отдельно от того, как она выглядит.
+ */
+export function monthBandsOf(
+  periods: readonly { startsOn: string }[],
+  today: string,
+): { key: string; month: number; span: number; isCurrent: boolean }[] {
+  const bands: { key: string; month: number; span: number; isCurrent: boolean }[] = [];
+  const nowKey = today.slice(0, 7);
+
+  for (const period of periods) {
+    const key = period.startsOn.slice(0, 7);
+    const last = bands.at(-1);
+    if (last?.key === key) {
+      last.span += 1;
+      continue;
+    }
+    bands.push({
+      key,
+      month: Number(key.slice(5, 7)),
+      span: 1,
+      isCurrent: key === nowKey,
+    });
+  }
+  return bands;
+}
+
 export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const { t, locale } = useI18n();
   /* Горизонт — состояние экрана: сколько периодов человек хочет видеть за раз. */
@@ -66,6 +102,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const edit = useEditGridCell(horizon);
   const propose = useCreateProposal();
   const isMember = useIsMember();
+  const today = useToday();
 
   if (isPending) return <div className="mgrid-note">{t('common.loading')}</div>;
   if (isError || !data) {
@@ -126,6 +163,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const editableMajor = (minor: string) =>
     toMajorString(money(BigInt(minor), base)).replace(/\.0+$/, '');
   const columns = data.periods.length;
+  const monthBands = monthBandsOf(data.periods, today);
 
   const cell = (c: GridCellDto, key: string) => (
     <span
@@ -302,12 +340,32 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   return (
     <div className="mgrid-wrap">
       <div className="mgrid" style={{ ['--cols' as string]: columns }}>
+        {/*
+          Полоса месяцев над колонками периодов (запрос владельца 16.08.2026). Периоды короче
+          месяца — при выплатах дважды в месяц их два на месяц, — и без этой полосы шесть дат
+          подряд читаются как ровный ряд, где не за что зацепиться глазом. Месяц объединяет
+          колонки и возвращает календарь, к которому человек привык.
+
+          Текущий месяц подсвечен, и это заменило подпись «сейчас» у даты: свечение говорит то же
+          самое, но не занимает место в ячейке и видно с одного взгляда на всю таблицу.
+        */}
+        <div className="mgrid-row mgrid-row-months">
+          <span className="mgrid-name" aria-hidden />
+          {monthBands.map((band) => (
+            <span
+              className={band.isCurrent ? 'mgrid-month mgrid-month-now' : 'mgrid-month'}
+              key={band.key}
+              style={{ gridColumn: `span ${band.span}` }}
+            >
+              {t(`month.${band.month}` as 'month.1')}
+            </span>
+          ))}
+        </div>
         <div className="mgrid-row mgrid-row-periods">
           <span className="mgrid-name">{t('plan.master.col1')}</span>
           {data.periods.map((p) => (
             <span className="mgrid-cell" key={p.startsOn}>
               {formatDate(p.startsOn)}
-              {p.materialized && <i className="mgrid-now">{t('plan.master.now')}</i>}
             </span>
           ))}
         </div>
