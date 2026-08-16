@@ -12,6 +12,7 @@ import {
   useRecurringItems,
   type RecurringItemDto,
 } from '../lib/queries.ts';
+import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { Panel, Tag } from './ui/Panel.tsx';
 import { Select } from './ui/Select.tsx';
 
@@ -87,6 +88,7 @@ export function RecurringPayments({ base }: { base: string }) {
 
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState(base);
   const [firstOn, setFirstOn] = useState(today);
   const [ruleIndex, setRuleIndex] = useState(0);
   const [invalid, setInvalid] = useState(false);
@@ -134,7 +136,7 @@ export function RecurringPayments({ base }: { base: string }) {
   };
 
   const submit = () => {
-    const minor = parseMinor(amount, base);
+    const minor = parseMinor(amount, currency);
     const rule = rules[ruleIndex];
     if (!name.trim() || !minor || !rule) {
       setInvalid(true);
@@ -145,7 +147,7 @@ export function RecurringPayments({ base }: { base: string }) {
       {
         name: name.trim(),
         amountMinor: minor,
-        currency: base,
+        currency,
         schedule: rule,
         // Первая дата — якорь правила и одновременно начало жизни платежа.
         startsOn: firstOn,
@@ -196,6 +198,18 @@ export function RecurringPayments({ base }: { base: string }) {
             aria-label={t('rec.amount')}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+          />
+          {/*
+            Валюта платежа (issue #115). Раньше её молча подставляли базовой, хотя вся остальная
+            цепочка валюту поддерживает — и «аренда 500» в Сербии уходила как 500 в базовой, без
+            единого признака ошибки на экране. По умолчанию базовая: частый случай не должен
+            требовать лишнего клика, но и молчать о выборе нельзя.
+          */}
+          <CurrencySelect
+            value={currency}
+            onChange={setCurrency}
+            label={t('spend.currency')}
+            className="field field-ccy-wide"
           />
           <input
             className="field num"
