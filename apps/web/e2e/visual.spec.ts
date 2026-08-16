@@ -463,20 +463,41 @@ test.describe('пустой аккаунт', () => {
     const panel = page.locator('.panel', { has: page.locator('.panel-tools') }).first();
     await panel.waitFor();
 
-    const inBody = await page.evaluate(() => {
-      const bad: string[] = [];
-      for (const p of document.querySelectorAll('.panel')) {
-        const head = p.querySelector('.panel-head');
-        if (!head) continue;
-        for (const act of p.querySelectorAll('.panel-body .prow > .act')) {
-          // Действие уровня панели в строке без чисел — ровно тот рассинхрон.
-          if (!act.closest('.prow')?.querySelector('.prow-num')) {
-            bad.push(`${p.getAttribute('aria-label') ?? ''}: ${(act.textContent ?? '').trim()}`);
-          }
-        }
-      }
-      return bad;
-    });
-    expect(inBody).toEqual([]);
+    /*
+     * Проверка через poll, а не одним снимком (issue #95).
+     *
+     * Тест мигал: в полном прогоне падал, в одиночку — никогда. Обе версии из issue проверены и
+     * НЕ подтвердились: воркер один (`workers: 1`, `fullyParallel: false`), гонки между ними быть
+     * не может; транзиентного нарушения тоже нет — опрос состояния каждые 20мс в течение трёх
+     * секунд после загрузки не поймал ни одного. Само падение за пять полных прогонов подряд не
+     * воспроизвелось: код с 11.08 сильно изменился.
+     *
+     * Причина осталась ненайденной, поэтому чинить наугад нечего — но снимать единственное
+     * мгновение на странице, которая ещё собирается, мы уже обжигались дважды (возврат фокуса,
+     * 1c2f53f). Poll убирает этот класс целиком и ничего не прячет: нарушение, которое осталось
+     * на экране, всё равно завалит тест по истечении ожидания.
+     */
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const bad: string[] = [];
+            for (const p of document.querySelectorAll('.panel')) {
+              const head = p.querySelector('.panel-head');
+              if (!head) continue;
+              for (const act of p.querySelectorAll('.panel-body .prow > .act')) {
+                // Действие уровня панели в строке без чисел — ровно тот рассинхрон.
+                if (!act.closest('.prow')?.querySelector('.prow-num')) {
+                  bad.push(
+                    `${p.getAttribute('aria-label') ?? ''}: ${(act.textContent ?? '').trim()}`,
+                  );
+                }
+              }
+            }
+            return bad;
+          }),
+        { message: 'действия уровня панели должны стоять в шапке, а не в теле' },
+      )
+      .toEqual([]);
   });
 });
