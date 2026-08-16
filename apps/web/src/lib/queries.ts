@@ -154,9 +154,19 @@ export function useMe() {
  * План текущего периода. `asMember` — предпросмотр владельца «глазами участника» (issue #46):
  * параметр только сужает видимое, поэтому его можно передавать с клиента.
  */
+/**
+ * Ключ кэша плана владельца.
+ *
+ * Вынесен в константу после бага «оплатить ничего не делает» (16.08.2026): пять мутаций клали
+ * свежий план в `['plan']`, а экран читал `['plan','own']`. Промах молчаливый — сервер отвечал 200,
+ * данные приходили и уходили в ячейку кэша, которую никто не читает. Виден он только глазами: на
+ * экране ничего не менялось.
+ */
+export const PLAN_KEY = ['plan', 'own'] as const;
+
 export function usePlan(enabled: boolean, asMember = false) {
   return useQuery({
-    queryKey: ['plan', asMember ? 'as-member' : 'own'],
+    queryKey: asMember ? ['plan', 'as-member'] : PLAN_KEY,
     enabled,
     retry: false,
     queryFn: () => api<PlanDto>(`/v1/plan/current${asMember ? '?as=member' : ''}`),
@@ -345,7 +355,7 @@ export function useSetCategoryBudget() {
         method: 'PUT',
         body: JSON.stringify({ plannedMinor }),
       }),
-    onSuccess: (plan) => qc.setQueryData(['plan'], plan),
+    onSuccess: (plan) => qc.setQueryData(PLAN_KEY, plan),
   });
 }
 
@@ -354,7 +364,7 @@ export function useClearCategoryBudget() {
   return useMutation({
     mutationFn: (id: string) =>
       api<PlanDto>(`/v1/plan/current/categories/${id}`, { method: 'DELETE' }),
-    onSuccess: (plan) => qc.setQueryData(['plan'], plan),
+    onSuccess: (plan) => qc.setQueryData(PLAN_KEY, plan),
   });
 }
 
@@ -1199,7 +1209,7 @@ export function useConfirmExecution() {
         body: JSON.stringify(executedMinor ? { executedMinor } : {}),
       }),
     onSuccess: (plan) => {
-      qc.setQueryData(['plan'], plan);
+      qc.setQueryData(PLAN_KEY, plan);
       void qc.invalidateQueries({ queryKey: ['transactions'] });
     },
   });
@@ -1211,7 +1221,7 @@ export function useSkipExecution() {
     mutationFn: ({ targetKind, targetId }: { targetKind: string; targetId: string }) =>
       api<PlanDto>(`/v1/plan/current/items/${targetKind}/${targetId}/skip`, { method: 'POST' }),
     onSuccess: (plan) => {
-      qc.setQueryData(['plan'], plan);
+      qc.setQueryData(PLAN_KEY, plan);
       void qc.invalidateQueries({ queryKey: ['transactions'] });
     },
   });
@@ -1320,7 +1330,7 @@ export function useApplyRebalance() {
     mutationFn: (body: { fromKind: string; fromId: string; toId: string; amountMinor: string }) =>
       api<PlanDto>('/v1/plan/current/rebalance', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: (plan) => {
-      qc.setQueryData(['plan'], plan);
+      qc.setQueryData(PLAN_KEY, plan);
       void qc.invalidateQueries({ queryKey: ['rebalance'] });
     },
   });

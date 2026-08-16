@@ -159,3 +159,35 @@ test('переключатели формы названы и достаточн
     expect(size!.height, `высота переключателя #${i}`).toBeGreaterThanOrEqual(24);
   }
 });
+
+/*
+ * Ни один орган управления не должен быть мельче, чем в него можно попасть.
+ *
+ * Перепись органов по всем экранам (16.08.2026) показала выпадающих: крестик удаления валюты в
+ * настройках — 13px высотой, кнопка разворота раздела в таблице — 17px. По ним промахиваются даже
+ * мышью, а пальцем — тем более. Остальные держатся двух семей: 28px (поля, кнопки, переключатели)
+ * и 22px (компактные действия и сегменты).
+ *
+ * Проверка идёт по экранам, а не по одному: выпадающие как раз и заводятся там, куда давно не
+ * смотрели.
+ */
+test('органы управления не мельче минимума для попадания', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+
+  for (const path of ['/plan', '/plan?view=table', '/obligations', '/settings']) {
+    await page.goto(path);
+    await page.locator('.panel, .mgrid-row').first().waitFor();
+
+    const tiny = await page.evaluate(() =>
+      [...document.querySelectorAll('button, input[type=checkbox]')]
+        .map((el) => ({
+          box: el.getBoundingClientRect(),
+          name: (el.textContent ?? '').trim() || (el as HTMLElement).className,
+        }))
+        .filter((x) => x.box.height > 0 && x.box.height < 20)
+        .map((x) => `${x.name.slice(0, 24)} — ${Math.round(x.box.height)}px`),
+    );
+    expect(tiny, `мелкие органы на ${path}`).toEqual([]);
+  }
+});
