@@ -280,6 +280,7 @@ export const en = {
   'plan.master.editFrom': 'From this date onward — click to change',
   'plan.master.ended': 'line has ended: nothing left to pay',
   'plan.master.noRate': 'No rate for today, so out of the table: {list}',
+  'plan.master.horizon': 'Horizon',
   'plan.master.hint':
     'Beyond the current period this is a projection from today’s rules, not an approved plan. Edit lines in their sections.',
   'plan.summary.perDay': 'To live on, per day',

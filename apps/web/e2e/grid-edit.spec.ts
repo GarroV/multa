@@ -148,3 +148,40 @@ test('долг заводится из таблицы, не уводя с экр
   });
   expect(page.url()).toBe(url);
 });
+
+/*
+ * «Отмена» рядом с «Добавить» должна быть кнопкой того же роста, а не мелким ярлыком.
+ *
+ * Замер до правки: «Добавить» 52x34, «Отмена» 60x23 — разной высоты и разного вида, потому что
+ * второстепенное действие набиралось классом ярлыка. Рядом друг с другом они читались как разные
+ * породы элементов, хотя это две кнопки одной формы (замечание владельца 16.08.2026).
+ */
+test('отмена и добавить — кнопки одного роста', async ({ page }) => {
+  await page
+    .locator('.mgrid-row-head', { hasText: /ДОЛГИ|DEBTS/i })
+    .first()
+    .getByRole('button', { name: /Добавить строку|Add a row/i })
+    .click();
+
+  const form = page.locator('.mgrid-addform');
+  const add = await form.getByRole('button', { name: /^Добавить$|^Add$/ }).boundingBox();
+  const cancel = await form.getByRole('button', { name: /^Отмена$|^Cancel$/ }).boundingBox();
+
+  expect(Math.abs(add!.height - cancel!.height)).toBeLessThanOrEqual(2);
+});
+
+/*
+ * Горизонт таблицы переключается (вопрос владельца 16.08.2026: «почему показывает планирование
+ * всего на 3 месяца?»). Было шесть периодов намертво — при выплатах дважды в месяц ровно три
+ * месяца. Теперь по умолчанию двенадцать, и горизонт можно растянуть до двадцати четырёх.
+ */
+test('горизонт таблицы переключается и меняет число колонок', async ({ page }) => {
+  const columns = () => page.locator('.mgrid-row-periods .mgrid-cell').count();
+  await expect.poll(columns).toBe(12);
+
+  await page.getByRole('button', { name: '24', exact: true }).click();
+  await expect.poll(columns).toBe(24);
+
+  await page.getByRole('button', { name: '6', exact: true }).click();
+  await expect.poll(columns).toBe(6);
+});

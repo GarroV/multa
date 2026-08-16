@@ -217,8 +217,12 @@ export function GridAddRow({
         <button type="button" className="btn" disabled={pending} onClick={submit}>
           {pending ? t('common.loading') : t('common.add')}
         </button>
-        {/* Отмена рядом с действием: передумать здесь так же нормально, как завести. */}
-        <button type="button" className="act" onClick={onDone}>
+        {/*
+          Отмена рядом с действием: передумать здесь так же нормально, как завести. Кнопка того же
+          роста, что «Добавить», только тише — раньше тут стоял класс ярлыка, и рядом друг с другом
+          они читались как разные породы элементов (замечание владельца 16.08.2026).
+        */}
+        <button type="button" className="btn btn-ghost" onClick={onDone}>
           {t('common.cancel')}
         </button>
         {invalid && <span className="sub danger">{t('spend.badAmount')}</span>}

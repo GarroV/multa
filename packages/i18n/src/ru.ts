@@ -276,6 +276,7 @@ export const ru: Record<TranslationKey, string> = {
   'plan.master.editFrom': 'С этой даты и далее — нажми, чтобы поправить',
   'plan.master.ended': 'строка кончилась: платить больше нечего',
   'plan.master.noRate': 'Без курса на сегодня и потому вне таблицы: {list}',
+  'plan.master.horizon': 'Горизонт',
   'plan.master.hint':
     'Дальше текущего периода — проекция по сегодняшним правилам, а не утверждённый план. Правки — в разделах.',
   'plan.summary.perDay': 'На жизнь, в день',

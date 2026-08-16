@@ -55,9 +55,14 @@ async function meWorkspaceId(client: TestClient): Promise<string | null> {
 }
 
 describe('мастер-сетка', () => {
-  test('горизонт по умолчанию — шесть периодов, и его можно сузить', async () => {
+  test('горизонт по умолчанию — двенадцать периодов, и его можно сузить', async () => {
+    /*
+     * Было шесть. При выплатах дважды в месяц это ровно три месяца — планировать отпуск или
+     * закрытие долга на таком горизонте нельзя (вопрос владельца 16.08.2026). Двенадцать даёт год
+     * при ежемесячных выплатах и полгода при полумесячных.
+     */
     const client = await onboarded();
-    expect((await grid(client)).periods).toHaveLength(6);
+    expect((await grid(client)).periods).toHaveLength(12);
     expect((await grid(client, '?periods=3')).periods).toHaveLength(3);
   });
 
@@ -147,14 +152,14 @@ describe('мастер-сетка', () => {
       201,
     );
     const goal = rowsOf(await grid(client), 'goal')[0]!;
-    expect(goal.cells.map((c) => c.state)).toEqual([
-      'planned',
-      'planned',
-      'ended',
-      'ended',
-      'ended',
-      'ended',
-    ]);
+    /*
+     * Суть проверки — ДВА периода набора и прочерк дальше, а не длина горизонта: 900 000 при
+     * 500 000 за период собираются за два. Поэтому сравниваем начало и требуем, чтобы весь хвост
+     * был «ended», иначе тест ломался бы от каждой смены умолчания (горизонт вырос с 6 до 12).
+     */
+    const states = goal.cells.map((c) => c.state);
+    expect(states.slice(0, 2)).toEqual(['planned', 'planned']);
+    expect(new Set(states.slice(2))).toEqual(new Set(['ended']));
   });
 
   test('доход разбит по источникам, и строки сходятся с итогом в каждой колонке', async () => {
@@ -333,4 +338,20 @@ describe('цифра дня текущего столбца сходится с 
     expect(grid.footer.freeMinor[0]).toBe(plan.freeMinor);
     expect(grid.footer.toExchangeMinor[0]).toBe(plan.toExchangeMinor);
   });
+});
+
+/*
+ * Горизонт таблицы (вопрос владельца 16.08.2026: «почему у нас там показывает планирование всего
+ * на 3 месяца?»).
+ *
+ * Потолок был 12 периодов, а при выплатах дважды в месяц это полгода — и по умолчанию бралось 6,
+ * то есть три месяца. Для планирования отпуска или закрытия долга этого мало: горизонт должен
+ * дотягиваться до года. 24 периода — тот же потолок, что у аналитики, чтобы два места не спорили.
+ */
+test('горизонт таблицы дотягивается до 24 периодов', async () => {
+  const client = await onboarded({ payoutMinor: '30000000' });
+  const grid = await expectOk<{ periods: { startsOn: string }[] }>(
+    await client.get('/v1/plan/grid?periods=24'),
+  );
+  expect(grid.periods).toHaveLength(24);
 });

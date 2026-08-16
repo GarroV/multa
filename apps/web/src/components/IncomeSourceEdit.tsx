@@ -127,7 +127,7 @@ export function IncomeSourceEdit({
             <button type="button" className="btn" disabled={patch.isPending} onClick={save}>
               {t('common.save')}
             </button>
-            <button type="button" className="act" onClick={onDone}>
+            <button type="button" className="btn btn-ghost" onClick={onDone}>
               {t('common.cancel')}
             </button>
           </span>

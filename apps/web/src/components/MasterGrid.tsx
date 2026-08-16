@@ -47,9 +47,11 @@ const GROUP_LABEL = {
   recurring: 'plan.groups.recurring',
 } as const;
 
-export function MasterGrid({ periods = 6 }: { periods?: number }) {
+export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const { t, locale } = useI18n();
-  const { data, isPending, isError, refetch } = usePlanGrid(periods);
+  /* Горизонт — состояние экрана: сколько периодов человек хочет видеть за раз. */
+  const [horizon, setHorizon] = useState(periods);
+  const { data, isPending, isError, refetch } = usePlanGrid(horizon);
   /* Сложенные разделы: состояние экрана, не домена, поэтому живёт здесь и не уезжает на сервер. */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   /*
@@ -60,7 +62,7 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
   const [editing, setEditing] = useState<string | null>(null);
   /* Какой раздел сейчас заводит строку: форма раскрывается под его шапкой, по одной за раз. */
   const [adding, setAdding] = useState<string | null>(null);
-  const edit = useEditGridCell(periods);
+  const edit = useEditGridCell(horizon);
   const isMember = useIsMember();
 
   if (isPending) return <div className="mgrid-note">{t('common.loading')}</div>;
@@ -351,7 +353,29 @@ export function MasterGrid({ periods = 6 }: { periods?: number }) {
           })}
         </div>
       )}
-      <div className="mgrid-note">{t('plan.master.hint')}</div>
+      <div className="mgrid-note mgrid-foot">
+        <span>{t('plan.master.hint')}</span>
+        {/*
+          Выбор горизонта (вопрос владельца 16.08.2026: «почему показывает планирование всего на
+          3 месяца?»). Длина периода у всех разная, поэтому считаем в периодах, а не в месяцах: при
+          выплатах дважды в месяц 12 периодов это полгода, при ежемесячных — год. Сколько именно
+          получилось, видно по датам в шапке.
+        */}
+        <span className="row row-8">
+          <span className="micro">{t('plan.master.horizon')}</span>
+          {[6, 12, 24].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={n === horizon ? 'act act-on' : 'act'}
+              aria-pressed={n === horizon}
+              onClick={() => setHorizon(n)}
+            >
+              {n}
+            </button>
+          ))}
+        </span>
+      </div>
     </div>
   );
 }

@@ -366,7 +366,11 @@ function LoansSection({ base }: SectionProps) {
                       >
                         {t('common.save')}
                       </button>
-                      <button type="button" className="act" onClick={() => setRepaying(null)}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setRepaying(null)}
+                      >
                         {t('common.cancel')}
                       </button>
                     </span>
