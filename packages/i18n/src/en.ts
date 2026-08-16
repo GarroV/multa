@@ -117,6 +117,13 @@ export const en = {
   'plan.today.until': 'until {date} · {days} days left',
 
   // План периода — автосборка каскадом (Спринт 2)
+  'prop.title': 'PROPOSED EDITS',
+  'prop.accept': 'Accept',
+  'prop.reject': 'Decline',
+  'prop.pending': 'waiting',
+  'prop.accepted': 'accepted',
+  'prop.rejected': 'declined',
+  'prop.sent': 'Proposed — the owner decides',
   'plan.groups.debt': 'Debts',
   'plan.groups.bucket': 'To exchange',
   'plan.groups.envelope': 'Savings',

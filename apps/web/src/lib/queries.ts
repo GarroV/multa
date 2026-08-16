@@ -1461,3 +1461,56 @@ export function useParseEntry() {
       }),
   });
 }
+
+/**
+ * Предложения правок (issue #83).
+ *
+ * Участник не пишет в план: он предлагает, владелец решает. Поэтому у участника та же ячейка, что
+ * у владельца, но её отправка идёт другой ручкой — а лента предложений живёт у владельца.
+ */
+export type ProposalDto = {
+  id: string;
+  targetKind: string;
+  targetId: string;
+  startsOn: string;
+  plannedMinor: string;
+  status: string;
+  createdAt: string;
+};
+
+export function useProposals() {
+  return useQuery({
+    queryKey: ['proposals'],
+    retry: false,
+    queryFn: () => api<{ proposals: ProposalDto[] }>('/v1/proposals'),
+  });
+}
+
+export function useCreateProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cell: {
+      targetKind: string;
+      targetId: string;
+      startsOn: string;
+      plannedMinor: string;
+    }) => api<ProposalDto>('/v1/proposals', { method: 'POST', body: JSON.stringify(cell) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+  });
+}
+
+export function useResolveProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, verdict }: { id: string; verdict: 'accept' | 'reject' }) =>
+      api(`/v1/proposals/${id}/${verdict}`, { method: 'POST' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] });
+      /*
+       * Принятое предложение переставляет деньги — план и таблица обязаны это показать сразу.
+       * Иначе владелец нажимает «принять», видит прежние числа и не понимает, случилось ли что-то.
+       */
+      void qc.invalidateQueries({ queryKey: ['plan'] });
+    },
+  });
+}

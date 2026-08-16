@@ -114,6 +114,13 @@ export const ru: Record<TranslationKey, string> = {
   'plan.today.until': 'до {date} · осталось дней: {days}',
 
   // План периода — автосборка каскадом (Спринт 2)
+  'prop.title': 'ПРЕДЛОЖЕНИЯ ПРАВОК',
+  'prop.accept': 'Принять',
+  'prop.reject': 'Отклонить',
+  'prop.pending': 'ждёт ответа',
+  'prop.accepted': 'принято',
+  'prop.rejected': 'отклонено',
+  'prop.sent': 'Предложено — владелец решит',
   'plan.groups.debt': 'Долги',
   'plan.groups.bucket': 'К размену',
   'plan.groups.envelope': 'Накопления',

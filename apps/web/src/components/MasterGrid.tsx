@@ -4,6 +4,7 @@ import { formatDate, formatMinor } from '../lib/format.ts';
 import { GridAddRow } from './GridAddRow.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import {
+  useCreateProposal,
   useEditGridCell,
   usePlanGrid,
   type GridCellDto,
@@ -63,6 +64,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   /* Какой раздел сейчас заводит строку: форма раскрывается под его шапкой, по одной за раз. */
   const [adding, setAdding] = useState<string | null>(null);
   const edit = useEditGridCell(horizon);
+  const propose = useCreateProposal();
   const isMember = useIsMember();
 
   if (isPending) return <div className="mgrid-note">{t('common.loading')}</div>;
@@ -97,12 +99,19 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
         return;
       }
     }
-    edit.mutate({
+    const cell = {
       targetKind: row.targetKind,
       targetId: row.targetId,
       startsOn,
       plannedMinor: minor.toString(),
-    });
+    };
+    /*
+     * Участник не пишет в план, а предлагает правку (issue #83): ячейка та же, ручка другая.
+     * Так и задумано — правит строку только владелец, но заблокированное поле не объясняет, что
+     * делать дальше, а «предложить» объясняет.
+     */
+    if (isMember) propose.mutate(cell);
+    else edit.mutate(cell);
   };
 
   const fmt = (minor: string) => formatMinor(minor, base, locale);
@@ -146,7 +155,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
     index: number,
   ) => {
     const startsOn = data.periods[index]?.startsOn;
-    if (!startsOn || c.state === 'ended' || isMember) return cell(c, key);
+    if (!startsOn || c.state === 'ended') return cell(c, key);
     const isEditing = editing === key;
 
     if (isEditing) {
@@ -354,7 +363,11 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
         </div>
       )}
       <div className="mgrid-note mgrid-foot">
-        <span>{t('plan.master.hint')}</span>
+        {/*
+          Участнику нужен ответ на его правку (issue #83): предложение план не меняет, и без этой
+          строки экран выглядит так, будто ввод не сработал — человек повторит его ещё раз.
+        */}
+        <span>{propose.isSuccess ? t('prop.sent') : t('plan.master.hint')}</span>
         {/*
           Выбор горизонта (вопрос владельца 16.08.2026: «почему показывает планирование всего на
           3 месяца?»). Длина периода у всех разная, поэтому считаем в периодах, а не в месяцах: при

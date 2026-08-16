@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { CategoryEditor } from '../components/CategoryEditor.tsx';
 import { IncomeEditor } from '../components/IncomeEditor.tsx';
 import { MasterGrid } from '../components/MasterGrid.tsx';
+import { Proposals } from '../components/Proposals.tsx';
 import { Tour } from '../components/tour/Tour.tsx';
 import { PLAN_TOUR } from '../components/tour/steps.ts';
 import { IncomeReceipt } from '../components/IncomeReceipt.tsx';
@@ -407,8 +408,18 @@ function PlanBody({ plan }: { plan: PlanDto }) {
       {receiptFor && (
         <IncomeReceipt event={receiptFor} base={base} onClose={() => setReceiptFor(null)} />
       )}
+      {/*
+        Лента предложений (issue #83): владельцу — то, что ждёт ответа, участнику — судьба его
+        предложений. Панель сама прячется, когда предлагать нечего.
+      */}
+      <Proposals base={base} />
       {/* Мастер-режим — другой взгляд на тот же план, а не второй экран рядом: панели уступают ему место. */}
-      {master && !isMember && <MasterGrid />}
+      {/*
+        Участнику таблица теперь доступна: ручка `/v1/plan/grid` научена матрице видимости (#84) и
+        сворачивает закрытые разделы в «Личное». Правка ячейки у него уходит предложением, а не в
+        план — заблокированное поле не объясняло, что делать дальше, а «предложить» объясняет.
+      */}
+      {master && <MasterGrid />}
       {!master && (
         <>
           <div className="kpi-strip">
