@@ -275,6 +275,30 @@ export function periodsUntil(
 }
 
 /**
+ * Начало следующего периода (issue #121).
+ *
+ * Нужно умолчанию «новый долг платится со следующей выплаты»: текущий период уже прожит наполовину,
+ * и обязательство, заведённое сегодня, откусывало бы от остатка задним числом.
+ *
+ * Считается тем же ядром и тем же ритмом, что и план, — иначе дата в форме и колонки таблицы
+ * разъехались бы, и человек не понял бы, какой из них верить.
+ */
+export function nextPeriodStart(
+  rhythm: unknown,
+  weekendRule: WeekendRule,
+  today: string,
+): string | null {
+  const config = { ...(rhythm as Record<string, unknown>), weekendRule } as PeriodConfig;
+  try {
+    const periods = generatePeriods(config, today, 3);
+    // Первый период, который начинается ПОЗЖЕ сегодняшнего дня: текущий уже идёт.
+    return periods.find((p) => p.startsOn > today)?.startsOn ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Метки-сид двух выплат месяца.
  *
  * Это ДАННЫЕ человека, а не строки интерфейса, поэтому i18n-ключей у них нет: подставляем на языке

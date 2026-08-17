@@ -150,3 +150,45 @@ test('долг можно завести с окном «платим с… по
   const created = debts.find((d) => d.name === 'Рассрочка');
   expect([created?.paysFrom, created?.paysUntil]).toEqual(['2026-11-01', '2027-02-28']);
 });
+
+/*
+ * Новый долг начинает платиться со следующей выплаты (issue #121, замечание владельца: «я внёс
+ * новый долг, и он должен привязаться к следующему периоду, не к текущему»).
+ *
+ * Текущий период уже прожит наполовину: деньги распределены, часть потрачена. Обязательство,
+ * заведённое сегодня, откусывало от остатка задним числом — цифра дня падала не потому, что человек
+ * потратил, а потому, что он что-то записал.
+ *
+ * Умолчание ВИДИМОЕ, а не тихое правило сервера: форма говорит, с какой даты начнёт платить, и дату
+ * можно изменить. Обратный случай реален — платёж может уходить уже в этом периоде, — и молча
+ * занижать обязательства нельзя.
+ */
+test('новый долг по умолчанию платится со следующего периода, и это видно', async ({ page }) => {
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  // Форма сообщает дату начала до нажатия «добавить», а не после.
+  await expect(panel.locator('.obl-from-note')).toBeVisible();
+
+  await panel.getByPlaceholder(/^Название$|^Name$/).fill('Автокредит');
+  await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('50000');
+  await panel.getByPlaceholder(/^Платёж$|^Payment$/).fill('10000');
+  await panel.getByRole('button', { name: /^Добавить$|^Add$/ }).click();
+  await expect(panel.getByText('Автокредит')).toBeVisible({ timeout: 15_000 });
+
+  const debts = await page.evaluate(async (api: string) => {
+    const res = await fetch(`${api}/v1/debts`, { credentials: 'include' });
+    return (await res.json()) as { name: string; paysFrom: string | null }[];
+  }, API_URL);
+  const created = debts.find((d) => d.name === 'Автокредит');
+
+  // Дата начала — начало следующего периода, а не «сегодня» и не пусто.
+  const plan = await page.evaluate(async (api: string) => {
+    const res = await fetch(`${api}/v1/plan/current`, { credentials: 'include' });
+    return (await res.json()) as { period: { endsOn: string } };
+  }, API_URL);
+  expect(created?.paysFrom).toBe(plan.period.endsOn);
+});

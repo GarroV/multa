@@ -1,5 +1,5 @@
 import { fromMajor, paymentToClose, type Currency, type WeekendRule } from '@multa/core';
-import { periodsUntil } from '../lib/income.ts';
+import { nextPeriodStart, periodsUntil } from '../lib/income.ts';
 import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { useIsMember } from '../lib/role.ts';
@@ -8,7 +8,7 @@ import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { Hint } from '../components/ui/Hint.tsx';
 import { ObligationEdit } from '../components/ObligationEdit.tsx';
-import { formatMinor } from '../lib/format.ts';
+import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useToday } from '../lib/useToday.ts';
 import { Select } from '../components/ui/Select.tsx';
@@ -449,6 +449,15 @@ function DebtsSection({ base }: SectionProps) {
    * ячеек таблицы — ноль сейчас, сумма с ноября, ноль с марта: работает, но догадаться нельзя.
    */
   const [windowOpen, setWindowOpen] = useState(false);
+  /*
+   * Новый долг по умолчанию начинает платиться со СЛЕДУЮЩЕЙ выплаты (issue #121). Текущий период
+   * уже прожит наполовину, и обязательство, заведённое сегодня, откусывало от остатка задним
+   * числом: цифра дня падала не потому, что человек потратил, а потому, что записал.
+   *
+   * Умолчание видимое — форма говорит дату, и её можно изменить. Тихим правилом сервера это делать
+   * нельзя: платёж может уходить уже в этом периоде, и молча занизить обязательства опаснее, чем
+   * показать их раньше срока.
+   */
   const [paysFrom, setPaysFrom] = useState('');
   const [paysUntil, setPaysUntil] = useState('');
   const [bySource, setBySource] = useState<Record<string, string>>({});
@@ -472,6 +481,15 @@ function DebtsSection({ base }: SectionProps) {
    * форме и пять колонок в таблице разошлись бы, и человек не понял бы, какой цифре верить.
    */
   const { data: meForDebt } = useMe();
+  const defaultFrom =
+    meForDebt?.workspace?.rhythm && meForDebt.today
+      ? nextPeriodStart(
+          meForDebt.workspace.rhythm,
+          (meForDebt.workspace.weekendRule ?? 'before') as WeekendRule,
+          meForDebt.today,
+        )
+      : null;
+  const fromToSend = paysFrom || defaultFrom;
   const remainingForCalc = toMinor(amount, ccy);
   const periodsAhead =
     closeBy && meForDebt?.workspace?.rhythm
@@ -524,7 +542,7 @@ function DebtsSection({ base }: SectionProps) {
         remainingMinor: principal,
         paymentMinor: pay,
         ...(split.length > 0 ? { paymentsBySource: split } : {}),
-        ...(windowOpen && paysFrom ? { paysFrom } : {}),
+        ...(fromToSend ? { paysFrom: fromToSend } : {}),
         ...(windowOpen && paysUntil ? { paysUntil } : {}),
       },
       {
@@ -739,6 +757,11 @@ function DebtsSection({ base }: SectionProps) {
                   onChange={(e) => setBySource({ ...bySource, [source.id]: e.target.value })}
                 />
               ))}
+            </div>
+          )}
+          {!windowOpen && defaultFrom && (
+            <div className="sub dim obl-from-note">
+              {t('obl.startsNext', { date: formatDate(defaultFrom) })}
             </div>
           )}
           {windowOpen && (
