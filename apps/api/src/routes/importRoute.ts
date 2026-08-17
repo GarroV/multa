@@ -1,4 +1,10 @@
-import { parseCategoryDictionary, parseSpendJournal, type JournalRow } from '@multa/core';
+import {
+  masterGridSummary,
+  parseCategoryDictionary,
+  parseMasterGrid,
+  parseSpendJournal,
+  type JournalRow,
+} from '@multa/core';
 import { and, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -138,6 +144,46 @@ importRoute.post('/import/preview', async (c) => {
         existingId: byName.get(name.toLowerCase()) ?? null,
       })),
     },
+  });
+});
+
+/**
+ * Предпросмотр ПЛАНА из Excel (issue #124): что продукт понял в таблице «строки × периоды».
+ *
+ * Ничего не пишет и решений не принимает. Шаг записи требует раскладки строк по видам — файл даёт
+ * имена, а не природу («Сбер» это кредит, «Отпуск» это цель), — и это решение владельца: ошибка
+ * развела бы долг и категорию по разные стороны каскада, где один неприкосновенен, а другую режут
+ * при нехватке. Предпросмотр как раз и нужен, чтобы решать по фактам.
+ */
+importRoute.post('/import/plan-preview', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = importPreviewSchema.parse(await c.req.json());
+  const found = bookAndSheet(body.fileBase64, body.sheet ?? '');
+  if ('error' in found && found.error === 'not_xlsx') return c.json({ error: 'not_xlsx' }, 400);
+
+  if (!body.sheet) {
+    return c.json({
+      sheets: found.book!.sheets.map((s) => ({ name: s.name, rows: s.rows.length })),
+      plan: null,
+    });
+  }
+  if (!found.sheet) {
+    return c.json(
+      { error: 'sheet_not_found', sheets: found.book?.sheets.map((s) => s.name) ?? [] },
+      400,
+    );
+  }
+
+  const parsed = parseMasterGrid(found.sheet.rows, { currency: ws.baseCurrency });
+  /*
+   * Ни одного периода — это не пустой план, а «мы не поняли лист»: у таблицы плана в первой строке
+   * даты месяцев. Молчать нельзя, иначе человек решит, что его файл пуст.
+   */
+  if (parsed.periods.length === 0) return c.json({ error: 'plan_header_not_found' }, 400);
+
+  return c.json({
+    sheets: found.book!.sheets.map((s) => ({ name: s.name, rows: s.rows.length })),
+    plan: masterGridSummary(parsed),
   });
 });
 

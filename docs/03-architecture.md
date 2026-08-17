@@ -197,6 +197,7 @@ E2E поднимает окружение сам (`apps/web/playwright.config.ts
 | `GET/POST/PATCH/DELETE /v1/debts`, `/envelopes`, `/goals`, `/buckets` | обязательства; PATCH правит строку, не теряя историю (#91); у долга есть `direction`: заём (`owed_to_me`) в каскад не идёт (#94) | 2      |
 | `GET/POST/PATCH/DELETE /v1/categories`                                | категории                                                                                                                        | 2      |
 | `POST /v1/import/preview`                                             | что получится из файла: строки, период, сумма, категории; ничего не пишет                                                        | 6      |
+| `POST /v1/import/plan-preview`                                        | предпросмотр ПЛАНА из таблицы «строки × периоды»; ничего не пишет, раскладка строк — за владельцем (#124)                        | 6      |
 | `POST /v1/import/commit`                                              | перенос пачкой: дедупликация по отпечатку строки, создание категорий                                                             | 6      |
 | `GET /v1/import/batches`, `DELETE /v1/import/batches/:id`             | список пачек и откат импорта целиком                                                                                             | 6      |
 | `GET/POST/DELETE /v1/transactions`                                    | факт: траты и внеплановые приходы                                                                                                | 3      |
