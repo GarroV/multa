@@ -95,17 +95,28 @@ const periodsToCover = (amount: bigint, perPeriod: bigint): number | null => {
  * Идём по периодам, а не делим нацело: при ступенях деления нет — платёж в каждом периоде свой.
  * `null` — не закроется в пределах горизонта (в том числе при нулевом платеже).
  */
-function periodsToClose(debt: ForecastDebt, periodsAhead: number): number | null {
+function periodsToClose(
+  debt: ForecastDebt,
+  periodsAhead: number,
+): { periods: number; freedMinor: bigint } | null {
   if (!debt.paymentsByPeriod?.length) {
     const periods = periodsToCover(debt.remainingMinor, debt.paymentMinor);
-    return periods === null || periods > periodsAhead ? null : periods;
+    if (periods === null || periods > periodsAhead) return null;
+    return { periods, freedMinor: debt.paymentMinor };
   }
   let left = debt.remainingMinor;
   for (let i = 0; i < periodsAhead; i++) {
-    const payment = debt.paymentsByPeriod[i] ?? debt.paymentMinor;
+    /*
+     * Ноль за пределами массива, а НЕ плоская сумма (17.08.2026). Вызывающий передаёт платёж на
+     * каждый период — это единственная правда; про периоды, которых он не назвал, мы не знаем
+     * ничего. Подставлять туда `paymentMinor` значило бы обещать закрытие долга на данных, которых
+     * нам не давали, — и обещание выходило в приятную сторону.
+     */
+    const payment = debt.paymentsByPeriod[i] ?? 0n;
     if (payment <= 0n) continue;
     left -= payment;
-    if (left <= 0n) return i + 1;
+    // Освобождается платёж ЗАКРЫВАЮЩЕГО периода, а не плоское поле: они могут различаться в разы.
+    if (left <= 0n) return { periods: i + 1, freedMinor: payment };
   }
   return null;
 }
@@ -117,8 +128,9 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
 
   for (const debt of input.debts) {
     if (debt.remainingMinor <= 0n) continue;
-    const periods = periodsToClose(debt, periodsAhead);
-    if (periods === null) continue;
+    const closing = periodsToClose(debt, periodsAhead);
+    if (closing === null) continue;
+    const { periods, freedMinor } = closing;
     const on = dateOf(periods);
     events.push({
       kind: 'debt_closed',
@@ -136,7 +148,7 @@ export function forecastTimeline(input: ForecastInput): ForecastEvent[] {
       currency: debt.currency,
       on,
       periodsAway: periods,
-      amountMinor: debt.paymentMinor,
+      amountMinor: freedMinor,
     });
   }
 
