@@ -577,23 +577,31 @@ function DebtsSection({ base }: SectionProps) {
                     </b>
                     <i>{t('obl.paymentPer')}</i>
                   </span>
-                  <button
-                    type="button"
-                    className="act"
-                    aria-pressed={editing === d.id}
-                    title={t('plan.act.edit')}
-                    onClick={() => setEditing(editing === d.id ? null : d.id)}
-                  >
-                    {t('plan.act.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="act"
-                    title={t('common.delete')}
-                    onClick={() => del.mutate(d.id)}
-                  >
-                    ✕
-                  </button>
+                  {/*
+                    Действия — в одной ячейке сетки (issue #122). Строка ведомости рассчитана на
+                    четыре колонки: день, имя, сумма и ОДНО действие. У долга их два, и второе
+                    переносилось на новый этаж, утаскивая полосу прогресса на третий — строка
+                    вырастала до 95px с пустотой между этажами.
+                  */}
+                  <span className="row row-tight">
+                    <button
+                      type="button"
+                      className="act"
+                      aria-pressed={editing === d.id}
+                      title={t('plan.act.edit')}
+                      onClick={() => setEditing(editing === d.id ? null : d.id)}
+                    >
+                      {t('plan.act.edit')}
+                    </button>
+                    <button
+                      type="button"
+                      className="act"
+                      title={t('common.delete')}
+                      onClick={() => del.mutate(d.id)}
+                    >
+                      ✕
+                    </button>
+                  </span>
                   <span className="prow-bar">
                     <Bar share={share} tone="lime" label={d.name} />
                     <span className="prow-num">

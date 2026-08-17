@@ -599,3 +599,48 @@ test('в одном ряду формы все органы управления
     `высоты: ${heights.join(', ')}`,
   ).toBeLessThanOrEqual(2);
 });
+
+/*
+ * Строка долга не разъезжается на три этажа (issue #122, замечание владельца: «всрато выглядит,
+ * зачем столько места пустого?»).
+ *
+ * Замер до правки: строка 95px. Сетка строки ведомости рассчитана на ЧЕТЫРЕ колонки — день, имя,
+ * сумма и одно действие, — а у долга действий два («править» и «×»). Второе переносилось на новый
+ * этаж, полоса прогресса уезжала на третий, между ними оставалась пустота.
+ *
+ * Проверяем не высоту на глаз, а само расползание: все действия стоят на одной линии с именем.
+ */
+test('действия строки не переносятся на второй этаж', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  const rows = await panel.evaluate((p) => {
+    const row = p.querySelector('.panel-body .prow') as HTMLElement | null;
+    if (!row) return null;
+    const name = row.querySelector('.prow-name')!.getBoundingClientRect();
+    const acts = [...row.querySelectorAll('.act')].map((el) => el.getBoundingClientRect());
+    return {
+      height: Math.round(row.getBoundingClientRect().height),
+      // Действие считается «уехавшим», если его середина ниже низа имени.
+      dropped: acts.filter((a) => a.top + a.height / 2 > name.bottom).length,
+    };
+  });
+
+  expect(rows, 'в демо должен быть хотя бы один долг').not.toBeNull();
+  expect(rows!.dropped, 'действия уехали под имя').toBe(0);
+  /*
+   * Порог 70px — это ДВА этажа: строка данных (30) плюс полоса прогресса с подписью «0 / 310 000».
+   * Полоса своей строкой — замысел дизайн-системы, а не пустота: она занимает всю ширину под именем
+   * и суммой. Третий этаж (95px) и был дефектом.
+   *
+   * Первая версия проверки требовала 60px — число, взятое из головы. Подгонять под него живой
+   * дизайн значило бы чинить не то: настоящая поломка ловится проверкой выше, про уехавшие
+   * действия.
+   */
+  expect(rows!.height, 'высота строки долга').toBeLessThanOrEqual(70);
+});
