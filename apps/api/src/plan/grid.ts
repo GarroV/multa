@@ -240,7 +240,16 @@ export async function getPlanGrid(
     sourceMinor: bigint,
     extra?: Partial<GridRowSpec>,
   ): void => {
-    if (sourceMinor <= 0n && extra?.percent === undefined) return;
+    /*
+     * Ноль — не повод прятать строку (issue #120, жалоба владельца «в таблице чего-то долга не
+     * вижу»). В плане такая строка денег не берёт, и это верно; но таблица показывает, ЧТО у
+     * человека есть, а правка ячейки — единственный способ назначить платёж «с такого-то периода».
+     * Пряча нулевую строку, мы замыкали круг: чтобы появиться в таблице, нужен платёж; чтобы
+     * задать платёж, нужна строка. Человек решал, что долг не сохранился, и заводил второй.
+     *
+     * Отрицательные суммы по-прежнему отбрасываем: это не «пусто», а испорченные данные.
+     */
+    if (sourceMinor < 0n) return;
     const perPeriodMinor = toBase(sourceMinor, sourceCurrency);
     if (perPeriodMinor === null) {
       unresolved.push({ targetKind, targetId, name, sourceCurrency });

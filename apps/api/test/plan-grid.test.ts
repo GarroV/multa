@@ -355,3 +355,37 @@ test('горизонт таблицы дотягивается до 24 пери�
   );
   expect(grid.periods).toHaveLength(24);
 });
+
+/*
+ * Долг без назначенного платежа обязан быть в таблице (issue #120, жалоба владельца: «в таблице
+ * чего-то долга не вижу»).
+ *
+ * Нулевую строку не тянули в план — и правильно, денег она не берёт. Но заодно её не стало и в
+ * мастер-таблице, а правка ячейки — это ровно тот способ, которым платёж назначается. Замкнутый
+ * круг: чтобы строка появилась, нужен платёж; чтобы задать платёж, нужна строка.
+ *
+ * Для человека это выглядит как «долг не сохранился», и он заводит второй.
+ */
+test('долг без платежа виден в таблице нулями, а не исчезает', async () => {
+  const client = await onboarded();
+  await expectOk(
+    await client.post('/v1/debts', {
+      name: 'Кредитка',
+      currency: 'RUB',
+      principalMinor: '31000000',
+      remainingMinor: '31000000',
+      paymentMinor: '0',
+    }),
+    201,
+  );
+
+  const grid = await expectOk<{
+    groups: { kind: string; rows: { name: string; cells: { minor: string }[] }[] }[];
+  }>(await client.get('/v1/plan/grid?periods=4'));
+  const debtRows = grid.groups.find((g) => g.kind === 'debt')?.rows ?? [];
+  const row = debtRows.find((r) => r.name === 'Кредитка');
+
+  expect(row, 'строка долга должна быть в таблице').toBeDefined();
+  // Нули, а не прочерки: долг живой, просто платёж ещё не назначен.
+  expect(new Set(row!.cells.map((c) => c.minor))).toEqual(new Set(['0']));
+});
