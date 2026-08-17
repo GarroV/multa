@@ -264,14 +264,61 @@ export function parseMasterGrid(
   opts: { readonly currency: string },
 ): MasterGridParse {
   const header = rows[0] ?? [];
+  const daysRow = rows[1] ?? [];
   const periodCols: number[] = [];
   const periods: string[] = [];
-  for (let c = 1; c < header.length; c += 1) {
+
+  /*
+   * Месяц ПРОТЯГИВАЕТСЯ вправо, пока в шапке пусто (найдено на настоящем файле владельца
+   * 17.08.2026). В «Кетчупе в Химках» месяц стоит только над первой колонкой пары — в Excel это
+   * объединённая ячейка, — а над второй пусто. Прежний разбор брал только колонки с датой, то есть
+   * каждую вторую, и молча выбрасывал все выплаты 25-го числа: половину дохода и половину расходов.
+   *
+   * Дата периода складывается из месяца шапки и ЧИСЛА из второй строки. Без этого полумесячный план
+   * ложился на первые числа месяцев и разъезжался с ритмом человека.
+   */
+  const dayAt = (c: number): number | null => {
+    const raw = normalize(daysRow[c]);
+    if (raw === '') return null;
+    const n = Math.trunc(Number(raw.replace(',', '.')));
+    return Number.isFinite(n) && n >= 1 && n <= 31 ? n : null;
+  };
+
+  /*
+   * Строка чисел месяца НЕОБЯЗАТЕЛЬНА, и определяем её наличие консервативно: она есть, только если
+   * число 1–31 стоит у КАЖДОЙ колонки с датой в шапке. По построению такая строка полна, а данные
+   * второй строкой (например «Страховка 12 000») этого условия не выполняют — и не будут приняты за
+   * ритм. Без этой осторожности разбор съедал бы обычную статью, стоящую второй.
+   */
+  const headerCols: number[] = [];
+  for (let c = 1; c < header.length; c += 1) if (excelSerialToISO(header[c])) headerCols.push(c);
+  const hasDaysRow = headerCols.length > 0 && headerCols.every((c) => dayAt(c) !== null);
+
+  let month: { year: number; month: number } | null = null;
+  for (let c = 1; c < Math.max(header.length, daysRow.length); c += 1) {
     const iso = excelSerialToISO(header[c]);
     if (iso) {
+      const [y, m] = iso.split('-');
+      month = { year: Number(y), month: Number(m) };
+    }
+    if (!month) continue;
+
+    if (!hasDaysRow) {
+      // Без строки чисел месяц протягивать нельзя: пустая колонка стала бы дублем периода.
+      if (!iso) continue;
       periodCols.push(c);
       periods.push(iso);
+      continue;
     }
+
+    const day = dayAt(c);
+    // Нет числа месяца — колонка не период: так отсекаются подписи и итоговые столбцы.
+    if (day === null) continue;
+
+    periodCols.push(c);
+    periods.push(
+      `${String(month.year).padStart(4, '0')}-${String(month.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+    );
   }
 
   let income: MasterLine | null = null;
