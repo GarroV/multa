@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { onboarded } from './client.ts';
+import { categoryId, expectOk, onboarded } from './client.ts';
 
 /**
  * Кривой id в пути — это «нет такого», а не сбой сервера.
@@ -66,5 +66,60 @@ describe('кривой id в пути', () => {
     }
 
     expect(failures).toEqual([]);
+  });
+});
+
+/*
+ * Изоляция по чужому id у ручек, которые скоупят не сами, а через вызываемую функцию (перепись
+ * 17.08.2026).
+ *
+ * Правило 7 проекта: ни один хендлер не принимает workspace_id от клиента, скоуп только из токена.
+ * У большинства ручек проверка «чужое недоступно» уже есть; у правки бюджета категории и отметки
+ * исполнения её не было — они делегируют скоуп внутрь `setCategoryBudget` / `setExecution`, и это
+ * место легко потерять при рефакторинге, ничего не заметив.
+ */
+describe('чужие идентификаторы у делегирующих ручек', () => {
+  test('чужую категорию нельзя перебюджетировать', async () => {
+    const other = await onboarded();
+    const foreignCategory = await categoryId(other, 'Продукты');
+
+    const mine = await onboarded();
+    const res = await mine.put(`/v1/plan/current/categories/${foreignCategory}`, {
+      plannedMinor: '900000',
+    });
+    // Не найдено, а не «нельзя»: чужая строка для меня не существует.
+    expect(res.status).toBe(404);
+
+    // И у соседа ничего не поменялось.
+    const plan = await expectOk<{ allocations: { targetId: string; plannedMinor: string }[] }>(
+      await other.get('/v1/plan/current'),
+    );
+    expect(plan.allocations.find((a) => a.targetId === foreignCategory)?.plannedMinor).not.toBe(
+      '900000',
+    );
+  });
+
+  test('чужой долг нельзя отметить исполненным', async () => {
+    const other = await onboarded();
+    const debt = await expectOk<{ id: string }>(
+      await other.post('/v1/debts', {
+        name: 'Кредит соседа',
+        currency: 'RUB',
+        principalMinor: '5000000',
+        remainingMinor: '5000000',
+        paymentMinor: '800000',
+      }),
+      201,
+    );
+
+    const mine = await onboarded();
+    expect((await mine.post(`/v1/plan/current/items/debt/${debt.id}/confirm`)).status).toBe(404);
+    expect((await mine.post(`/v1/plan/current/items/debt/${debt.id}/unconfirm`)).status).toBe(404);
+
+    // У соседа строка так и осталась неотмеченной.
+    const plan = await expectOk<{
+      allocations: { targetKind: string; executionStatus: string }[];
+    }>(await other.get('/v1/plan/current'));
+    expect(plan.allocations.find((a) => a.targetKind === 'debt')?.executionStatus).toBe('pending');
   });
 });
