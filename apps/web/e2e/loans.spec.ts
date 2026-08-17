@@ -192,3 +192,45 @@ test('новый долг по умолчанию платится со след
   }, API_URL);
   expect(created?.paysFrom).toBe(plan.period.endsOn);
 });
+
+/*
+ * «Платёж» и «Срок» — один выбор из двух, а не флажок (issue #117, замечание владельца: «там же
+ * чекбокс "до даты" или "сумма", где система сама должна перераспределить выплаты по месяцам»).
+ *
+ * Способ задать долг ровно один из двух: либо человек называет платёж, либо срок — и продукт
+ * считает второе сам. Это взаимоисключающий выбор, и сегмент говорит об этом сам, как в референсе
+ * владельца (Mixpanel: 7D / 30D / 3M).
+ *
+ * Сегмент — ростом с поля этого ряда, а не как в шапке: иначе вернулся бы тот самый разнобой
+ * высот, из-за которого ряд и переделывали.
+ */
+test('способ задать долг выбирается сегментом, и он одного роста с полями', async ({ page }) => {
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  const seg = panel.locator('.panel-foot .seg').first();
+  await expect(seg).toBeVisible();
+
+  // По умолчанию задаём платёж: поле суммы на месте, поля даты нет.
+  await expect(panel.getByPlaceholder(/^Платёж$|^Payment$/)).toBeVisible();
+
+  await seg.getByRole('button', { name: /^Срок$|^By date$/ }).click();
+  await expect(panel.locator('input[type=date]').first()).toBeVisible();
+  await expect(panel.getByPlaceholder(/^Платёж$|^Payment$/)).toHaveCount(0);
+
+  // Рост сегмента совпадает с полями ряда: разброс больше 2px — снова разные породы.
+  const heights = await panel.evaluate((p) => {
+    const rows = p.querySelectorAll('.panel-foot .form-row');
+    const last = rows[rows.length - 1] as HTMLElement;
+    return [...last.querySelectorAll('button, input')]
+      .map((el) => Math.round(el.getBoundingClientRect().height))
+      .filter((h) => h > 0);
+  });
+  expect(
+    Math.max(...heights) - Math.min(...heights),
+    `высоты: ${heights.join(', ')}`,
+  ).toBeLessThanOrEqual(2);
+});

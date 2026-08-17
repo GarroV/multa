@@ -697,19 +697,26 @@ function DebtsSection({ base }: SectionProps) {
               />
             )}
             {/*
-              Три необязательные настройки формы — одной породы (замечание владельца 16.08.2026).
-              Раньше первая была флажком, две другие капслочными кнопками: четыре высоты в одном
-              ряду. Теперь это переключатели ростом с поле ввода, и включённое состояние видно по
-              рамке, а не по галочке.
+              Способ задать долг — один выбор из двух (issue #117), поэтому сегмент, а не флажок:
+              либо человек называет платёж, либо срок, и продукт считает второе сам. Общий контур
+              говорит о взаимоисключающем выборе сам — тот же приём, что в референсе владельца.
+
+              Остальные настройки этого ряда — переключатели одной породы (16.08.2026): раньше здесь
+              стояли флажок и капслочные кнопки, четыре высоты в одном ряду.
             */}
-            <button
-              type="button"
-              className="toggle"
-              aria-pressed={mode === 'deadline'}
-              onClick={() => setMode(mode === 'deadline' ? 'payment' : 'deadline')}
-            >
-              {t('obl.closeBy')}
-            </button>
+            <span className="seg seg-inline" role="group" aria-label={t('obl.mode')}>
+              {(['payment', 'deadline'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className="seg-btn"
+                  aria-pressed={mode === m}
+                  onClick={() => setMode(m)}
+                >
+                  {t(m === 'payment' ? 'obl.mode.payment' : 'obl.mode.deadline')}
+                </button>
+              ))}
+            </span>
             {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
             <Hint text={t('obl.formHint')} />
             {/*

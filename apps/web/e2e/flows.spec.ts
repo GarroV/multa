@@ -346,10 +346,11 @@ test('долг можно завести по сроку — взнос посч
 
   const panel = page.locator('.panel', { hasText: /DEBTS|ДОЛГИ/i }).first();
   /*
-   * Режим включается переключателем, а не флажком: три необязательные настройки формы сведены к
-   * одной породе (замечание владельца о разнобое, 16.08.2026).
+   * Способ задать долг выбирается сегментом «Платёж | Срок» (#117): это один выбор из двух, а не
+   * флажок. Раньше здесь был флажок, до него — капслочная кнопка; проверка идёт за интерфейсом,
+   * потому что проверяет поведение, а не разметку.
    */
-  await panel.getByRole('button', { name: /^Закрыть к дате$|^Close by$/ }).click();
+  await panel.getByRole('button', { name: /^Срок$|^By date$/ }).click();
   await panel.getByPlaceholder(/^Name$|^Название$/).fill('Кредитка');
   await panel.getByPlaceholder(/Left to pay|Осталось/).fill('300000');
   await panel.locator('input[type=date]').first().fill('2027-05-10');

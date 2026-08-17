@@ -465,6 +465,9 @@ export const en = {
   'obl.split': 'Split across payouts',
   'obl.split.hint':
     'How much goes out of each payout. Empty means nothing goes out of that one. Once set, the single payment is no longer used.',
+  'obl.mode': 'How to define the debt',
+  'obl.mode.payment': 'Payment',
+  'obl.mode.deadline': 'By date',
   'obl.payment': 'Payment',
   'obl.remaining': 'Left to pay',
   'obl.formHint':
