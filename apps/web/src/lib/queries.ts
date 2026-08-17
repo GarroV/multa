@@ -1215,6 +1215,26 @@ export function useConfirmExecution() {
   });
 }
 
+/**
+ * Снять отметку исполнения (#119, жалоба владельца: «внесено при нажатии никак не реагирует»).
+ *
+ * Кнопка показывает нажатое состояние — значит должна и отжиматься. Отдельная мутация, а не
+ * «подтвердить на ноль»: на сервере это разные утверждения.
+ */
+export function useUnconfirmExecution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ targetKind, targetId }: { targetKind: string; targetId: string }) =>
+      api<PlanDto>(`/v1/plan/current/items/${targetKind}/${targetId}/unconfirm`, {
+        method: 'POST',
+      }),
+    onSuccess: (plan) => {
+      qc.setQueryData(PLAN_KEY, plan);
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
+
 export function useSkipExecution() {
   const qc = useQueryClient();
   return useMutation({

@@ -1342,7 +1342,7 @@ export async function setExecution(
   asOf: string,
   targetKind: TargetKind,
   targetId: string,
-  mode: 'confirm' | 'skip',
+  mode: 'confirm' | 'skip' | 'unconfirm',
   executedOverrideMinor?: bigint,
 ): Promise<PlanDto> {
   if (targetKind === 'category') throw new Error('execution_not_applicable');
@@ -1378,8 +1378,19 @@ export async function setExecution(
   }
   if (!item) throw new Error('planned_item_not_found');
 
-  const executedMinor = mode === 'skip' ? 0n : (executedOverrideMinor ?? item.plannedMinor);
-  const status = mode === 'skip' ? 'skipped' : executionOf(item.plannedMinor, executedMinor).status;
+  /*
+   * Отмена (жалоба владельца 16.08.2026: «внесено при нажатии никак не реагирует, а должно
+   * отменять»). Возвращает строку ровно в то состояние, в котором она была до отметки: ноль
+   * исполненного и статус «ждём». Отдельная ветка, а не «подтвердить на ноль»: подтверждение на
+   * ноль означало бы «заплатил нисколько», и это другое утверждение.
+   */
+  const executedMinor = mode === 'confirm' ? (executedOverrideMinor ?? item.plannedMinor) : 0n;
+  const status =
+    mode === 'skip'
+      ? 'skipped'
+      : mode === 'unconfirm'
+        ? 'pending'
+        : executionOf(item.plannedMinor, executedMinor).status;
 
   // Транзакции этой строки пересоздаём: одна строка плана — одна транзакция исполнения.
   await db

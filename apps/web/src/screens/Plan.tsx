@@ -21,6 +21,7 @@ import {
   useBalances,
   useCancelIncomeReceipt,
   useConfirmExecution,
+  useUnconfirmExecution,
   useForecast,
   useGoalFreeze,
   useMe,
@@ -83,8 +84,9 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
   const { t } = useI18n();
   const confirm = useConfirmExecution();
   const skip = useSkipExecution();
+  const unconfirm = useUnconfirmExecution();
   const freeze = useGoalFreeze();
-  const busy = confirm.isPending || skip.isPending;
+  const busy = confirm.isPending || skip.isPending || unconfirm.isPending;
   // Провал денежной мутации обязан быть виден: иначе он читается как «кнопка не сработала».
   const failed = confirm.isError || skip.isError || freeze.isError;
   const done = a.executionStatus === 'confirmed';
@@ -135,7 +137,16 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
           className="act"
           disabled={busy}
           aria-pressed={done}
-          onClick={() => confirm.mutate({ targetKind: a.targetKind, targetId: a.targetId })}
+          /*
+           * Отмеченная строка отжимается тем же нажатием (#119). Кнопка и так показывает нажатое
+           * состояние — значит обязана ходить в обе стороны, иначе ошибиться строкой можно, а
+           * исправить нечем.
+           */
+          onClick={() =>
+            done
+              ? unconfirm.mutate({ targetKind: a.targetKind, targetId: a.targetId })
+              : confirm.mutate({ targetKind: a.targetKind, targetId: a.targetId })
+          }
         >
           {done ? t('exec.status.confirmed') : t('plan.act.pay')}
         </button>

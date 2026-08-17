@@ -253,3 +253,63 @@ describe('пересборка плана', () => {
     expect(ids).not.toContain(debtId);
   });
 });
+
+/*
+ * Отмена подтверждения (жалоба владельца 16.08.2026: «внесено при нажатии никак не реагирует… а
+ * должно отменять»).
+ *
+ * Кнопка показывает нажатое состояние, то есть выглядит переключателем, — но обратного хода не
+ * было вовсе. Ошибся строкой, отметил не тот платёж — и откатить нечем, а план до конца периода
+ * считает деньги ушедшими.
+ */
+/*
+ * Отмена подтверждения (жалоба владельца 16.08.2026: «внесено при нажатии никак не реагирует… а
+ * должно отменять»).
+ *
+ * Кнопка показывает нажатое состояние, то есть выглядит переключателем, — но обратного хода не
+ * было вовсе. Ошибся строкой, отметил не тот платёж — и откатить нечем, а план до конца периода
+ * считает деньги ушедшими.
+ */
+describe('отмена подтверждения', () => {
+  test('снятая отметка возвращает строку в исходное состояние', async () => {
+    const { client, debtId } = await withDebt();
+    await expectOk(await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`));
+
+    const plan = await expectOk<PlanDto>(
+      await client.post(`/v1/plan/current/items/debt/${debtId}/unconfirm`),
+    );
+    expect(row(plan, debtId).executionStatus).toBe('pending');
+    expect(row(plan, debtId).executedMinor).toBe('0');
+  });
+
+  test('отмена убирает и транзакцию: иначе в истории остаётся трата, которой не было', async () => {
+    /*
+     * Это главное в отмене. Вернуть статус и оставить транзакцию — молчаливая ложь: на экране
+     * «не оплачено», а в тратах периода деньги ушли, и сойтись они уже не смогут.
+     */
+    const { client, debtId } = await withDebt();
+    await expectOk(await client.post(`/v1/plan/current/items/debt/${debtId}/confirm`));
+    expect(await transactionCount(client)).toBeGreaterThan(0);
+
+    await expectOk(await client.post(`/v1/plan/current/items/debt/${debtId}/unconfirm`));
+    expect(await transactionCount(client)).toBe(0);
+  });
+
+  test('пропуск снимается той же ручкой', async () => {
+    const { client, debtId } = await withDebt();
+    await expectOk(await client.post(`/v1/plan/current/items/debt/${debtId}/skip`));
+
+    const plan = await expectOk<PlanDto>(
+      await client.post(`/v1/plan/current/items/debt/${debtId}/unconfirm`),
+    );
+    expect(row(plan, debtId).executionStatus).toBe('pending');
+  });
+
+  test('отмена неотмеченной строки не ошибка: нажали дважды — ничего не сломалось', async () => {
+    const { client, debtId } = await withDebt();
+    const plan = await expectOk<PlanDto>(
+      await client.post(`/v1/plan/current/items/debt/${debtId}/unconfirm`),
+    );
+    expect(row(plan, debtId).executionStatus).toBe('pending');
+  });
+});

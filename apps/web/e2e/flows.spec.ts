@@ -492,9 +492,18 @@ test('«оплатить» отмечает обязательство испо�
    * «оплатить» её уже не находит. Первая версия этой проверки на том и споткнулась — и выглядело
    * это как «починка не работает», хотя запрос отвечал 200.
    */
-  await expect(row.getByRole('button', { name: /^внесено$|^done$/i })).toHaveAttribute(
+  const done = row.getByRole('button', { name: /^внесено$|^done$/i });
+  await expect(done).toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 });
+
+  /*
+   * И отжимается тем же нажатием (#119, жалоба владельца: «внесено при нажатии никак не реагирует,
+   * а должно отменять»). Кнопка показывает нажатое состояние — значит обязана ходить в обе стороны:
+   * отметил не ту строку, и исправить нечем.
+   */
+  await done.click();
+  await expect(row.getByRole('button', { name: /^оплатить$|^pay$/i })).toHaveAttribute(
     'aria-pressed',
-    'true',
+    'false',
     { timeout: 15_000 },
   );
 });

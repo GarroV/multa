@@ -594,7 +594,10 @@ app.put('/v1/plan/current/categories/:id', requireWorkspace, async (c) => {
 app.delete('/v1/plan/current/categories/:id', requireWorkspace, (c) => handleCategoryBudget(c, 0n));
 
 // Раскладка дня выплаты: «сделал» / «пропустил» по плановой строке (01-domain-model §Исполнение).
-async function handleExecution(c: Context<{ Variables: AppVariables }>, mode: 'confirm' | 'skip') {
+async function handleExecution(
+  c: Context<{ Variables: AppVariables }>,
+  mode: 'confirm' | 'skip' | 'unconfirm',
+) {
   const ws = c.get('workspace')!;
   const targetKind = c.req.param('kind') as TargetKind;
   const targetId = c.req.param('id');
@@ -759,6 +762,14 @@ app.post('/v1/plan/current/items/:kind/:id/confirm', requireWorkspace, (c) =>
 );
 app.post('/v1/plan/current/items/:kind/:id/skip', requireWorkspace, (c) =>
   handleExecution(c, 'skip'),
+);
+
+/*
+ * Снять отметку исполнения (#119). Отдельная ручка, а не «confirm с нулём»: подтверждение на ноль
+ * означало бы «заплатил нисколько» — другое утверждение, и в истории оно выглядело бы иначе.
+ */
+app.post('/v1/plan/current/items/:kind/:id/unconfirm', requireWorkspace, (c) =>
+  handleExecution(c, 'unconfirm'),
 );
 
 // --- FX ---
