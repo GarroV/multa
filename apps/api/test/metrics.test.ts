@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { expectOk, onboarded, signedUp } from './client.ts';
+import { anonymous, categoryId, expectOk, onboarded, signedUp } from './client.ts';
 
 /**
  * Метрики закрытой беты (Спринт 6).
@@ -50,5 +50,42 @@ describe('метрики', () => {
   test('без входа метрики не отдаются', async () => {
     const { app } = await import('../src/app.ts');
     expect((await app.request('http://localhost:3000/v1/metrics')).status).toBe(401);
+  });
+});
+
+/*
+ * Метрики — не для всех вошедших (найдено сверкой изоляции 17.08.2026).
+ *
+ * Комментарий над ручкой обещал: «только агрегаты и только владельцу СВОЕГО воркспейса — кроме
+ * воронки, которая по природе кросс-аккаунтная». На деле кросс-аккаунтными были все три запроса,
+ * включая пересборки. А сторожем стоял `requireAuth`, то есть числа читал любой вошедший — в том
+ * числе гость демо, а вход в демо публичный по ссылке.
+ *
+ * Итог: сколько всего воркспейсов, сколько дошло до конца онбординга и сколько пересборок применено
+ * — бизнес-числа основателя — были фактически открыты всем.
+ */
+describe('доступ к метрикам', () => {
+  test('гость демо метрик не видит', async () => {
+    const guest = anonymous();
+    await expectOk(await guest.post('/v1/demo/enter'));
+    const res = await guest.get('/v1/metrics');
+    expect(res.status).toBe(403);
+  });
+
+  test('пересборки считаются по своему воркспейсу, а не по всем', async () => {
+    /*
+     * Чужая пересборка не должна попадать в мой счётчик. Проверяем ровно то, что обещал
+     * комментарий: кросс-аккаунтна только воронка.
+     */
+    const other = await onboarded();
+    const food = await categoryId(other, 'Продукты');
+    await expectOk(
+      await other.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '900000' }),
+    );
+
+    const mine = await onboarded();
+    const metrics = await expectOk<MetricsDto>(await mine.get('/v1/metrics'));
+    // У свежего воркспейса своих пересборок нет — сколько бы их ни было у соседей.
+    expect(metrics.rebalances.applied).toBe(0);
   });
 });

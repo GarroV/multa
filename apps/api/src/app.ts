@@ -178,10 +178,28 @@ app.get('/v1/health', async (c) =>
  * не будет: профиль нулевой стоимости, а событийный поток в чужой сервис для трёх чисел — это чужие
  * ключи, чужой договор и персональные данные наружу.
  *
- * Показывает только агрегаты и только владельцу СВОЕГО воркспейса — кроме воронки, которая по
- * природе кросс-аккаунтная. Личных данных в ответе нет: ни почт, ни сумм, ни идентификаторов.
+ * Личных данных в ответе нет: ни почт, ни сумм, ни идентификаторов — только агрегаты.
+ *
+ * Что кросс-аккаунтно и почему (сверка 17.08.2026): воронка онбординга и возврат на 7-й день — по
+ * природе продуктовые метрики, они и считаются по всем воркспейсам. А вот пересборки считаются по
+ * СВОЕМУ: обещание в этом комментарии раньше расходилось с кодом, где счётчик шёл по всей таблице.
+ *
+ * Гость демо метрик не видит вовсе. Вход в демо публичный по ссылке, а `requireAuth` пускал любого
+ * вошедшего — то есть бизнес-числа основателя были фактически открыты всем.
  */
 app.get('/v1/metrics', requireAuth, async (c) => {
+  const viewer = c.get('user');
+  if (viewer?.email === DEMO_EMAIL) return c.json({ error: 'not_for_demo' }, 403);
+  /*
+   * Свой воркспейс ищем сами, а не через `requireWorkspace`: тот отвечает 409, если воркспейса нет,
+   * а воронку вправе прочитать и тот, кто ещё не завёл свой — она про продукт, а не про его деньги.
+   */
+  const [own] = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.ownerId, viewer!.id))
+    .limit(1);
+
   const [funnel] = await db
     .select({
       workspaces: sql<number>`count(*)::int`,
@@ -214,7 +232,9 @@ app.get('/v1/metrics', requireAuth, async (c) => {
       applied: sql<number>`count(*) filter (where ${planRevisions.reason} <> 'undo')::int`,
       undone: sql<number>`count(*) filter (where ${planRevisions.accepted} = false)::int`,
     })
-    .from(planRevisions);
+    .from(planRevisions)
+    // По своему воркспейсу: чужая пересборка в мой счётчик попадать не должна.
+    .where(own ? eq(planRevisions.workspaceId, own.id) : sql`false`);
 
   return c.json({
     onboarding: {
