@@ -78,14 +78,32 @@ describe('compareProviders', () => {
     expect(result.confident).toBe(false);
   });
 
-  it('уверенность появляется, когда у лучшего провайдера есть повторяемость', () => {
-    const result = compareProviders([
+  it('уверенность требует повторяемости у обеих сторон сравнения', () => {
+    /*
+     * Ожидание изменено осознанно (17.08.2026), и вот почему. Фраза продукта звучит так: «у {X} тот
+     * же объём стоил бы дешевле на {сумма}» — то есть утверждение опирается на объёмы и спреды
+     * ОСТАЛЬНЫХ провайдеров, а не только лучшего. Когда у худшего одна сделка, вся «экономия»
+     * посчитана по одной операции, которая могла быть срочной или разовой невезухой.
+     *
+     * Прежняя версия требовала повторяемости только у лучшего и на таких данных ставила
+     * «уверенно». У продукта при этом уже есть честная замена — «разница видна, но сделок пока
+     * мало, это может быть случайность», — и именно она тут уместна.
+     */
+    const thin = compareProviders([
       deal({ provider: 'Меняльня', spreadPct: '0.90' }),
       deal({ provider: 'Меняльня', spreadPct: '1.10' }),
       deal({ provider: 'Банк', spreadPct: '2.60' }),
     ]);
-    expect(result.best?.provider).toBe('Меняльня');
-    expect(result.confident).toBe(true);
+    expect(thin.best?.provider).toBe('Меняльня');
+    expect(thin.confident, 'у Банка одна сделка — уверенности нет').toBe(false);
+
+    const enough = compareProviders([
+      deal({ provider: 'Меняльня', spreadPct: '0.90' }),
+      deal({ provider: 'Меняльня', spreadPct: '1.10' }),
+      deal({ provider: 'Банк', spreadPct: '2.60' }),
+      deal({ provider: 'Банк', spreadPct: '2.40' }),
+    ]);
+    expect(enough.confident).toBe(true);
   });
 
   it('операции без известного спреда в сравнение не идут', () => {
@@ -120,5 +138,51 @@ describe('compareProviders', () => {
     // Объёмы в разных валютах: экономию в одной цифре не выразить, поэтому её нет.
     expect(result.savingMinor).toBe(0n);
     expect(result.savingCurrency).toBeNull();
+  });
+});
+
+/*
+ * Уверенность в совете должна опираться и на того, ОТ КОГО советуем уйти.
+ *
+ * Найдено осмотром живых данных 17.08.2026: у худшего провайдера была одна сделка, и на ней держалось
+ * 87 000 из 107 000 обещанной экономии — четыре пятых совета из единственной операции. При этом
+ * флаг «уверенно» стоял, потому что проверял только лучшего.
+ *
+ * Одна сделка не говорит, что банк плохой систематически: это мог быть срочный размен, другой
+ * порог суммы, разовая невезуха. Совет «уходи оттуда» на таком основании — превышение того, что мы
+ * знаем, а продукт обещает быть штурманом, а не гадателем.
+ */
+describe('уверенность совета по размену', () => {
+  it('одна сделка у худшего — совет не уверенный', () => {
+    const result = compareProviders([
+      deal({ provider: 'Wise', spreadPct: '1.00', occurredOn: '2026-07-01' }),
+      deal({ provider: 'Wise', spreadPct: '1.10', occurredOn: '2026-07-15' }),
+      // Единственная сделка, и самая дорогая: именно она задаёт весь размер «экономии».
+      deal({ provider: 'Банк', spreadPct: '3.00', occurredOn: '2026-07-20' }),
+    ]);
+    expect(result.best?.provider).toBe('Wise');
+    expect(result.worst?.provider).toBe('Банк');
+    expect(result.confident, 'нельзя быть уверенным по одной сделке худшего').toBe(false);
+  });
+
+  it('по две сделки у обоих — совет уверенный', () => {
+    const result = compareProviders([
+      deal({ provider: 'Wise', spreadPct: '1.00', occurredOn: '2026-07-01' }),
+      deal({ provider: 'Wise', spreadPct: '1.10', occurredOn: '2026-07-15' }),
+      deal({ provider: 'Банк', spreadPct: '3.00', occurredOn: '2026-07-20' }),
+      deal({ provider: 'Банк', spreadPct: '2.80', occurredOn: '2026-07-25' }),
+    ]);
+    expect(result.confident).toBe(true);
+  });
+
+  it('сама разница остаётся видна и без уверенности', () => {
+    // Не уверены в совете — не значит скрыли числа: человек вправе видеть, что размены разные.
+    const result = compareProviders([
+      deal({ provider: 'Wise', spreadPct: '1.00' }),
+      deal({ provider: 'Банк', spreadPct: '3.00' }),
+    ]);
+    expect(result.confident).toBe(false);
+    expect(result.providers.length).toBe(2);
+    expect(result.savingMinor > 0n).toBe(true);
   });
 });

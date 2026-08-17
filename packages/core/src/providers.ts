@@ -108,7 +108,22 @@ export function compareProviders(deals: readonly ProviderDeal[]): ProviderCompar
   const comparable = providers.length >= 2 && named.length >= 1;
   const best = comparable ? (named[0] ?? null) : null;
   const worst = comparable ? (named.at(-1) ?? null) : null;
-  const confident = best !== null && best.deals >= MIN_DEALS_FOR_ADVICE;
+  /*
+   * Уверенность требует достаточной выборки У ОБОИХ — и у лучшего, и у того, от кого советуем уйти
+   * (найдено осмотром живых данных 17.08.2026).
+   *
+   * Раньше проверялся только лучший, и совет мог держаться на ОДНОЙ сделке худшего: в демо на ней
+   * стояло 87 000 из 107 000 обещанной экономии — четыре пятых из единственной операции. Одна
+   * сделка не говорит, что провайдер плох систематически: бывает срочный размен, другой порог
+   * суммы, разовая невезуха. «Уходи оттуда» на таком основании — обещание знания, которого нет.
+   *
+   * Числа при этом не скрываются: разница провайдеров видна и без уверенности, скрывается только
+   * сам совет (см. Statistics.tsx — фразу держит именно этот флаг).
+   */
+  const confident =
+    best !== null &&
+    best.deals >= MIN_DEALS_FOR_ADVICE &&
+    (worst === null || worst === best || worst.deals >= MIN_DEALS_FOR_ADVICE);
 
   let savingMinor = 0n;
   let savingCurrency: string | null = null;

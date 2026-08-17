@@ -123,6 +123,48 @@ const DEMO_RATES: { base: string; rate: string }[] = [
 ];
 
 /**
+ * История разменов демо — ОДИН источник и для самих операций, и для дней, на которые нужны курсы.
+ *
+ * Раньше дни курсов стояли отдельным списком чисел, и добавленный размен молча не записывался:
+ * `getRate` не находил курса, а сид отвечает на это `continue`. Демо теряло сделку без признаков.
+ */
+const FX_HISTORY: {
+  from: 'RUB';
+  to: 'EUR' | 'RSD';
+  fromMinor: bigint;
+  spreadBp: bigint;
+  back: number;
+  provider: string;
+}[] = [
+  /*
+   * Разные обменники с повторяемостью У ОБЕИХ СТОРОН сравнения: совет молчит, пока мало сделок
+   * не только у лучшего, но и у того, от кого советуем уйти (17.08.2026). Иначе вся «экономия»
+   * стояла бы на одной операции банка — четыре пятых суммы из единственного размена, который мог
+   * быть срочным. Поэтому и у Wise, и у Bank их по две.
+   */
+  {
+    from: 'RUB',
+    to: 'EUR',
+    fromMinor: 6_000_000n,
+    spreadBp: 180n,
+    back: 20,
+    provider: 'Menjačnica',
+  },
+  {
+    from: 'RUB',
+    to: 'RSD',
+    fromMinor: 4_000_000n,
+    spreadBp: 90n,
+    back: 35,
+    provider: 'Menjačnica',
+  },
+  { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 260n, back: 50, provider: 'Bank' },
+  { from: 'RUB', to: 'EUR', fromMinor: 3_500_000n, spreadBp: 240n, back: 78, provider: 'Bank' },
+  { from: 'RUB', to: 'EUR', fromMinor: 5_500_000n, spreadBp: 120n, back: 65, provider: 'Wise' },
+  { from: 'RUB', to: 'EUR', fromMinor: 4_500_000n, spreadBp: 110n, back: 12, provider: 'Wise' },
+];
+
+/**
  * Подстраховка курсов демо. Без котировок валютные траты не записались бы («rate_unavailable»),
  * а копилка потерь на спреде осталась бы пустой — то есть демо не показало бы ровно то, ради чего
  * продукт и нужен. Вставляем как `manual` и только там, где котировки нет: настоящие курсы
@@ -225,10 +267,17 @@ export async function seedDemo(userId: string): Promise<string> {
   await wipe(workspaceId);
   const asOf = today(DEMO_TZ);
   // Даты, на которые демо смотрит курсом: сегодня и дни разменов ниже.
+  /*
+   * Дни курсов берутся ИЗ САМОГО списка разменов (`FX_HISTORY`), а не дублируются числами рядом.
+   *
+   * Дублирование уже подвело: список стоял как [20, 35, 50, 65], и добавленный шестой размен на
+   * 78 дней назад молча не записался — `getRate` не нашёл курса, а сид на это отвечает `continue`.
+   * Демо теряло сделку без единого признака, и понять это можно было только сверкой чисел.
+   */
   await ensureDemoRates(
     workspaceId,
     asOf,
-    [20, 35, 50, 65].map((back) => shift(asOf, -back)),
+    FX_HISTORY.map((op) => shift(asOf, -op.back)),
   );
 
   const catRows = await db
@@ -653,38 +702,7 @@ export async function seedDemo(userId: string): Promise<string> {
    * суммы стояли константами, и на экране статистики средний спред выходил −0,4% при отдельных
    * операциях «+9,4%» и «−30,8%», то есть меняла как будто платил сверху рыночного курса.
    */
-  const fxHistory: {
-    from: 'RUB';
-    to: 'EUR' | 'RSD';
-    fromMinor: bigint;
-    spreadBp: bigint;
-    back: number;
-    provider: string;
-  }[] = [
-    /*
-     * Разные обменники с повторяемостью: сравнение провайдеров (issue #53) молчит, пока у лучшего
-     * одна сделка, поэтому у Wise их две — иначе демо показывает панель без главного вывода.
-     */
-    {
-      from: 'RUB',
-      to: 'EUR',
-      fromMinor: 6_000_000n,
-      spreadBp: 180n,
-      back: 20,
-      provider: 'Menjačnica',
-    },
-    {
-      from: 'RUB',
-      to: 'RSD',
-      fromMinor: 4_000_000n,
-      spreadBp: 90n,
-      back: 35,
-      provider: 'Menjačnica',
-    },
-    { from: 'RUB', to: 'EUR', fromMinor: 6_000_000n, spreadBp: 260n, back: 50, provider: 'Bank' },
-    { from: 'RUB', to: 'EUR', fromMinor: 5_500_000n, spreadBp: 120n, back: 65, provider: 'Wise' },
-    { from: 'RUB', to: 'EUR', fromMinor: 4_500_000n, spreadBp: 110n, back: 12, provider: 'Wise' },
-  ];
+  const fxHistory = FX_HISTORY;
   for (const op of fxHistory) {
     const day = shift(asOf, -op.back);
     const official = await getRate(op.from, op.to, day, workspaceId);
