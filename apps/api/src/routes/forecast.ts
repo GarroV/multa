@@ -1,19 +1,23 @@
 import {
   amountOn,
+  debtPaymentForPeriod,
+  incomeEventsIn,
   daysInPeriod,
   forecastTimeline,
   generatePeriods,
   recurringDueIn,
   type PeriodConfig,
   type RecurringSchedule,
+  type WeekendRule,
 } from '@multa/core';
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
 import { debts, goals, recurringItems } from '../db/schema/domain.ts';
+import { listSources } from '../income/store.ts';
 import { requireWorkspace, type AppVariables, type Workspace } from '../middleware.ts';
-import { parseAmountSteps } from '../plan/assemble.ts';
+import { parseAmountSteps, parsePaymentsBySource } from '../plan/assemble.ts';
 import { sectionVisible } from '../plan/sharing.ts';
 import { settingsOf } from '../settings/store.ts';
 
@@ -45,7 +49,7 @@ export async function forecastOf(ws: Workspace, asMember = false) {
   // Период не определяется — это сбой ритма, а не пустой прогноз: молчать здесь нельзя.
   if (!current) throw new Error('period_undeterminable');
 
-  const [debtRows, goalRows, recurringRows] = await Promise.all([
+  const [debtRows, goalRows, recurringRows, sourceRows] = await Promise.all([
     db
       .select()
       .from(debts)
@@ -65,10 +69,27 @@ export async function forecastOf(ws: Workspace, asMember = false) {
       .select()
       .from(recurringItems)
       .where(and(eq(recurringItems.workspaceId, ws.id), eq(recurringItems.active, true))),
+    /*
+     * Источники дохода: без них не применить разбивку платежа по выплатам. Через `listSources`, а
+     * не своим запросом — он приводит расписание и сумму к типам ядра, и второй разбор тех же
+     * данных однажды разошёлся бы с первым.
+     */
+    listSources(ws.id),
   ]);
 
   // Регулярные платежи текущего периода: их не видно ни в обязательствах, ни в факте,
   // поэтому без них лента «что впереди» врала бы в пользу пользователя (#21).
+  /* Кто платит в каждом периоде: нужно долгам с разбивкой по выплатам. */
+  const sourcesByPeriod = horizon.map((period) => [
+    ...new Set(
+      incomeEventsIn(
+        sourceRows.filter((x) => x.active),
+        period,
+        ws.paydayWeekendRule as WeekendRule,
+      ).map((e) => e.sourceId),
+    ),
+  ]);
+
   const dueSoon = recurringDueIn(
     recurringRows.map((r) => ({
       id: r.id,
@@ -126,8 +147,23 @@ export async function forecastOf(ws: Workspace, asMember = false) {
        * Платёж по периодам, а не сегодняшний (#103): весь остальной код ходит через `amountOn`,
        * а прогноз считал по плоской сумме и обещал закрытие в разы позже или раньше, чем есть.
        */
-      paymentsByPeriod: horizon.map((period) =>
-        amountOn(d.paymentMinor, parseAmountSteps(d.amountSteps), period.startsOn),
+      /*
+       * То же правило ядра, что в плане и мастер-сетке (`debtPaymentForPeriod`). Своя формула тут
+       * уже врала: прогноз знал про ступени, но не знал ни про разбивку по выплатам, ни про окно
+       * платежей — и обещал закрытие долга, который в этих периодах денег не берёт вовсе.
+       */
+      paymentsByPeriod: horizon.map((period, i) =>
+        debtPaymentForPeriod(
+          {
+            paymentMinor: d.paymentMinor,
+            steps: parseAmountSteps(d.amountSteps),
+            bySource: parsePaymentsBySource(d.paymentsBySource),
+            paysFrom: d.paysFrom,
+            paysUntil: d.paysUntil,
+          },
+          sourcesByPeriod[i] ?? [],
+          period.startsOn,
+        ),
       ),
     })),
     goals: goalRows.map((g) => ({

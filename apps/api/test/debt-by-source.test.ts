@@ -247,3 +247,67 @@ test('внутри окна долг платит как обычно', async ()
   );
   expect(debtIn(await getPlan(client))).toBe('2000000');
 });
+
+/*
+ * Прогноз обязан считать платёж тем же правилом, что план и таблица.
+ *
+ * Найдено сверкой кода 17.08.2026, а не сообщением о баге: прогноз ходил через `amountOn` — то есть
+ * знал про ступени суммы, но НЕ знал ни про разбивку по выплатам, ни про окно платежей, которые
+ * появились сегодня. Значит «долг закроется через N периодов» считалось по платежу, которого в
+ * этих периодах нет.
+ *
+ * Это ровно тот класс, что уже кусал дважды: два места считают одни деньги по-разному, и человек
+ * не понимает, какой цифре верить.
+ */
+test('прогноз не обещает закрытия долга, который вне окна платежей', async () => {
+  const { client } = await withTwoSources();
+  await expectOk(
+    await client.post('/v1/debts', {
+      name: 'Старый кредит',
+      currency: 'RUB',
+      principalMinor: '8000000',
+      remainingMinor: '8000000',
+      paymentMinor: '2000000',
+      paysFrom: '2020-01-01',
+      paysUntil: '2020-12-31',
+    }),
+    201,
+  );
+
+  const forecast = await expectOk<{ events: { kind: string; name?: string }[] }>(
+    await client.get('/v1/forecast'),
+  );
+  // Долг вне окна денег не берёт — обещать его закрытие нечем.
+  expect(
+    forecast.events.filter((e) => e.kind === 'debt_closed' && e.name === 'Старый кредит'),
+  ).toEqual([]);
+});
+
+test('прогноз учитывает разбивку по выплатам, а не общую сумму', async () => {
+  const { client, advanceId, salaryId } = await withTwoSources();
+  await expectOk(
+    await client.post('/v1/debts', {
+      name: 'Сбер',
+      currency: 'RUB',
+      principalMinor: '4000000',
+      remainingMinor: '4000000',
+      // Общая сумма заведомо велика: если прогноз возьмёт её, закрытие выйдет намного раньше.
+      paymentMinor: '4000000',
+      paymentsBySource: [
+        { sourceId: advanceId, amountMinor: '100000' },
+        { sourceId: salaryId, amountMinor: '100000' },
+      ],
+    }),
+    201,
+  );
+
+  const forecast = await expectOk<{ events: { kind: string; name?: string; date?: string }[] }>(
+    await client.get('/v1/forecast'),
+  );
+  const closing = forecast.events.find((e) => e.kind === 'debt_closed' && e.name === 'Сбер');
+  /*
+   * 40 000 остатка по 1 000 за выплату — это двадцать периодов, то есть за горизонтом прогноза.
+   * По общей сумме долг закрылся бы первым же платежом, и прогноз соврал бы в приятную сторону.
+   */
+  expect(closing, 'закрытие не должно попасть в горизонт').toBeUndefined();
+});
