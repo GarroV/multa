@@ -1,4 +1,11 @@
-# Multa — Схема данных (Postgres / Supabase)
+# Multa — Схема данных (self-hosted Postgres 16)
+
+> Self-hosted Postgres в docker-compose, без BaaS — решение от 19.07.2026 (см. CLAUDE.md §Стек).
+> Упоминание Supabase в заголовке было следом отменённого варианта.
+>
+> **Что уже существует, а что запланировано.** Разделы до «Billing» описывают работающую схему —
+> её можно сверить с `apps/api/src/db/schema/`. Разделы «Billing», «Админка» и «Правовое» — план
+> следующих фаз: этих таблиц в базе НЕТ (см. CLAUDE.md §Режим: dogfooding-first).
 
 Правила: деньги — `bigint` minor units; курсы — `numeric(20,10)`; валюты — `char(3)` ISO 4217; изоляция workspace — в API-middleware (RLS опционально как вторая линия). Все таблицы: `id uuid pk default gen_random_uuid()`, `created_at`, `updated_at`. Таблицы пользователей/сессий создает better-auth (users, sessions, accounts...).
 
@@ -104,6 +111,10 @@ create table debts (
   payment_minor bigint not null,     -- платеж за период
   due_date date,                     -- расчетная дата закрытия
   amount_steps jsonb,                -- «с такой-то даты платёж другой»; правило в core/amountOn
+  payments_by_source jsonb,          -- «5 000 с аванса, 15 000 с зарплаты»: [{source_id, amount_minor}] (#117)
+                                     -- сильнее amount_steps: складывать их = заплатить дважды
+  pays_from date,                    -- окно платежей, границы ВКЛЮЧИТЕЛЬНЫЕ; вне окна платёж 0 (#117)
+  pays_until date,                   -- новый долг по умолчанию стартует со следующей выплаты (#121)
   direction text not null default 'owed_by_me',  -- owed_to_me = заём: в каскад НЕ идёт (#94)
   counterparty text,
   agreed_rate numeric(20,10),        -- договорный курс для p2p-долгов
@@ -168,6 +179,27 @@ create table plan_revisions (
   accepted boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+-- Предложения правок от участника совместного доступа (#83).
+-- Правит строку только владелец — это правило продукта, поэтому участник не пишет в план, а
+-- создаёт предложение со своим жизненным циклом. Принятие выполняет ТУ ЖЕ операцию, что правка
+-- ячейки (core/setGridCell): второй дороги к деньгам не появляется.
+create table edit_proposals (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces on delete cascade,
+  author_id text not null references "user" on delete cascade,
+  target_kind text not null check (target_kind in ('category','debt','envelope','goal')),
+  target_id uuid not null,
+  starts_on date not null,           -- период, которому адресована правка
+  planned_minor bigint not null,
+  status text not null default 'pending' check (status in ('pending','accepted','rejected')),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  resolved_by text references "user" on delete set null
+);
+-- Скрытый раздел отвечает «не найдено», а не «нельзя»: отказ по существу подтверждал бы, что
+-- строка существует, и участник узнавал бы о скрытой цели через форму предложения.
+create index edit_proposals_ws_status_idx on edit_proposals (workspace_id, status);
 
 create table transactions (
   id uuid primary key default gen_random_uuid(),
