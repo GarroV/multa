@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api.ts';
 import { Panel, Tag } from './ui/Panel.tsx';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { skippedGroups } from '../lib/importView.ts';
 import { Select } from './ui/Select.tsx';
 import {
   useImportBatches,
@@ -168,6 +169,22 @@ export function ImportExcel({ base }: { base: string }) {
                 {t('imp.skipped', { count: shown.journal.rowsSkipped.length })}
               </Tag>
             )}
+            {/*
+              Номера строк и причина, а не только счёт. На настоящем файле владельца (5047 строк)
+              «не переедут: 18» оказалось бесполезным: найти их невозможно, а среди них были восемь
+              строк с суммой, попавшей в колонку «Продукт» — около 14 000 ₽ реальных трат.
+              Догадываться за человека нельзя, но сказать, где смотреть, — обязаны.
+            */}
+            {skippedGroups(shown.journal.rowsSkipped).map((g) => (
+              <span className="sub dim imp-skipped-rows" key={g.reason}>
+                {t(`imp.skip.${g.reason}` as 'imp.skip.no_amount')}
+                {': '}
+                {g.rows.join(', ')}
+                {g.total > g.rows.length
+                  ? t('imp.skip.more', { rest: g.total - g.rows.length })
+                  : ''}
+              </span>
+            ))}
           </span>
           <span className="prow-num" />
           <button type="button" className="act" disabled={commit.isPending} onClick={move}>
