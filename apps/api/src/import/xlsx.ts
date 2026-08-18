@@ -129,7 +129,15 @@ function parseSheet(xml: string, shared: string[]): string[][] {
   const rows: string[][] = [];
   for (const rowMatch of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
     const cells: string[] = [];
-    for (const cellMatch of (rowMatch[1] ?? '').matchAll(/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+    /*
+     * Атрибуты ленивым квантификатором (issue #125). Жадный `[^>]*` съедал `/` перед `>`, поэтому
+     * на самозакрывающейся пустой ячейке (`<c r="I4" s="8"/>` — так Excel пишет любую
+     * отформатированную пустую) первая альтернатива не срабатывала: разбор уходил во вторую и
+     * добирал ближайший `</c>`, то есть конец СЛЕДУЮЩЕЙ ячейки. Её значение попадало в пустую, а
+     * сама она из строки выпадала — на настоящем файле деньги переезжали на шесть колонок влево,
+     * молча и правдоподобно.
+     */
+    for (const cellMatch of (rowMatch[1] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const attrs = cellMatch[1] ?? '';
       const body = cellMatch[2] ?? '';
       const ref = /r="([A-Z]+\d+)"/.exec(attrs)?.[1] ?? '';
