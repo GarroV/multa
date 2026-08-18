@@ -3,18 +3,29 @@ import {
   parseCategoryDictionary,
   parseMasterGrid,
   parseSpendJournal,
+  planFromMasterGrid,
+  suggestLineKinds,
   type JournalRow,
+  type MasterGridAssignment,
 } from '@multa/core';
 import { and, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
+import { today } from '../clock.ts';
 import { db } from '../db/client.ts';
-import { categories, importBatches, transactions } from '../db/schema/domain.ts';
+import {
+  categories,
+  debts,
+  envelopes,
+  goals,
+  importBatches,
+  transactions,
+} from '../db/schema/domain.ts';
 import { isUuid } from '../http/ids.ts';
 import { readXlsx, type XlsxBook } from '../import/xlsx.ts';
-import { ensurePeriodForDate } from '../plan/assemble.ts';
+import { ensurePeriodForDate, setCategoryBudget } from '../plan/assemble.ts';
 import { requireWorkspace, type AppVariables } from '../middleware.ts';
-import { importCommitSchema, importPreviewSchema } from '../validation.ts';
+import { importCommitSchema, importPlanApplySchema, importPreviewSchema } from '../validation.ts';
 
 /**
  * Импорт истории из Excel (issue #76) — то, без чего человек не переезжает с таблицы: переносить
@@ -183,8 +194,136 @@ importRoute.post('/import/plan-preview', async (c) => {
 
   return c.json({
     sheets: found.book!.sheets.map((s) => ({ name: s.name, rows: s.rows.length })),
-    plan: masterGridSummary(parsed),
+    plan: {
+      ...masterGridSummary(parsed),
+      /*
+       * Подсказка вида по каждой строке. Она не решает за человека — ставит умолчание и называет
+       * причину: «похоже на итог», «впереди денег нет», «по умолчанию категория». Без неё интерфейс
+       * предложил бы категорию для «Итого затраты», и план раздулся бы вдвое двойником поверх
+       * настоящих статей (поймано на эталонном файле владельца).
+       */
+      suggestions: suggestLineKinds(parsed, today(ws.timezone)).map((s) => ({
+        ...s,
+        // Деньги наружу уходят строками, как во всём API: bigint в JSON не сериализуется.
+        perPeriodMinor: s.perPeriodMinor.toString(),
+        totalAheadMinor: s.totalAheadMinor.toString(),
+      })),
+    },
   });
+});
+
+/**
+ * Перенос плана в продукт (issue #124): создаёт то, что человек выбрал в предпросмотре.
+ *
+ * Ничего не угадывает: строка без вида в раскладке не переносится вовсе. Вид определяет судьбу
+ * строки в каскаде — долг и корзину автоматика не трогает никогда, категорию при нехватке режут, —
+ * поэтому ошибка здесь меняет то, чем продукт распоряжается, а не подпись на экране (правило 3).
+ *
+ * Повторный прогон не удваивает: сущность с тем же именем считается той же. Человек уточняет
+ * раскладку и грузит файл снова — это обычный путь, а два «Сбера» удвоили бы неприкосновенную часть
+ * каскада и съели бы деньги, которых нет.
+ */
+importRoute.post('/import/plan-apply', async (c) => {
+  const ws = c.get('workspace')!;
+  const body = importPlanApplySchema.parse(await c.req.json());
+  const found = bookAndSheet(body.fileBase64, body.sheet);
+  if ('error' in found && found.error === 'not_xlsx') return c.json({ error: 'not_xlsx' }, 400);
+  if (!found.sheet) return c.json({ error: 'sheet_not_found' }, 400);
+
+  const parsed = parseMasterGrid(found.sheet.rows, { currency: ws.baseCurrency });
+  if (parsed.periods.length === 0) return c.json({ error: 'plan_header_not_found' }, 400);
+
+  // Ключи приходят строками (так устроен JSON) — раскладка ядра работает по номерам строк.
+  const assignment: Record<number, 'debt' | 'goal' | 'envelope' | 'category' | 'skip'> = {};
+  for (const [index, kind] of Object.entries(body.assignment)) assignment[Number(index)] = kind;
+
+  const plan = planFromMasterGrid(parsed, assignment as MasterGridAssignment, {
+    asOf: today(ws.timezone),
+    currency: ws.baseCurrency,
+  });
+
+  /*
+   * Что уже есть в воркспейсе — по именам, приведённым к нижнему регистру: человек мог создать
+   * «Сбер» руками до переноса, и второй такой же не нужен.
+   */
+  const [debtNames, goalNames, envelopeNames, categoryNames] = await Promise.all([
+    db.select({ name: debts.name }).from(debts).where(eq(debts.workspaceId, ws.id)),
+    db.select({ name: goals.name }).from(goals).where(eq(goals.workspaceId, ws.id)),
+    db.select({ name: envelopes.name }).from(envelopes).where(eq(envelopes.workspaceId, ws.id)),
+    db
+      .select({ id: categories.id, name: categories.name })
+      .from(categories)
+      .where(and(eq(categories.workspaceId, ws.id), eq(categories.archived, false))),
+  ]);
+  const taken = (rows: { name: string }[]) => new Set(rows.map((r) => r.name.toLowerCase()));
+  const hasDebt = taken(debtNames);
+  const hasGoal = taken(goalNames);
+  const hasEnvelope = taken(envelopeNames);
+  const categoryByName = new Map(categoryNames.map((r) => [r.name.toLowerCase(), r.id]));
+
+  const created = { debts: 0, goals: 0, envelopes: 0, categories: 0 };
+
+  for (const debt of plan.debts) {
+    if (hasDebt.has(debt.name.toLowerCase())) continue;
+    await db.insert(debts).values({
+      workspaceId: ws.id,
+      name: debt.name,
+      currency: debt.currency,
+      /*
+       * Тело долга равно остатку: сколько было взято, файл не знает — в нём только план платежей.
+       * Выдумывать исходную сумму нельзя, а остаток — то, что человек действительно должен.
+       */
+      principalMinor: debt.remainingMinor,
+      remainingMinor: debt.remainingMinor,
+      paymentMinor: debt.paymentMinor,
+    });
+    created.debts += 1;
+  }
+
+  for (const goal of plan.goals) {
+    if (hasGoal.has(goal.name.toLowerCase())) continue;
+    await db.insert(goals).values({
+      workspaceId: ws.id,
+      name: goal.name,
+      currency: goal.currency,
+      targetMinor: goal.targetMinor,
+      plannedPerPeriodMinor: goal.perPeriodMinor,
+    });
+    created.goals += 1;
+  }
+
+  for (const envelope of plan.envelopes) {
+    if (hasEnvelope.has(envelope.name.toLowerCase())) continue;
+    await db.insert(envelopes).values({
+      workspaceId: ws.id,
+      name: envelope.name,
+      currency: envelope.currency,
+      ruleKind: 'fixed',
+      ruleValue: envelope.fixedMinor.toString(),
+    });
+    created.envelopes += 1;
+  }
+
+  for (const category of plan.categories) {
+    let id = categoryByName.get(category.name.toLowerCase());
+    if (!id) {
+      const rows = await db
+        .insert(categories)
+        .values({ workspaceId: ws.id, name: category.name, sort: 900 })
+        .returning({ id: categories.id });
+      id = rows[0]!.id;
+      categoryByName.set(category.name.toLowerCase(), id);
+      created.categories += 1;
+    }
+    /*
+     * Бюджет ставим через общий путь плана, а не записью в planned_items: он же создаёт период,
+     * считает приход и пишет ревизию. Свой запрос разошёлся бы с этой логикой ровно в тот момент,
+     * когда она поменяется.
+     */
+    await setCategoryBudget(ws, today(ws.timezone), id, category.budgetMinor);
+  }
+
+  return c.json({ created, skipped: plan.skipped });
 });
 
 importRoute.post('/import/commit', async (c) => {

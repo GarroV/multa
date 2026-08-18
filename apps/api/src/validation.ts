@@ -270,6 +270,23 @@ export const importCommitSchema = z.object({
   filename: z.string().min(1).max(200).optional(),
 });
 
+/**
+ * Перенос плана из Excel (issue #124): раскладка «номер строки → вид».
+ *
+ * По номеру, а не по имени: в настоящем файле владельца «Прочее» встречается дважды, и по имени
+ * эти строки склеились бы в один ключ — вид, выбранный для одной, молча применился бы к другой.
+ *
+ * Строки, которой в раскладке нет, продукт не касается: умолчание живёт в интерфейсе, где человек
+ * его видит и может поменять, а не в записи, где оно молча создало бы сущность.
+ */
+export const importPlanApplySchema = z.object({
+  fileBase64: z.string().min(1).max(MAX_IMPORT_BASE64),
+  sheet: z.string().min(1).max(120),
+  assignment: z
+    .record(z.string().regex(/^\d{1,4}$/), z.enum(['debt', 'goal', 'envelope', 'category', 'skip']))
+    .default({}),
+});
+
 /** Горизонт сравнения провайдеров (issue #53): меньше месяца — не выборка, больше двух лет — не про сейчас. */
 export const spreadQuerySchema = z.object({
   months: z.coerce.number().int().min(1).max(24).default(6),
