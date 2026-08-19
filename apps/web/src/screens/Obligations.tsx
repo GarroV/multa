@@ -1,4 +1,5 @@
 import { fromMajor, paymentToClose, type Currency, type WeekendRule } from '@multa/core';
+import { envelopeEditFieldKind, envelopeEditFieldValue } from '../lib/envelopeView.ts';
 import { nextPeriodStart, periodsUntil } from '../lib/income.ts';
 import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
@@ -907,8 +908,9 @@ function EnvelopesSection({ base }: SectionProps) {
                     {
                       key: 'ruleValue',
                       label: t('obl.rule.fixed'),
-                      kind: 'plain' as const,
-                      value: String(e.ruleValue),
+                      // «Фикс» — деньги в minor units, «процент» — число как есть (issue #127).
+                      kind: envelopeEditFieldKind(e.ruleKind),
+                      value: envelopeEditFieldValue(e.ruleKind, String(e.ruleValue)),
                     },
                   ]}
                   onDone={() => setEditing(null)}
