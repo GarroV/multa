@@ -262,7 +262,13 @@ function ForecastPanel({ base, locale }: { base: string; locale: string }) {
             <span className={e.kind === 'goal_at_risk' ? 'st-warn' : undefined}>{label(e)}</span>
           </span>
           <span className="prow-num">
-            <i>{e.on}</i>
+            {/*
+              Через `formatDate`, а не как пришло из API: дата события прогноза печаталась сырым ISO
+              («2026-09-19») в строке, где соседняя ячейка уже показывала «10.08» — два формата в
+              одной панели (замечание владельца 19.08.2026). Год здесь нужен: события уходят на
+              горизонт до года вперёд, и «19.09» без года не отличить от прошлогоднего.
+            */}
+            <i>{formatDate(e.on, { year: true })}</i>
           </span>
           <span />
         </div>

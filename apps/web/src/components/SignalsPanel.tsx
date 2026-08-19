@@ -64,12 +64,28 @@ export function SignalsPanel({ base, locale }: { base: string; locale: string })
    * Параметры сигнала — сырые значения (суммы в minor units). Денежные приводим к виду человека
    * здесь: сервер формат не знает и знать не должен, а словарь получает уже готовую подстановку.
    */
+  /**
+   * Параметры подстановки в текст сигнала.
+   *
+   * Суммы форматировались с самого начала, а даты уезжали в текст сырыми — «Ozon installment closes
+   * on 2026-09-03» посреди экрана, где всё остальное показано как «03.09» (замечание владельца
+   * 19.08.2026: «даты просил в человеческом виде сделать»). Правило то же, что для сумм: значение
+   * приводится к формату продукта здесь, один раз, а не в каждом шаблоне.
+   *
+   * Год у сигналов нужен: они говорят про закрытие долга и риск цели на горизонте до года вперёд,
+   * и «03.09» без года не отличить от прошлогоднего.
+   */
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   const textParams = (signal: SignalDto): Record<string, string | number> => {
     const out: Record<string, string | number> = {};
     for (const [key, value] of Object.entries(signal.params)) {
-      out[key] = key.endsWith('Minor')
-        ? `${formatMinor(String(value), base, locale)} ${base}`
-        : value;
+      if (key.endsWith('Minor')) {
+        out[key] = `${formatMinor(String(value), base, locale)} ${base}`;
+      } else if (typeof value === 'string' && ISO_DATE.test(value)) {
+        out[key] = formatDate(value, { year: true });
+      } else {
+        out[key] = value;
+      }
     }
     return out;
   };

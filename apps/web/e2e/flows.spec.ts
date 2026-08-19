@@ -508,3 +508,51 @@ test('«оплатить» отмечает обязательство испо�
     { timeout: 15_000 },
   );
 });
+
+test('даты на экранах человеческие, а не ISO из базы', async ({ page }) => {
+  /*
+   * Замечание владельца 19.08.2026: «даты просил в человеческом виде сделать». В ленте «Что
+   * впереди» события прогноза печатались как есть из API — «2026-09-19» посреди русского экрана,
+   * рядом с «10.08» в соседней строке. Формат в продукте один и он решён давно (дд.мм, хелпер
+   * `formatDate`, решение владельца 2026-08-03) — просто одно место его не звало.
+   *
+   * Проверка идёт по видимому тексту всех основных экранов, а не по одному компоненту: место, где
+   * забыли хелпер, найдётся снова, и ловить его надо целым классом. Значения полей (`input
+   * type=date`) сюда не попадают намеренно — там ISO обязателен по стандарту HTML, его показывает
+   * сам браузер в локали пользователя.
+   */
+  const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/;
+
+  /*
+   * Ждать надо ИМЕННО панель прогноза, а не любую строку экрана. Первая версия проверки ждала
+   * `.prow` и зеленела на сломанном коде: панель «Что впереди» приходит отдельным запросом
+   * (`/v1/forecast`) и появляется позже остального плана — к моменту снятия текста её на экране
+   * ещё не было, а ISO-даты живут ровно в ней.
+   */
+  await page.goto('/plan');
+  await page
+    .locator('section', { hasText: /What is ahead|Что впереди/i })
+    .first()
+    .waitFor({
+      timeout: 20_000,
+    });
+  const ahead = await page
+    .locator('section', { hasText: /What is ahead|Что впереди/i })
+    .first()
+    .innerText();
+  expect(
+    ahead.split('\n').filter((line) => ISO_DATE.test(line)),
+    'лента «Что впереди»: ISO-даты вместо человеческих',
+  ).toEqual([]);
+
+  for (const path of ['/plan', '/plan?view=table', '/statistics', '/obligations']) {
+    await page.goto(path);
+    await page.locator('.prow, .mgrid-row, .tile').first().waitFor({ timeout: 15_000 });
+    // Даём дозагрузиться панелям, которые приходят отдельными запросами.
+    await page.waitForLoadState('networkidle');
+
+    const raw = await page.locator('main').evaluate((el) => (el as HTMLElement).innerText);
+    const hits = raw.split('\n').filter((line) => ISO_DATE.test(line));
+    expect(hits, `${path}: ISO-даты в тексте экрана`).toEqual([]);
+  }
+});
