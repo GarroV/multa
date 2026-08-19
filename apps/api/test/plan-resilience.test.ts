@@ -67,6 +67,45 @@ describe('сборка плана не ломается насмерть', () =>
     expect(plan.unresolved.some((u) => u.targetId === goal.id)).toBe(true);
   });
 
+  test('доход в валюте без курса уходит в unresolved, а не в молчаливый ноль', async () => {
+    /*
+     * Инвариант 11 (01-domain-model §Инварианты): «курс недоступен → приход попадает в unresolved,
+     * а не в молчаливый ноль». Ядро (`expectedIncomeForPeriod`) это соблюдает и покрыто тестом —
+     * но связку с HTTP-ответом `/v1/plan/current` до этого теста не проверял никто: неверная
+     * сериализация или потерянное поле по пути от ядра до DTO прошли бы незамеченными.
+     *
+     * Курс KZT намеренно не сидим заранее — источник в валюте, для которой котировки никогда не
+     * было, тот же случай, что и «котировка пропала».
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    await forgetRate('KZT', 'RUB');
+    await expectOk(
+      await client.post('/v1/income-sources', {
+        label: 'Фриланс в тенге',
+        currency: 'KZT',
+        schedule: { kind: 'monthly-days', days: [10, 25] },
+        amount: { kind: 'absolute', amountMinor: '5000000' },
+        stability: 'variable',
+      }),
+      201,
+    );
+
+    const plan = await getPlan(client);
+    const unresolved = plan.income.unresolved.find((e) => e.currency === 'KZT');
+    expect(unresolved).toBeTruthy();
+    expect(unresolved?.reason).toBe('rate_unavailable');
+
+    // Событие видно в общем списке (не спрятано) — просто без суммы в базовой валюте.
+    expect(plan.income.events.some((e) => e.currency === 'KZT')).toBe(true);
+
+    /*
+     * Доход основного источника (300 000 ₽ на 10 и 25) считается по нормальным событиям —
+     * непрошедшая валюта не должна ни обнулить его молча, ни (что было бы другой ошибкой)
+     * прибавить к нему выдуманную сумму.
+     */
+    expect(BigInt(plan.incomeMinor)).toBeGreaterThan(0n);
+  });
+
   test('повторные запросы плана остаются рабочими, а не залипают на ошибке', async () => {
     const client = await onboarded({ payoutMinor: '30000000' });
     const goal = await addGoal(client, '5000000');
