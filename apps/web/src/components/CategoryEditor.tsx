@@ -88,7 +88,7 @@ function CategoryRow({
 
   return (
     <div className="list-item">
-      <span className="row row-8">
+      <span className="row row-gap-8">
         <button
           className="btn btn-ghost"
           aria-pressed={cat.protected}
@@ -115,7 +115,7 @@ function CategoryRow({
         )}
         {badInput && <span className="sub danger">{t('spend.badAmount')}</span>}
       </span>
-      <span className="row row-8">
+      <span className="row row-gap-8">
         <input
           className="field num field-sm"
           inputMode="decimal"
@@ -127,7 +127,7 @@ function CategoryRow({
         />
         <span className="sub num num-w-32">{base}</span>
         {budget?.advice && (
-          <span className="row row-6">
+          <span className="row row-gap-6">
             <span className="dim text-xs">
               {t(budget.advice.kind === 'raise' ? 'advice.raise' : 'advice.lower', {
                 amount: `${formatMinor(budget.advice.suggestedMinor, base, locale)} ${base}`,

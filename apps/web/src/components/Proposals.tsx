@@ -48,7 +48,7 @@ export function Proposals({ base }: { base: string }) {
           </span>
           <span className="prow-num mono">{formatMinor(p.plannedMinor, base, locale)}</span>
           {!isMember && (
-            <span className="row row-8">
+            <span className="row row-gap-8">
               <button
                 type="button"
                 className="btn"

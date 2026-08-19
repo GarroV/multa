@@ -437,7 +437,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
           сам. Компонент в продукте уже был (тема, язык) — переключатель горизонта его сначала
           проигнорировал, и получилась третья порода органов управления на том же экране.
         */}
-        <span className="row row-8">
+        <span className="row row-gap-8">
           <span className="micro">{t('plan.master.horizon')}</span>
           <span className="seg" role="group" aria-label={t('plan.master.horizon')}>
             {[6, 12, 24].map((n) => (

@@ -170,7 +170,7 @@ export function IncomeEditor({ base, locale }: { base: string; locale: string })
         )}
         {addSource.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
         {removeSource.isError && <span className="sub danger">⚠ {t('common.error')}</span>}
-        <span className="row row-6">
+        <span className="row row-gap-6">
           <Hint text={t('income.editor.rhythmHint')} />
           <Link className="act" to="/settings">
             {t('settings.rhythm')}

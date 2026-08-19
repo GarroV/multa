@@ -66,7 +66,7 @@ export function BehaviourSettings() {
         <span className="prow-num" />
         <span />
         <span className="prow-bar prow-bar-full">
-          <span className="row row-6">
+          <span className="row row-gap-6">
             {COMPRESS_PRESETS.map((order) => (
               <button
                 key={order.join('-')}

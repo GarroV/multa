@@ -134,7 +134,7 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
             <Hint text={t('rec.reserve.hint')} />
           </label>
 
-          <span className="row row-6">
+          <span className="row row-gap-6">
             <span className="sub dim">{t('rec.steps')}</span>
             <Hint text={t('rec.steps.hint')} />
           </span>

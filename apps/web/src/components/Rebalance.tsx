@@ -62,7 +62,7 @@ export function Rebalance({
 
         {options.map((o) => (
           <div key={`${o.targetKind}:${o.targetId}`} className="list-item">
-            <span className="row row-8">
+            <span className="row row-gap-8">
               <span>{o.name}</span>
               {o.usual && <span className="chip chip-xs">{t('rebalance.usual')}</span>}
               <span className="dim mono text-sm">

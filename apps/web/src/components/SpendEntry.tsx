@@ -57,7 +57,7 @@ function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale:
 
   return (
     <div className="list-item">
-      <span className="row row-8">
+      <span className="row row-gap-8">
         <span className="sub num">{formatDate(tx.occurredOn)}</span>
         <span>{catName ?? t('spend.noCategory')}</span>
         {tx.note && <span className="sub">· {tx.note}</span>}
@@ -253,7 +253,7 @@ export function SpendEntry({
         </div>
 
         {/* Трата или приход: один ввод на оба случая — «пришло сегодня» так же частый жест, как трата. */}
-        <div className="row row-8">
+        <div className="row row-gap-8">
           {(['expense', 'income'] as const).map((k) => (
             <button
               key={k}
@@ -316,7 +316,7 @@ export function SpendEntry({
 
         <div className="stack-sm">
           <span className="micro">{t('spend.amount')}</span>
-          <div className="row row-8">
+          <div className="row row-gap-8">
             <input
               className="field num field-amount"
               inputMode="decimal"
@@ -339,7 +339,7 @@ export function SpendEntry({
         {!isIncome && (
           <div className="stack-sm">
             <span className="micro">{t('spend.category')}</span>
-            <div className="row row-8">
+            <div className="row row-gap-8">
               <button
                 type="button"
                 className="chip"
@@ -363,7 +363,7 @@ export function SpendEntry({
           </div>
         )}
 
-        <div className="row row-8">
+        <div className="row row-gap-8">
           <div className="stack-sm">
             <span className="micro">{t('spend.date')}</span>
             <input

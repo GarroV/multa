@@ -198,7 +198,7 @@ export function ObligationEdit({
           )}
           {paymentsBySource !== undefined && splitOpen && (
             <>
-              <span className="row row-6">
+              <span className="row row-gap-6">
                 <span className="sub dim">{t('obl.split')}</span>
                 <Hint text={t('obl.split.hint')} />
               </span>
@@ -219,7 +219,7 @@ export function ObligationEdit({
           )}
           {initialSteps !== undefined && (
             <>
-              <span className="row row-6">
+              <span className="row row-gap-6">
                 <span className="sub dim">{t('rec.steps')}</span>
                 <Hint text={t('rec.steps.hint')} />
               </span>
