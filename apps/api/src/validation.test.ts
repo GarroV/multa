@@ -28,6 +28,35 @@ describe('createWorkspaceSchema', () => {
   it('отвергает валюту не из 3 символов', () => {
     expect(() => createWorkspaceSchema.parse({ baseCurrency: 'RUBLE' })).toThrow();
   });
+
+  /*
+   * Найдено на живом проде 19.08.2026: у одного из пользователей базовая валюта записана как
+   * «СОМ» — кириллицей, вместо KGS. Проверка смотрела только длину, и три русские буквы прошли
+   * как код валюты.
+   *
+   * Последствие тихое и полное: курса для «СОМ» не существует ни в одном источнике, поэтому
+   * каждая строка плана уходит в «нерешённые», а `exponentOf` отдаёт для неизвестного кода
+   * дефолтные два знака — то есть суммы ещё и выглядят правдоподобно. Человек видит пустой план
+   * и не может понять, почему.
+   *
+   * Код валюты по ISO 4217 — три ЛАТИНСКИЕ заглавные буквы, и проверять надо именно это.
+   */
+  it('отвергает код валюты не из латиницы: «СОМ» кириллицей — не KGS', () => {
+    expect(() => createWorkspaceSchema.parse({ baseCurrency: 'СОМ' })).toThrow();
+    expect(() => createWorkspaceSchema.parse({ baseCurrency: 'РУБ' })).toThrow();
+    // Смесь алфавитов ловится тем же правилом: «ВUB» с русской В выглядит как RUB.
+    expect(() => createWorkspaceSchema.parse({ baseCurrency: 'ВUB' })).toThrow();
+  });
+
+  it('цифры и знаки в коде валюты тоже не проходят', () => {
+    expect(() => createWorkspaceSchema.parse({ baseCurrency: '123' })).toThrow();
+    expect(() => createWorkspaceSchema.parse({ baseCurrency: 'R-B' })).toThrow();
+  });
+
+  it('строчные латинские буквы принимаются и приводятся к верхнему регистру', () => {
+    // Это не поблажка: клиенты присылают и «rub», и «RUB», и подмена регистра здесь безопасна.
+    expect(createWorkspaceSchema.parse({ baseCurrency: 'rsd' }).baseCurrency).toBe('RSD');
+  });
 });
 
 describe('incomeSourceSchema', () => {

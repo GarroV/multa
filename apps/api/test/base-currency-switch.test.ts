@@ -1,0 +1,78 @@
+import { describe, expect, test } from 'vitest';
+import { categoryId, expectOk, getPlan, onboarded } from './client.ts';
+
+/**
+ * Смена базовой валюты воркспейса (запрос владельца 19.08.2026: «в моём случае надо будет перевести
+ * на базовую валюту в динарах»).
+ *
+ * Инвариант 2 из 01-domain-model прямо обещает: «Снапшот курса в транзакции иммутабелен; смена
+ * базовой валюты НЕ ТРОГАЕТ историю». Проверяем, выполняется ли обещание — потому что суммы,
+ * которые хранятся ИМЕННО в базовой валюте (бюджет категории, `base_amount_minor` транзакции,
+ * ожидаемый доход периода), при подмене валюты воркспейса меняют смысл, даже не меняя числа:
+ * 20 000, записанные как рубли, начинают читаться как динары.
+ */
+describe('смена базовой валюты не искажает уже записанное', () => {
+  /*
+   * `test.fails` — тест обязан ПАДАТЬ, пока #136 не решён, и это не заглушка, а маркер долга:
+   * набор остаётся зелёным, а в день, когда поведение починят, тест «неожиданно пройдёт» и
+   * потребует переписать себя под выбранное решение. Обычный `skip` такого не даёт — он молчит
+   * навсегда, и проблему забывают.
+   */
+  test.fails(
+    'бюджет категории и факт траты не меняют смысл после смены базы RUB → RSD',
+    async () => {
+      const client = await onboarded({ payoutMinor: '30000000' });
+      const on = new Date().toISOString().slice(0, 10);
+      /*
+       * Курсы здесь намеренно НЕ сеем. Трата ниже — в базовой валюте, курс для неё не нужен, а
+       * посев `RSD→RUB` ронял соседний файл: `receipts.test.ts` проверяет отказ подтверждения ИМЕННО
+       * при отсутствии этого курса, файлы бегут параллельно через одну базу, и мой посев ломал его в
+       * двух прогонах из трёх. Тест, который валит соседа, хуже отсутствующего.
+       */
+
+      const food = await categoryId(client, 'Продукты');
+      await expectOk(
+        await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '2000000' }),
+      );
+      await expectOk(
+        await client.post('/v1/transactions', {
+          kind: 'expense',
+          amountMinor: '500000',
+          currency: 'RUB',
+          categoryId: food,
+          occurredOn: on,
+        }),
+        201,
+      );
+
+      const before = await getPlan(client);
+      const budgetBefore = before.allocations.find((a) => a.targetId === food)!;
+      expect(before.baseCurrency).toBe('RUB');
+      expect(budgetBefore.plannedMinor).toBe('2000000'); // 20 000 рублей
+      expect(before.spentLivingMinor).toBe('500000'); // 5 000 рублей факта
+
+      // Человек переезжает: теперь он живёт в динарах и меняет базовую валюту в настройках.
+      await expectOk(await client.patch('/v1/workspace', { baseCurrency: 'RSD' }));
+
+      const after = await getPlan(client);
+      expect(after.baseCurrency).toBe('RSD');
+
+      /*
+       * Вот в чём подвох. Число осталось прежним, а валюта сменилась — значит 20 000 рублей бюджета
+       * молча стали 20 000 динаров (примерно 15 600 рублей по курсу дня), а 5 000 рублей факта —
+       * 5 000 динаров. Никто не спросил и не предупредил.
+       *
+       * Тест фиксирует то, что продукт обязан обеспечить: либо суммы пересчитаны по курсу и остались
+       * той же величиной, либо смена базы отклонена, пока есть история. Молчаливое переозначивание —
+       * не вариант ни при каком ответе.
+       */
+      const budgetAfter = after.allocations.find((a) => a.targetId === food);
+      const stillMeansTheSameMoney =
+        budgetAfter !== undefined && BigInt(budgetAfter.plannedMinor) !== 2_000_000n;
+      expect(
+        stillMeansTheSameMoney,
+        'бюджет 20 000 ₽ после перехода на динары остался числом 20 000 — значит он молча переозначен',
+      ).toBe(true);
+    },
+  );
+});
