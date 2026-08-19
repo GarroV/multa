@@ -146,7 +146,7 @@ const periodsSettings = z.object({
  * Верхняя граница не бюрократия: список рисуется выпадашкой в каждой форме, и два десятка позиций
  * там — уже не выбор, а поиск.
  */
-export const DEFAULT_CURRENCIES = ['RUB', 'EUR', 'USD', 'KGS', 'KZT'] as const;
+export const DEFAULT_CURRENCIES = ['RUB', 'EUR', 'USD', 'RSD', 'KGS', 'KZT'] as const;
 
 const currencySettings = z.object({
   /** Что показывать в выпадашках валюты. Пустой список запрещён: выбирать было бы не из чего. */

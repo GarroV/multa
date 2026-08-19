@@ -229,7 +229,13 @@ test('список валют настраивается и по умолчан�
   const initial = await expectOk<{ currency: { list: string[] } }>(
     await client.get('/v1/workspace/settings'),
   );
-  expect(initial.currency.list).toEqual(['RUB', 'EUR', 'USD', 'KGS', 'KZT']);
+  /*
+   * RSD — не экзотика, а один из четырёх пунктов «популярных» валют на онбординге
+   * (`OnboardingCurrency.tsx`, `POPULAR`) и штатная котировка ЦБ (issue #132): продукт для живущих
+   * между Россией и Сербией без сербского динара в дефолтном списке — противоречие в самом ядре
+   * сценария, а не деталь.
+   */
+  expect(initial.currency.list).toEqual(['RUB', 'EUR', 'USD', 'RSD', 'KGS', 'KZT']);
 
   const patched = await expectOk<{ currency: { list: string[] } }>(
     await client.patch('/v1/workspace/settings', { currency: { list: ['rub', 'kzt', 'rub'] } }),
