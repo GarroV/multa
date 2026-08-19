@@ -77,32 +77,45 @@ interface CategoryBudget {
   readonly baseMinor: bigint;
 }
 
-/** Бюджеты категорий периода (planned_items × categories), архивные исключены. */
-async function loadCategoryBudgets(periodId: string): Promise<CategoryBudget[]> {
+/**
+ * Бюджеты категорий периода (categories × planned_items этого периода), архивные исключены.
+ *
+ * От категорий, а не от planned_items (сверка 19.08.2026, жалоба владельца «продукты не
+ * добавляются»): прежний INNER JOIN + фильтр `plannedMinor > 0n` исключал категорию из каскада
+ * целиком, если для неё ещё не было строки в этом периоде, — а у только что заведённой категории
+ * её и не может быть. Категория выпадала не только из планового бюджета (там 0 и так подразумевался
+ * бы), но из самого списка `plan.allocations` — мастер-таблица, которая берёт первую колонку
+ * ИМЕННО оттуда, не находила категорию вовсе и рисовала «строки в этом периоде нет», хотя строка
+ * есть, просто пуста. У долгов/целей/конвертов/корзин той же ловушки нет: они читаются из своих
+ * таблиц напрямую и присутствуют в каскаде всегда, с нулём в худшем случае.
+ */
+async function loadCategoryBudgets(
+  workspaceId: string,
+  periodId: string,
+): Promise<CategoryBudget[]> {
   const rows = await db
     .select({
-      targetId: plannedItems.targetId,
+      targetId: categories.id,
       plannedMinor: plannedItems.plannedMinor,
       name: categories.name,
       isProtected: categories.protected,
     })
-    .from(plannedItems)
-    .innerJoin(categories, eq(categories.id, plannedItems.targetId))
-    .where(
+    .from(categories)
+    .leftJoin(
+      plannedItems,
       and(
+        eq(plannedItems.targetId, categories.id),
         eq(plannedItems.periodId, periodId),
         eq(plannedItems.targetKind, 'category'),
-        eq(categories.archived, false),
       ),
-    );
-  return rows
-    .filter((r) => r.plannedMinor > 0n)
-    .map((r) => ({
-      targetId: r.targetId,
-      name: r.name,
-      isProtected: r.isProtected,
-      baseMinor: r.plannedMinor,
-    }));
+    )
+    .where(and(eq(categories.workspaceId, workspaceId), eq(categories.archived, false)));
+  return rows.map((r) => ({
+    targetId: r.targetId,
+    name: r.name,
+    isProtected: r.isProtected,
+    baseMinor: r.plannedMinor ?? 0n,
+  }));
 }
 
 /**
@@ -872,7 +885,7 @@ async function assembleForPeriod(
     // Чьи выплаты приходят в этом периоде: долг с разбивкой берёт сумму именно с них.
     [...new Set(income.events.map((e) => e.sourceId))],
   );
-  const cats = await loadCategoryBudgets(periodId);
+  const cats = await loadCategoryBudgets(ws.id, periodId);
   // Правки человека по обязательствам этого периода: пересборка списала часть взноса с цели.
   const overrides = await loadOverrides(periodId);
 

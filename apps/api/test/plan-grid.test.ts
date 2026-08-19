@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { db } from '../src/db/client.ts';
 import { payPeriods } from '../src/db/schema/domain.ts';
-import { categoryId, expectOk, getPlan, onboarded, type TestClient } from './client.ts';
+import { categoryId, expectOk, getPlan, onboarded, seedRate, type TestClient } from './client.ts';
 
 /**
  * Мастер-сетка «строки × периоды выплат» (issue #47) — таблица, ради которой человек уходит из
@@ -294,6 +294,71 @@ describe('мастер-сетка', () => {
     // Подвал не должен шелохнуться: платёж показан, но в раздачу не входит.
     expect(after.footer.freeMinor).toEqual(before.footer.freeMinor);
     expect(after.footer.perDayMinor).toEqual(before.footer.perDayMinor);
+  });
+
+  test('регулярный платёж в чужой валюте виден, а не молча нулём (жалоба владельца 19.08.2026)', async () => {
+    /*
+     * «Квартира EUR» и «Подписка EUR» показывали прочерк в каждой колонке горизонта — платёж как
+     * будто не наступал никогда. Причина не в курсе (он был), а в порядке загрузки: карта курсов
+     * строится ДО того, как код доходит до регулярных платежей, и валюты регулярных платежей в неё
+     * никогда не попадали. `toBase()` для EUR получал `undefined` из карты и возвращал null, а
+     * сборка регулярных платежей превращала null в 0n через `?? 0n` — тихо, без единого признака,
+     * что курс не найден (в отличие от долгов/целей: там для этого есть список «нерешённые»).
+     *
+     * Курс есть — `seedRate` кладёт его явно, — поэтому платёж должен быть виден с первой же
+     * колонки, а не потерян.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+
+    await expectOk(
+      await client.post('/v1/recurring-items', {
+        name: 'Квартира',
+        amountMinor: '65000',
+        currency: 'EUR',
+        schedule: { kind: 'monthly-days', days: [5] },
+      }),
+      201,
+    );
+
+    const dto = await grid(client);
+    const row = dto.groups
+      .find((g) => g.kind === 'recurring')
+      ?.rows.find((r) => r.name === 'Квартира');
+    if (!row) throw new Error('строки «Квартира» нет в матрице');
+    // 650 EUR × 100 ₽/EUR = 65 000 ₽ — хотя бы в одной колонке горизонта платёж обязан наступить.
+    expect(row.cells.some((c) => c.state === 'planned' && c.minor !== '0')).toBe(true);
+  });
+
+  test('новая категория без бюджета видна строкой, а не исчезает (жалоба владельца 19.08.2026)', async () => {
+    /*
+     * «Продукты не добавляются» — категория создавалась на сервере (POST 201, подтверждено сетевым
+     * логом), но не появлялась строкой в РАСХОДЫ: `for (const c of categoryRows) { if
+     * (byIndex.every(v => v <= 0n)) continue; }` выбрасывал её из сборки ДО того, как она попадала в
+     * `rows` — у только что заведённой категории бюджет не задан нигде, значит `byIndex` сплошь нули.
+     *
+     * Ровно тот же класс дефекта, что уже был закрыт в issue #120 для долгов («в таблице чего-то
+     * долга не вижу») — но там фикс жил в общей функции `push()`, а категории идут отдельным
+     * циклом, и общий фикс их не коснулся. Чтобы задать бюджет категории, нужна строка; чтобы
+     * появиться в таблице (по прежней логике), нужен бюджет — тот же замкнутый круг, что был у
+     * долгов.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    await expectOk(await client.post('/v1/categories', { name: 'Продукты' }), 201);
+
+    const dto = await grid(client);
+    const row = rowsOf(dto, 'category').find((r) => r.name === 'Продукты');
+    if (!row) throw new Error('строки «Продукты» нет в матрице — категория пропала после создания');
+    /*
+     * Первая колонка — не проекция, а «сохранённый» текущий период: снимок берётся из
+     * plan.allocations (getCurrentPlan). Категория без бюджета там отсутствовала вовсе —
+     * `loadCategoryBudgets` брал их INNER JOIN'ом с planned_items и дополнительно фильтровал
+     * `plannedMinor > 0n`, то есть исключал категорию из каскада целиком, а не просто занулял.
+     * Отсюда и второй слой того же бага: даже после починки цикла в grid.ts первая колонка
+     * получала state:'none' (`saved.get(key) === undefined`), остальные — 'planned' по проекции.
+     */
+    expect(row.cells.every((c) => c.state === 'planned' && c.minor === '0')).toBe(true);
   });
 });
 

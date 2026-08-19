@@ -177,38 +177,48 @@ export async function getPlanGrid(
   // Первая колонка — состояние экрана «План» как есть, включая правки человека и заморозки.
   const plan = await getCurrentPlan(ws, asOf);
 
-  const [debtRows, bucketRows, envelopeRows, goalRows, categoryRows, sources] = await Promise.all([
-    db
-      .select()
-      .from(debts)
-      .where(
-        and(
-          eq(debts.workspaceId, ws.id),
-          sql`${debts.closedAt} is null`,
-          // Заём в раздачу не идёт: иначе каскад откладывал бы деньги на возврат чужого долга (#94).
-          sql`${debts.direction} = 'owed_by_me'`,
+  const [debtRows, bucketRows, envelopeRows, goalRows, categoryRows, sources, recurringRows] =
+    await Promise.all([
+      db
+        .select()
+        .from(debts)
+        .where(
+          and(
+            eq(debts.workspaceId, ws.id),
+            sql`${debts.closedAt} is null`,
+            // Заём в раздачу не идёт: иначе каскад откладывал бы деньги на возврат чужого долга (#94).
+            sql`${debts.direction} = 'owed_by_me'`,
+          ),
         ),
-      ),
-    db
-      .select()
-      .from(currencyBuckets)
-      .where(and(eq(currencyBuckets.workspaceId, ws.id), eq(currencyBuckets.active, true))),
-    db.select().from(envelopes).where(eq(envelopes.workspaceId, ws.id)),
-    db
-      .select()
-      .from(goals)
-      .where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
-    db
-      .select()
-      .from(categories)
-      .where(and(eq(categories.workspaceId, ws.id), eq(categories.archived, false))),
-    listSources(ws.id),
-  ]);
+      db
+        .select()
+        .from(currencyBuckets)
+        .where(and(eq(currencyBuckets.workspaceId, ws.id), eq(currencyBuckets.active, true))),
+      db.select().from(envelopes).where(eq(envelopes.workspaceId, ws.id)),
+      db
+        .select()
+        .from(goals)
+        .where(and(eq(goals.workspaceId, ws.id), sql`${goals.achievedAt} is null`)),
+      db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.workspaceId, ws.id), eq(categories.archived, false))),
+      listSources(ws.id),
+      db
+        .select()
+        .from(recurringItems)
+        .where(and(eq(recurringItems.workspaceId, ws.id), eq(recurringItems.active, true))),
+    ]);
 
   /*
    * Карта курсов на «сегодня», один запрос на валюту. Дальше все строки конвертируются из неё:
    * иначе grid звал бы getRate на каждую пару × период и делал бы это тем чаще, чем длиннее
    * горизонт.
+   *
+   * Валюты регулярных платежей — тоже сюда (найдено на жалобе владельца 19.08.2026: «Квартира» и
+   * «Подписка» в EUR показывали прочерк в каждой колонке горизонта). Раньше `recurringRows`
+   * загружался НИЖЕ этого блока, отдельным запросом, и его валюты в карту не попадали никогда —
+   * `toBase()` для EUR получал `undefined` из карты и возвращал null при живом курсе в базе.
    */
   const currencies = new Set<string>();
   for (const d of debtRows) currencies.add(d.currency);
@@ -216,6 +226,7 @@ export async function getPlanGrid(
   for (const e of envelopeRows) if (e.ruleKind !== 'percent') currencies.add(e.currency);
   for (const g of goalRows) currencies.add(g.currency);
   for (const s of sources) currencies.add(s.currency);
+  for (const r of recurringRows) currencies.add(r.currency);
   currencies.delete(base);
 
   const rateEntries = await Promise.all(
@@ -357,8 +368,14 @@ export async function getPlanGrid(
     const byIndex = periods.map((p: PayPeriod, i: number) =>
       i === 0 ? planned : (futurePlans.get(`${p.startsOn}:${c.id}`) ?? planned),
     );
-    // Строки нет, только если её нет ни в одном периоде: иначе бюджет на май пропал бы из таблицы.
-    if (byIndex.every((v: bigint) => v <= 0n)) continue;
+    /*
+     * Нулевой бюджет строку не прячет (issue #120, применённый и здесь 19.08.2026: жалоба
+     * владельца «продукты не добавляются»). Только что заведённая категория бюджета нигде не
+     * имеет — `byIndex` сплошь нули, — и прежний фильтр выбрасывал её из таблицы РАНЬШЕ, чем она
+     * успевала попасть на экран. Замкнутый круг: чтобы задать бюджет, нужна строка; чтобы
+     * появиться, нужен бюджет. У долгов/конвертов/целей/корзин та же ловушка закрыта в общей
+     * `push()`; категории идут отдельным циклом, и общий фикс их не касался.
+     */
     rows.push({
       targetKind: 'category',
       targetId: c.id,
@@ -415,11 +432,6 @@ export async function getPlanGrid(
    * Сумма по колонке — сколько списаний правило даёт в этом периоде: платёж 5-го числа при
    * полумесячном ритме попадает не в каждый период, и рисовать его всюду значило бы врать.
    */
-  const recurringRows = await db
-    .select()
-    .from(recurringItems)
-    .where(and(eq(recurringItems.workspaceId, ws.id), eq(recurringItems.active, true)));
-
   const recurringGroup: GridGroupDto | null =
     recurringRows.length === 0
       ? null
