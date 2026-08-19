@@ -387,9 +387,23 @@ async function resolveObligations(
     sourceMinor: bigint,
     extra?: { toCurrency?: string; baseOverride?: bigint },
   ): Promise<void> => {
-    if (sourceMinor <= 0n) return; // нулевые/пустые обязательства в план не тянем
+    /*
+     * Ноль строку не прячет (issue #134). Раньше здесь стояло `<= 0n`, и долг с платежом в ноль —
+     * пауза в выплатах, обычное дело — исчезал с «Плана», оставаясь в мастер-таблице (там то же
+     * условие починено в #120) и рядом с нулевыми категориями на том же экране. Три разных правила
+     * для одного и того же: человек ставил платёж в ноль и решал, что случайно удалил долг.
+     *
+     * Отрицательные по-прежнему отбрасываем: это не «пусто», а испорченные данные.
+     *
+     * Курс для нулевой суммы не спрашиваем: конвертировать нечего, а `unresolved` из-за строки,
+     * которая денег не берёт, был бы ложной тревогой — экран сообщал бы о недоступном курсе там,
+     * где он ни на что не влияет.
+     */
+    if (sourceMinor < 0n) return;
     const baseMinor =
-      extra?.baseOverride ?? (await toBase(sourceMinor, sourceCurrency, base, on, ws.id));
+      sourceMinor === 0n
+        ? 0n
+        : (extra?.baseOverride ?? (await toBase(sourceMinor, sourceCurrency, base, on, ws.id)));
     if (baseMinor === null) {
       unresolved.push({
         targetKind,

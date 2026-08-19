@@ -454,3 +454,43 @@ test('долг без платежа виден в таблице нулями, 
   // Нули, а не прочерки: долг живой, просто платёж ещё не назначен.
   expect(new Set(row!.cells.map((c) => c.minor))).toEqual(new Set(['0']));
 });
+
+test('обязательство с нулевой суммой видно и на «Плане», не только в таблице (#134)', async () => {
+  /*
+   * Два главных экрана про одни и те же деньги обязаны показывать один и тот же набор строк.
+   * До этого теста действовали три разных правила: таблица показывала ноль (починено в #120),
+   * `assemble.ts` его прятал (`sourceMinor <= 0n`), а категории после починки 19.08.2026 —
+   * показывала на том же «Плане». Долг на паузе (договорился с банком, ждёт рефинансирования) в
+   * таблице был, а с «Плана» исчезал: человек решает, что случайно удалил его, и заводит второй.
+   *
+   * Проверяем оба экрана в одном тесте — иначе следующая правка легко вернёт расхождение,
+   * поправив одну сторону.
+   */
+  const client = await onboarded({ payoutMinor: '30000000' });
+  await expectOk(
+    await client.post('/v1/debts', {
+      name: 'Кредитка на паузе',
+      currency: 'RUB',
+      principalMinor: '31000000',
+      remainingMinor: '31000000',
+      paymentMinor: '0',
+    }),
+    201,
+  );
+
+  const plan = await getPlan(client);
+  const planRow = plan.allocations.find((a) => a.name === 'Кредитка на паузе');
+  expect(planRow, 'долг на паузе обязан быть в плане, а не исчезать').toBeDefined();
+  // Ноль, а не отсутствие: строка есть, денег не берёт.
+  expect(planRow!.allocatedMinor).toBe('0');
+  expect(planRow!.plannedMinor).toBe('0');
+
+  // И ничего не сломалось в самом каскаде: нулевая строка не отнимает у остальных.
+  expect(BigInt(plan.totalAllocatedMinor)).toBe(0n);
+
+  const dto = await grid(client, '?periods=4');
+  const gridRow = rowsOf(dto, 'debt').find((r) => r.name === 'Кредитка на паузе');
+  expect(gridRow, 'та же строка обязана быть и в таблице').toBeDefined();
+  // Первая колонка таблицы = «План»: одно и то же число, а не два разных.
+  expect(gridRow!.cells[0]?.minor).toBe(planRow!.allocatedMinor);
+});
