@@ -29,6 +29,23 @@ async function violations(page: import('@playwright/test').Page) {
     // Уровень AA: тот же, что в наших правилах для контраста.
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
+
+  /*
+   * У axe есть вторая корзина — `incomplete`: случаи, о которых он ОТКАЗАЛСЯ судить. Туда уходит,
+   * например, контраст символьных кнопок («content contains only non-text characters»), и раньше мы
+   * их просто не видели: тест зелёный, значит «проверено» (#145).
+   *
+   * Падать на этом нельзя — там бывают и честные «не могу проверить», не зависящие от нас. Но и
+   * молчать нельзя: слепое пятно должно быть видно в выводе, чтобы его закрыли своим замером. Один
+   * такой уже закрыт обходом символьных кнопок ниже.
+   */
+  if (result.incomplete.length > 0) {
+    const skipped = result.incomplete
+      .map((v) => `${v.id} × ${v.nodes.length}: ${v.nodes[0]?.any[0]?.message ?? ''}`)
+      .join('\n  ');
+    console.log(`axe не смог проверить (не падение, но и не «проверено»):\n  ${skipped}`);
+  }
+
   return result.violations.map((v) => ({
     id: v.id,
     impact: v.impact,
@@ -210,6 +227,115 @@ test('включённое состояние символьной кнопки 
   // 10px — мелкий текст, порог AA для него 4.5, а не 3.0.
   expect(fontSize).toBeLessThan(18);
   expect(ratio, `контраст значка ${Math.round(ratio * 100) / 100}`).toBeGreaterThanOrEqual(4.5);
+});
+
+/**
+ * Сплошной обход символьных кнопок замером (issue #145).
+ *
+ * axe про них молчит по определению: «Element content contains only non-text characters» — и уводит
+ * случай в `incomplete`, куда `violations()` не смотрит. То есть весь мелкий инструментарий продукта
+ * (`⋯`, `✕`, `⤫`, `■`, `🎙`, `←`, `→`, `●`) не проверялся вовсе, хотя именно у него самый строгий
+ * порог: кегль 10px.
+ *
+ * Обход, а не список: нарушения заводятся там, куда давно не смотрели. Один такой уже нашёлся —
+ * значок настроек формы долга давал 3.14 в нажатом состоянии (#126).
+ */
+async function symbolViolations(
+  page: import('@playwright/test').Page,
+  withHover: boolean,
+): Promise<string[]> {
+  const measure = (node: Element) => {
+    const parse = (c: string) => {
+      const n = (c.match(/[\d.]+/g) ?? []).map(Number);
+      return { r: n[0] ?? 0, g: n[1] ?? 0, b: n[2] ?? 0, a: n.length > 3 ? (n[3] ?? 1) : 1 };
+    };
+    type Rgba = ReturnType<typeof parse>;
+    const over = (f: Rgba, b: Rgba): Rgba => ({
+      r: f.r * f.a + b.r * (1 - f.a),
+      g: f.g * f.a + b.g * (1 - f.a),
+      b: f.b * f.a + b.b * (1 - f.a),
+      a: 1,
+    });
+    const lum = (c: Rgba) => {
+      const f = (x: number) => {
+        const s = x / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+    };
+    /*
+     * Фон собираем вверх по дереву до первого непрозрачного: подложки состояний заданы как
+     * `rgba(accent, .08/.16)`, и замер «по своему background» считал бы их самим акцентом, завышая
+     * контраст.
+     */
+    const layers: Rgba[] = [];
+    for (let n: Element | null = node; n; n = n.parentElement) {
+      const c = parse(getComputedStyle(n).backgroundColor);
+      if (c.a > 0) layers.push(c);
+      if (c.a === 1) break;
+    }
+    let bg: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+    for (const c of layers.reverse()) bg = over(c, bg);
+    const cs = getComputedStyle(node);
+    const a = lum(parse(cs.color));
+    const b = lum(bg);
+    const size = Number.parseFloat(cs.fontSize);
+    return {
+      ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+      size,
+      text: (node.textContent ?? '').trim(),
+      cls: node.className,
+    };
+  };
+
+  const bad: string[] = [];
+  const symbols = page.locator('button, a').filter({ hasNotText: /[\p{L}\p{N}]/u });
+  const total = await symbols.count();
+  for (let i = 0; i < total; i++) {
+    const el = symbols.nth(i);
+    if (!(await el.isVisible())) continue;
+    // `force`: часть значков перекрыта липкой колонкой, но проверяем мы цвет, а не попадание мышью.
+    if (withHover) await el.hover({ force: true }).catch(() => {});
+    const r = await el.evaluate(measure);
+    // Порог AA: 3.0 только для крупного текста, у мелкого — 4.5.
+    const need = r.size >= 24 ? 3 : 4.5;
+    if (r.ratio < need) {
+      bad.push(`«${r.text}» ${r.cls} — ${Math.round(r.ratio * 100) / 100} при норме ${need}`);
+    }
+  }
+  return [...new Set(bad)];
+}
+
+const SYMBOL_SCREENS = [
+  '/plan',
+  '/plan?view=table',
+  '/obligations',
+  '/settings',
+  '/history',
+] as const;
+
+test('символьные кнопки читаемы в обеих темах', async ({ page }) => {
+  await resetDemo(page);
+  await enterDemo(page);
+
+  for (const theme of ['dark', 'light'] as const) {
+    await page.goto('/plan');
+    await page.locator('.seg-btn', { hasText: theme === 'dark' ? /^dark$/ : /^light$/ }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+
+    for (const path of SYMBOL_SCREENS) {
+      await page.goto(path);
+      await page.locator('.panel, .mgrid-row').first().waitFor();
+      await stopMotion(page);
+      /*
+       * Наведение проверяем только в светлой теме. В тёмной подложка состояния делает фон СВЕТЛЕЕ
+       * холста, а текст и без того яркий — контраст там растёт, а не падает; все найденные до сих
+       * пор нарушения (#142, #126) были в светлой. Поэлементный обход с курсором дорог по времени,
+       * и платить за него дважды нечем.
+       */
+      expect(await symbolViolations(page, theme === 'light'), `${theme} · ${path}`).toEqual([]);
+    }
+  }
 });
 
 test('лист ввода траты доступен', async ({ page }) => {
