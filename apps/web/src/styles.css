@@ -41,6 +41,13 @@
 
   --cyan: #00e5ff;
   --cyan-hi: #7ff3ff;
+  /*
+   * Цвет акцентного ТЕКСТА под курсором. Отдельно от `--cyan-ink` потому, что наведение подкладывает
+   * под текст ещё и 8% заливки акцентом: фон становится темнее панели, и порог, который `--cyan-ink`
+   * проходил на панели, на этой подложке уже не проходил. В тёмной теме цвет тот же — там наведение
+   * уводит текст в яркое, а не в бледное, и контраст только растёт.
+   */
+  --accent-hover-ink: var(--cyan);
   --cyan-rgb: 0, 229, 255;
   --mag: #ff2e97;
   --mag-rgb: 255, 46, 151;
@@ -132,6 +139,9 @@
 
   --cyan: #0089ab;
   --cyan-hi: #00647f;
+  /* Замеры до правки (#142): на подложке наведения #dbe8f0 базовый cyan давал 3.25 при пороге 4.5
+     для 10px, а `--cyan-ink` — 4.03, тоже мимо. Тёмный вариант даёт 5.4 и остаётся узнаваемым. */
+  --accent-hover-ink: var(--cyan-hi);
   --cyan-rgb: 0, 137, 171;
   --mag: #d4136c;
   --mag-rgb: 212, 19, 108;
@@ -1080,7 +1090,7 @@ a {
     background 120ms ease;
 }
 .act:hover:not(:disabled) {
-  color: var(--cyan);
+  color: var(--accent-hover-ink);
   border-color: rgba(var(--cyan-rgb), 0.5);
   background: rgba(var(--cyan-rgb), 0.08);
 }
@@ -1423,7 +1433,13 @@ a {
   border-color: var(--accent);
   font-weight: 600;
 }
-.act-primary:hover {
+/*
+ * `:not(:disabled)` здесь не про поведение, а про вес: у `.act:hover:not(:disabled)` специфичность
+ * выше, и он перекрашивал подпись главной кнопки в акцентный текст поверх её тёмной заливки —
+ * контраст 2.06 вместо 4.5, то есть подпись почти исчезала под курсором. Правило про заливку
+ * побеждало, правило про цвет — нет, и на глаз это читалось как «кнопка гаснет».
+ */
+.act-primary:hover:not(:disabled) {
   background: var(--cyan-hi);
   border-color: var(--cyan-hi);
   color: var(--bg-void);
@@ -1968,7 +1984,7 @@ a {
 }
 .hint:hover,
 .hint:focus-visible {
-  color: var(--accent);
+  color: var(--accent-hover-ink);
   border-color: var(--accent);
 }
 
@@ -2006,7 +2022,7 @@ a {
   width: 10px;
 }
 .mgrid-toggle:hover .mgrid-chev {
-  color: var(--accent);
+  color: var(--accent-hover-ink);
 }
 /* Строка раздела отбита от подписи отступом: видно, что она под ней, а не рядом. */
 .mgrid-row-item .mgrid-name {

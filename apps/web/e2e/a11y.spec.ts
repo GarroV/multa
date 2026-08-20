@@ -96,6 +96,32 @@ test('лист чека доступен', async ({ page }) => {
   expect(await violations(page)).toEqual([]);
 });
 
+test('наведение не роняет контраст в светлой теме (#142)', async ({ page }) => {
+  /*
+   * Наведение проверяется ЯВНО, а не как побочный эффект клика в соседних сценариях. Раньше hover
+   * попадал в замер случайно — курсор оставался над кнопкой после клика, — и падение мигало: три
+   * прогона файла давали 11 passed, 2 failed, 1 failed. Мигающий тест хуже падающего: он приучает
+   * считать настоящее нарушение шумом.
+   *
+   * Проверяются все места, где наведение меняет цвет текста на акцентный, а не только то, на
+   * котором нарушение заметили: мелкая кнопка, главная кнопка (у неё своя тёмная заливка) и
+   * подсказка. Порог у них строгий — кегль 10–11px.
+   */
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.locator('.seg-btn', { hasText: /^light$/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  const spots: readonly string[] = ['.act:not(.act-primary)', '.act-primary', '.hint'];
+  for (const spot of spots) {
+    const target = page.locator(spot).first();
+    // Подсказка есть не на каждом экране — отсутствие места не повод падать.
+    if ((await target.count()) === 0) continue;
+    await target.hover();
+    expect(await violations(page), `наведение на ${spot}`).toEqual([]);
+  }
+});
+
 test('лист ввода траты доступен', async ({ page }) => {
   /*
    * Формы — самое опасное место: поле без подписи выглядит нормально и полностью непригодно для
