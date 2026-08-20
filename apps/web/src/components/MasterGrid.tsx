@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { fromMajor, money, toMajorString } from '@multa/core';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { GridAddRow } from './GridAddRow.tsx';
@@ -14,6 +14,15 @@ import { IconPlus } from './ui/icons.tsx';
 import { useIsMember } from '../lib/role.ts';
 import { useToday } from '../lib/useToday.ts';
 import { isSectionVisible } from '../lib/sections.ts';
+import {
+  clampNameWidth,
+  DEFAULT_NAME_WIDTH,
+  MAX_NAME_WIDTH,
+  MIN_NAME_WIDTH,
+  nameWidthFrom,
+  readNameWidth,
+  writeNameWidth,
+} from '../lib/gridColumnWidth.ts';
 
 /**
  * Мастер-режим (issue #47) — та самая таблица, которую основатель вёл в Excel: строки статей
@@ -103,6 +112,81 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const propose = useCreateProposal();
   const isMember = useIsMember();
   const today = useToday();
+
+  /*
+   * Ширина колонки имён (issue #133). Начальное значение читается один раз при монтировании —
+   * иначе каждый рендер лез бы в localStorage, а перетаскивание рендерит на каждый шаг курсора.
+   */
+  const [nameWidth, setNameWidth] = useState(() =>
+    typeof window === 'undefined' ? DEFAULT_NAME_WIDTH : readNameWidth(window.localStorage),
+  );
+  /*
+   * Актуальная ширина живёт и в ref. Обработчики читают её оттуда, а не из замыкания рендера: пять
+   * нажатий стрелки подряд (зажатая клавиша даёт ~30 в секунду) приходят быстрее, чем React
+   * перерисовывает, и каждое считало бы шаг от одного и того же старого значения — вместо плавного
+   * роста колонка прыгала к границе. Поймано E2E, который посылает события серией без паузы.
+   */
+  const widthRef = useRef(nameWidth);
+  const applyWidth = useCallback((px: number, persist: boolean) => {
+    const clamped = clampNameWidth(px);
+    widthRef.current = clamped;
+    setNameWidth(clamped);
+    // В хранилище пишем по концу жеста, а не на каждом кадре: 60 записей в секунду ему не нужны.
+    if (persist && typeof window !== 'undefined') writeNameWidth(window.localStorage, clamped);
+  }, []);
+
+  /* Точка отсчёта жеста: дельта считается от неё, иначе за длинный жест копится ошибка округления. */
+  const dragFrom = useRef<{ startWidth: number; startX: number } | null>(null);
+
+  const onResizeStart = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    // Только основная кнопка: правый клик или тачпад-жест не должны начинать перетаскивание.
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragFrom.current = { startWidth: widthRef.current, startX: e.clientX };
+    /*
+     * Захват указателя: без него курсор, ушедший с тонкой полосы хендла (а он уходит сразу — рука не
+     * держит 6 пикселей), терял события, и колонка замирала на полпути.
+     */
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const onResizeMove = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      const from = dragFrom.current;
+      if (!from) return;
+      applyWidth(nameWidthFrom({ ...from, clientX: e.clientX }), false);
+    },
+    [applyWidth],
+  );
+
+  const onResizeEnd = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (!dragFrom.current) return;
+      dragFrom.current = null;
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      applyWidth(widthRef.current, true);
+    },
+    [applyWidth],
+  );
+
+  /* Клавиатура — не догонялка за мышью, а единственный способ для того, кто мышью не пользуется. */
+  const onResizeKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      const step = e.shiftKey ? 32 : 8;
+      const next =
+        e.key === 'ArrowLeft'
+          ? widthRef.current - step
+          : e.key === 'ArrowRight'
+            ? widthRef.current + step
+            : e.key === 'Home'
+              ? DEFAULT_NAME_WIDTH
+              : null;
+      if (next === null) return;
+      e.preventDefault();
+      applyWidth(next, true);
+    },
+    [applyWidth],
+  );
 
   if (isPending) return <div className="mgrid-note">{t('common.loading')}</div>;
   if (isError || !data) {
@@ -339,7 +423,10 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
 
   return (
     <div className="mgrid-wrap">
-      <div className="mgrid" style={{ ['--cols' as string]: columns }}>
+      <div
+        className="mgrid"
+        style={{ ['--cols' as string]: columns, ['--mgrid-name-w' as string]: `${nameWidth}px` }}
+      >
         {/*
           Полоса месяцев над колонками периодов (запрос владельца 16.08.2026). Периоды короче
           месяца — при выплатах дважды в месяц их два на месяц, — и без этой полосы шесть дат
@@ -362,7 +449,29 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
           ))}
         </div>
         <div className="mgrid-row mgrid-row-periods">
-          <span className="mgrid-name">{t('plan.master.col1')}</span>
+          <span className="mgrid-name">
+            {t('plan.master.col1')}
+            {/*
+              Хендл — один, в шапке колонки: он тянет границу на всю таблицу, а не одну строку.
+              Роль `separator` с `aria-valuenow` — не украшение: без неё колонку нельзя раздвинуть с
+              клавиатуры, а это единственный путь для того, кто мышью не пользуется.
+            */}
+            <span
+              className="mgrid-resize"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={t('plan.master.resize')}
+              aria-valuenow={nameWidth}
+              aria-valuemin={MIN_NAME_WIDTH}
+              aria-valuemax={MAX_NAME_WIDTH}
+              tabIndex={0}
+              onPointerDown={onResizeStart}
+              onPointerMove={onResizeMove}
+              onPointerUp={onResizeEnd}
+              onPointerCancel={onResizeEnd}
+              onKeyDown={onResizeKey}
+            />
+          </span>
           {data.periods.map((p) => (
             <span className="mgrid-cell" key={p.startsOn}>
               {formatDate(p.startsOn)}

@@ -275,3 +275,68 @@ test('месяцы стоят над своими колонками, текущ
   const firstCell = await cells.first().boundingBox();
   expect(Math.abs(firstMonth!.x - firstCell!.x)).toBeLessThanOrEqual(1);
 });
+
+/**
+ * Ширина колонки имён (issue #133, жалоба владельца «столбец слева не раздвинуть»).
+ *
+ * Проверяются оба пути и персистентность: мышью, клавиатурой и «переживает перезагрузку». Последнее
+ * важнее, чем кажется: подгонять колонку каждый визит — это не настройка, а работа.
+ */
+async function nameWidth(page: import('@playwright/test').Page): Promise<number> {
+  return page
+    .locator('.mgrid-name')
+    .first()
+    .evaluate((el) => Math.round(el.getBoundingClientRect().width));
+}
+
+test('колонка имён раздвигается мышью и запоминает ширину', async ({ page }) => {
+  const handle = page.locator('.mgrid-resize');
+  await expect(handle).toBeVisible();
+  const before = await nameWidth(page);
+
+  const box = (await handle.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  const after = await nameWidth(page);
+  expect(after).toBeGreaterThan(before + 100);
+
+  await page.reload();
+  await expect(page.locator('.mgrid')).toBeVisible();
+  expect(await nameWidth(page)).toBe(after);
+});
+
+test('колонка имён раздвигается с клавиатуры, и шаги складываются', async ({ page }) => {
+  const handle = page.locator('.mgrid-resize');
+  await handle.focus();
+  await page.keyboard.press('Home');
+  const base = await nameWidth(page);
+
+  /*
+   * Три нажатия подряд обязаны дать три шага. Первая версия читала ширину из замыкания обработчика,
+   * и быстрая серия (а зажатая стрелка даёт ~30 нажатий в секунду) считала каждый шаг от одного и
+   * того же старого значения: вместо плавного роста колонка прыгала к границе.
+   */
+  await handle.press('ArrowRight');
+  await handle.press('ArrowRight');
+  await handle.press('ArrowRight');
+  expect(await nameWidth(page)).toBe(base + 24);
+
+  /*
+   * И то же самое СЕРИЕЙ без паузы: зажатая стрелка даёт ~30 событий в секунду, то есть они
+   * приходят быстрее, чем React перерисовывает. `press` такую плотность не воспроизводит — между
+   * нажатиями успевает пройти рендер, и дефект прячется. Поэтому события отправляются подряд.
+   */
+  await handle.press('Home');
+  await handle.evaluate((el) => {
+    for (let i = 0; i < 5; i++) {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    }
+  });
+  expect(await nameWidth(page)).toBe(base + 40);
+
+  await handle.press('Home');
+  expect(await nameWidth(page)).toBe(base);
+});
