@@ -556,3 +556,36 @@ test('даты на экранах человеческие, а не ISO из б
     expect(hits, `${path}: ISO-даты в тексте экрана`).toEqual([]);
   }
 });
+
+/**
+ * Форма ввода перестала выглядеть как два одинаковых текстовых поля (issue #138, вопрос владельца
+ * «в чём смысл писать название и потом ещё и заметка? как заметка будет отображаться?»).
+ *
+ * Проверяется именно то, что отвечает на вопрос: фраза живёт в своём блоке и помечена как
+ * несохраняемая, а вытащенная из неё заметка видна в «понял так» — до отправки, а не после.
+ */
+test('умное поле отделено от полей записи, и заметка видна в разборе', async ({ page }) => {
+  await page.locator('.act-primary').click();
+  const sheet = page.locator('.sheet');
+  await expect(sheet).toBeVisible();
+
+  // Блок разбора — свой, с меткой: раньше поле стояло вплотную к «Заметке» и ничем от неё не отличалось.
+  const box = sheet.locator('.smart-box');
+  await expect(box).toBeVisible();
+  await expect(box.locator('.micro')).toHaveText(/phrase|Фразой/i);
+  await expect(box).toContainText(/not saved|не сохранит/i);
+
+  // Поле заметки живёт снаружи блока разбора — иначе разделение только на словах.
+  await expect(box.locator('input[aria-label="Note"], input[aria-label="Заметка"]')).toHaveCount(0);
+
+  const smart = box.locator('input.grow');
+  await smart.fill('250 groceries coffee to go');
+  await smart.press('Enter');
+
+  /*
+   * «Понял так» обязано показать заметку. Без неё человек видел только сумму с датой и не знал, что
+   * из фразы попадёт в комментарий, — ровно то, о чём спрашивал владелец.
+   */
+  await expect(sheet.getByText(/Recognised:|Понял так:/)).toContainText('coffee to go');
+  await expect(sheet.locator('input[placeholder="0"]')).toHaveValue(/250/);
+});

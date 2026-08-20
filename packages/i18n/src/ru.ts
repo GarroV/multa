@@ -586,9 +586,10 @@ export const ru: Record<TranslationKey, string> = {
   'spend.voice.denied': 'Микрофон не разрешён — можно набрать фразу руками.',
   'spend.voice.no': 'Этот браузер не умеет записывать звук.',
   'spend.voice.failed': 'Не разобрал запись. Попробуй ещё раз или набери фразу.',
+  'spend.smart.label': 'Фразой',
   'spend.smart.placeholder': 'например «250 продукты» или «кофе 4.5 eur вчера»',
   'spend.smart.hint':
-    'Пиши как сказал бы: сколько, куда, когда. Что не распозналось — поправишь ниже.',
+    'Пиши как сказал бы: сколько, куда, когда. Сама фраза не сохранится — в запись уйдут поля ниже.',
   'spend.smart.parsed': 'Понял так: {summary}',
   'spend.spentOfPlan': 'потрачено {spent} из {plan}',
   'spend.kind.expense': 'Трата',

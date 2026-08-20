@@ -592,9 +592,10 @@ export const en = {
   'spend.voice.denied': 'Microphone is blocked — type the phrase instead.',
   'spend.voice.no': 'This browser cannot record audio.',
   'spend.voice.failed': 'Could not make out the recording. Try again or type it.',
+  'spend.smart.label': 'By phrase',
   'spend.smart.placeholder': 'e.g. “250 groceries” or “coffee 4.5 eur yesterday”',
   'spend.smart.hint':
-    'Type it as you would say it — amount, where, when. Anything unclear stays editable below.',
+    'Type it as you would say it — amount, where, when. The phrase itself is not saved; the fields below are.',
   'spend.smart.parsed': 'Recognised: {summary}',
   'spend.spentOfPlan': 'spent {spent} of {plan}',
   'spend.kind.expense': 'Spent',

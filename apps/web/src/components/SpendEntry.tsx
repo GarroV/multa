@@ -6,6 +6,7 @@ import { useVoiceCapture } from '../lib/useVoiceCapture.ts';
 import { CurrencySelect } from './ui/CurrencySelect.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import { useToday } from '../lib/useToday.ts';
+import { parsedSummary } from '../lib/spendSummary.ts';
 import { ApiError } from '../lib/api.ts';
 import {
   useCategories,
@@ -36,18 +37,6 @@ function parseMinor(value: string, ccy: string): string | null {
  * Пересказ, а не дамп полей: человеку важно поймать подмену — «понял 4,50 в рублях», когда он
  * диктовал евро, — а не сверить json. Поэтому в строке ровно то, что чаще всего понимается неверно.
  */
-function summaryOf(
-  p: { amountMinor: string; currency: string; occurredOn: string; categoryName?: string | null },
-  base: string,
-  locale: string,
-): string {
-  const amount = `${formatMinor(p.amountMinor, p.currency, locale)} ${p.currency}`;
-  const parts = [amount, formatDate(p.occurredOn)];
-  if (p.categoryName) parts.push(p.categoryName);
-  void base;
-  return parts.join(' · ');
-}
-
 function SpendRow({ tx, base, locale }: { tx: Transaction; base: string; locale: string }) {
   const { t } = useI18n();
   const { data: categories = [] } = useCategories();
@@ -171,7 +160,7 @@ export function SpendEntry({
           setKind(remote.kind);
           setAmount(toMajorString(money(BigInt(remote.amountMinor), remote.currency)));
           setCurrency(remote.currency);
-          setUnderstood(summaryOf(remote, base, locale));
+          setUnderstood(parsedSummary(remote, locale));
           setOccurredOn(remote.occurredOn);
           setNote(remote.note ?? '');
           setCategoryId(remote.kind === 'income' ? undefined : (remote.categoryId ?? undefined));
@@ -183,14 +172,14 @@ export function SpendEntry({
     setBadAmount(false);
     setKind(parsed.kind);
     setUnderstood(
-      summaryOf(
+      parsedSummary(
         {
           amountMinor: parsed.amountMinor.toString(),
           currency: parsed.currency,
           occurredOn: parsed.occurredOn,
           categoryName: parsed.categoryName,
+          note: parsed.note,
         },
-        base,
         locale,
       ),
     );
@@ -267,10 +256,19 @@ export function SpendEntry({
           ))}
         </div>
 
-        <div className="stack-xs">
+        {/*
+          Умное поле отделено рамкой и подписью (issue #138, вопрос владельца «в чём смысл писать
+          название и потом ещё и заметка?»). До этого оно выглядело ровно как «Заметка» пятью
+          строками ниже — то же поле, тот же размер, — хотя это инструмент ввода: фраза разбирается
+          и НИГДЕ НЕ СОХРАНЯЕТСЯ. Два одинаковых поля с разной судьбой объяснить подписью нельзя,
+          поэтому объясняет вид.
+        */}
+        <div className="stack-xs smart-box">
+          <span className="micro dim">{t('spend.smart.label')}</span>
           <div className="form-row">
             <input
               className="field grow"
+              aria-label={t('spend.smart.label')}
               placeholder={t('spend.smart.placeholder')}
               value={smart}
               onChange={(e) => setSmart(e.target.value)}
