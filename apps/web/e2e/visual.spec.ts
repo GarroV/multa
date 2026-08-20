@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterDemo, resetDemo } from './helpers.ts';
+import { enterDemo, resetDemo, stopMotion } from './helpers.ts';
 
 /**
  * Визуальные регрессии (issue #17).
@@ -15,17 +15,6 @@ import { enterDemo, resetDemo } from './helpers.ts';
  * читать. Эталоны берутся только с элементов, у которых нет ни дат, ни сумм — с пиктограмм; всё
  * остальное проверяется утверждениями о геометрии, которые от данных не зависят.
  */
-
-/**
- * Гасим переходы и анимации перед замерами. В визуальных проверках это не оптимизация, а условие
- * корректности: с включёнными переходами замер попадает в промежуточный кадр и утверждение
- * проверяет цвет, которого на экране нет ни до, ни после.
- */
-async function stopMotion(page: import('@playwright/test').Page): Promise<void> {
-  await page.addStyleTag({
-    content: '*, *::before, *::after { transition: none !important; animation: none !important; }',
-  });
-}
 
 const WIDTHS = [320, 390, 768, 1024, 1440] as const;
 const SCREENS = ['/plan', '/plan?view=table', '/statistics', '/obligations', '/settings'] as const;

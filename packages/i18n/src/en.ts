@@ -475,6 +475,7 @@ export const en = {
   'obl.window.hint':
     'Which periods the debt takes money in. Both ends are inclusive; leave one empty for no limit on that side.',
   'obl.startsNext': 'Payments start {date} — from the next payout',
+  'obl.settings': 'Debt settings',
   'obl.split': 'Split across payouts',
   'obl.split.hint':
     'How much goes out of each payout. Empty means nothing goes out of that one. Once set, the single payment is no longer used.',

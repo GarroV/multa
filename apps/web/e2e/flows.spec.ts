@@ -350,6 +350,8 @@ test('долг можно завести по сроку — взнос посч
    * флажок. Раньше здесь был флажок, до него — капслочная кнопка; проверка идёт за интерфейсом,
    * потому что проверяет поведение, а не разметку.
    */
+  /* Сегмент уехал под значок настроек (#126): в ряду он был четвёртым элементом из семи. */
+  await panel.getByRole('button', { name: /Настройки долга|Debt settings/ }).click();
   await panel.getByRole('button', { name: /^Срок$|^By date$/ }).click();
   await panel.getByPlaceholder(/^Name$|^Название$/).fill('Кредитка');
   await panel.getByPlaceholder(/Left to pay|Осталось/).fill('300000');

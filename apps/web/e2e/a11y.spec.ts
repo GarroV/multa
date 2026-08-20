@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { enterDemo, resetDemo } from './helpers.ts';
+import { enterDemo, resetDemo, stopMotion } from './helpers.ts';
 
 /**
  * Автоматическая проверка доступности (web/testing.md: «Run automated accessibility checks»).
@@ -122,6 +122,96 @@ test('наведение не роняет контраст в светлой т
   }
 });
 
+/**
+ * Контраст символьной кнопки замеряем САМИ, а не через axe (issue #145).
+ *
+ * axe про такие элементы судить отказывается: «Element content contains only non-text characters», —
+ * и уводит их в `incomplete`, куда хелпер `violations()` не смотрит. Проверено: тест через axe
+ * оставался зелёным, даже когда символ был намеренно выкрашен в `#a8d8e6`. Зелёный тест, который не
+ * может упасть, хуже отсутствующего — он выдаёт себя за проверку.
+ *
+ * Фон собираем вверх по дереву до первого непрозрачного: подложка нажатой кнопки — `rgba(accent,
+ * .16)`, и замер «по своему background» считал бы её самим акцентом, завышая контраст.
+ */
+async function symbolContrast(target: import('@playwright/test').Locator) {
+  return target.evaluate((el) => {
+    const parse = (c: string) => {
+      const n = (c.match(/[\d.]+/g) ?? []).map(Number);
+      return { r: n[0] ?? 0, g: n[1] ?? 0, b: n[2] ?? 0, a: n.length > 3 ? (n[3] ?? 1) : 1 };
+    };
+    type Rgba = ReturnType<typeof parse>;
+    const over = (fg: Rgba, bg: Rgba): Rgba => ({
+      r: fg.r * fg.a + bg.r * (1 - fg.a),
+      g: fg.g * fg.a + bg.g * (1 - fg.a),
+      b: fg.b * fg.a + bg.b * (1 - fg.a),
+      a: 1,
+    });
+    const lum = (c: Rgba) => {
+      const f = (x: number) => {
+        const s = x / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+    };
+
+    const layers: Rgba[] = [];
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      const c = parse(getComputedStyle(node).backgroundColor);
+      if (c.a > 0) layers.push(c);
+      if (c.a === 1) break;
+    }
+    let bg: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+    for (const c of layers.reverse()) bg = over(c, bg);
+
+    const a = lum(parse(getComputedStyle(el).color));
+    const b = lum(bg);
+    return {
+      ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+      fontSize: Number.parseFloat(getComputedStyle(el).fontSize),
+    };
+  });
+}
+
+test('включённое состояние символьной кнопки читается в светлой теме', async ({ page }) => {
+  /*
+   * Нажатое — третье состояние после покоя и наведения, и у него свои цвета: акцентный текст на
+   * акцентной подложке. Ровно эта пара уже давала 3.25 при наведении (#142), поэтому включённое
+   * проверяется отдельно — иначе «починили hover» означало бы «починили один случай из трёх».
+   *
+   * Пример на экране — значок настроек формы долга (#126): он помечается нажатым, когда внутри
+   * что-то включено, и по замыслу обязан бросаться в глаза.
+   */
+  await resetDemo(page);
+  await enterDemo(page);
+  await page.locator('.seg-btn', { hasText: /^light$/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.goto('/obligations');
+  await stopMotion(page);
+
+  const gear = page.locator('.act-icon[aria-label]').first();
+  await expect(gear).toBeVisible({ timeout: 20_000 });
+  await gear.click();
+  await page.locator('.obl-settings .seg-btn', { hasText: /^By date$|^Срок$/ }).click();
+  await gear.click();
+  await expect(gear).toHaveAttribute('aria-pressed', 'true');
+  /*
+   * Уводим курсор перед замером. После клика мышь остаётся на кнопке, и правило наведения перебивает
+   * нажатое состояние — первая версия теста мерила hover и радовалась 5.73, хотя нажатое состояние
+   * давало 3.14. Тест мерил не то состояние, которое назван мерить.
+   */
+  await page.mouse.move(0, 0);
+
+  /*
+   * Меряем ИМЕННО этот значок, а не первый попавшийся `.act-icon[aria-pressed="true"]`: на экране
+   * есть тумблеры регулярных платежей с тем же атрибутом, и селектор по атрибуту брал их — тест
+   * зеленел, проверив не то, что назван проверять.
+   */
+  const { ratio, fontSize } = await symbolContrast(gear);
+  // 10px — мелкий текст, порог AA для него 4.5, а не 3.0.
+  expect(fontSize).toBeLessThan(18);
+  expect(ratio, `контраст значка ${Math.round(ratio * 100) / 100}`).toBeGreaterThanOrEqual(4.5);
+});
+
 test('лист ввода траты доступен', async ({ page }) => {
   /*
    * Формы — самое опасное место: поле без подписи выглядит нормально и полностью непригодно для
@@ -169,6 +259,14 @@ test('переключатели формы названы и достаточн
   await enterDemo(page);
   await page.goto('/obligations');
 
+  /*
+   * Переключатели уехали под значок настроек (#126) — сначала раскрываем панель. Проверка от этого не
+   * теряет смысл: требование «имя есть, попасть можно» относится к ним в любом месте формы.
+   */
+  await page
+    .getByRole('button', { name: /Настройки долга|Debt settings/ })
+    .first()
+    .click();
   const controls = page.locator('input[type=checkbox], .toggle');
   await controls.first().waitFor();
   const count = await controls.count();

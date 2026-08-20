@@ -25,3 +25,15 @@ export async function enterDemo(page: Page): Promise<void> {
   await page.goto('/demo');
   await expect(page).toHaveURL(/\/plan$/, { timeout: 20_000 });
 }
+
+/**
+ * Гасим переходы и анимации перед замерами. В проверках цвета и раскладки это не оптимизация, а
+ * условие корректности: с включёнными переходами замер попадает в промежуточный кадр и утверждение
+ * проверяет цвет, которого на экране нет ни до, ни после. Однажды это уже давало зелёную проверку на
+ * заведомо сломанной светлой теме.
+ */
+export async function stopMotion(page: Page): Promise<void> {
+  await page.addStyleTag({
+    content: '*, *::before, *::after { transition: none !important; animation: none !important; }',
+  });
+}

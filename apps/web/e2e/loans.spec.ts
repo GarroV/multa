@@ -79,6 +79,8 @@ test('долг можно завести сразу с разными сумма
   await panel.getByPlaceholder(/^Название$|^Name$/).fill('Сбер');
   // Остаток обязателен: долг без суммы к выплате — не долг.
   await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('80000');
+  /* Разбивка уехала под значок настроек (#126) — сначала открываем панель. */
+  await panel.getByRole('button', { name: /Настройки долга|Debt settings/ }).click();
   await panel.getByRole('button', { name: /Разбить по выплатам|Split across payouts/ }).click();
 
   // По полю на каждый источник дохода воркспейса — их в демо больше одного.
@@ -105,6 +107,8 @@ test('разбивка, заданная при заведении, доезжа
 
   await panel.getByPlaceholder(/^Название$|^Name$/).fill('Тинькофф');
   await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('60000');
+  /* Разбивка уехала под значок настроек (#126) — сначала открываем панель. */
+  await panel.getByRole('button', { name: /Настройки долга|Debt settings/ }).click();
   await panel.getByRole('button', { name: /Разбить по выплатам|Split across payouts/ }).click();
   await panel.locator('.obl-split input').first().fill('7000');
   await panel.getByRole('button', { name: /^Добавить$|^Add$/ }).click();
@@ -135,6 +139,8 @@ test('долг можно завести с окном «платим с… по
   await panel.getByPlaceholder(/^Название$|^Name$/).fill('Рассрочка');
   await panel.getByPlaceholder(/^Осталось$|^Left to pay$/).fill('40000');
   await panel.getByPlaceholder(/^Платёж$|^Payment$/).fill('10000');
+  /* Окно платежей уехало под значок настроек (#126). */
+  await panel.getByRole('button', { name: /Настройки долга|Debt settings/ }).click();
   await panel.getByRole('button', { name: /Платим с… по…|Pay from… to…/ }).click();
   await panel.getByLabel(/^Платим с$|^Pay from$/).fill('2026-11-01');
   await panel.getByLabel(/^Платим по$|^Pay until$/).fill('2027-02-28');
@@ -211,6 +217,8 @@ test('способ задать долг выбирается сегментом
     .first();
   await panel.waitFor();
 
+  /* Сегмент уехал под значок настроек (#126): в ряду он был четвёртым элементом из семи. */
+  await panel.getByRole('button', { name: /Настройки долга|Debt settings/ }).click();
   const seg = panel.locator('.panel-foot .seg').first();
   await expect(seg).toBeVisible();
 
@@ -233,4 +241,45 @@ test('способ задать долг выбирается сегментом
     Math.max(...heights) - Math.min(...heights),
     `высоты: ${heights.join(', ')}`,
   ).toBeLessThanOrEqual(2);
+});
+
+/**
+ * Форма долга собрана в один ряд, настройки — по требованию (issue #126, реакция владельца на
+ * скрин: «сейчас очень путает»).
+ *
+ * В ряду стояло семь элементов сразу: два поля, сегмент «Платёж/Срок», знак вопроса, две
+ * кнопки-переключателя и «Добавить». Форма уже упрощалась один раз (#117) — значит дело не в
+ * стилях, а в том, что ВСЁ показано сразу. Поэтому редкое уезжает под значок, а частое остаётся.
+ */
+test('форма долга: настройки спрятаны, но не потеряны', async ({ page }) => {
+  await page.goto('/obligations');
+  const panel = page
+    .locator('.panel[aria-label*="ДОЛГИ" i], .panel[aria-label*="DEBTS" i]')
+    .first();
+  await panel.waitFor();
+
+  // Обычный путь — имя, остаток, платёж, «добавить». Редкое в глаза не бросается.
+  const settings = panel.getByRole('button', { name: /Настройки долга|Debt settings/ });
+  await expect(settings).toBeVisible();
+  await expect(
+    panel.getByRole('button', { name: /Разбить по выплатам|Split across payouts/ }),
+  ).toBeHidden();
+  await expect(
+    panel.getByRole('group', { name: /Как задаём долг|How to define the debt/ }),
+  ).toBeHidden();
+
+  await settings.click();
+  await expect(
+    panel.getByRole('button', { name: /Разбить по выплатам|Split across payouts/ }),
+  ).toBeVisible();
+
+  /*
+   * Скрытая, но включённая настройка обязана быть заметна снаружи: иначе человек закрывает панель и
+   * не понимает, почему поле «Платёж» превратилось в дату. Значок помечается нажатым.
+   */
+  await panel.getByRole('button', { name: /^Срок$|^By date$/ }).click();
+  await settings.click();
+  await expect(settings).toHaveAttribute('aria-pressed', 'true');
+  // Режим виден и по самому полю: вместо суммы платежа — дата закрытия.
+  await expect(panel.locator('input[type="date"]').first()).toBeVisible();
 });

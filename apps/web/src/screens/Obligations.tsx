@@ -451,6 +451,16 @@ function DebtsSection({ base }: SectionProps) {
    */
   const [windowOpen, setWindowOpen] = useState(false);
   /*
+   * Панель настроек долга (issue #126, реакция владельца на скрин формы: «сейчас очень путает»).
+   *
+   * В ряду стояло семь элементов сразу: остаток, платёж, сегмент «Платёж/Срок», знак вопроса, две
+   * кнопки-переключателя и «Добавить». Форма уже упрощалась один раз (#117, чекбокс и капслочные
+   * кнопки → сегмент и toggle) и всё равно путала — значит дело не в стилях кнопок, а в том, что ВСЁ
+   * показано сразу. Поэтому редкое (способ задания, разбивка по выплатам, окно платежей) уезжает под
+   * значок, а частое — имя, остаток, платёж, «добавить» — остаётся на виду.
+   */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /*
    * Новый долг по умолчанию начинает платиться со СЛЕДУЮЩЕЙ выплаты (issue #121). Текущий период
    * уже прожит наполовину, и обязательство, заведённое сегодня, откусывало от остатка задним
    * числом: цифра дня падала не потому, что человек потратил, а потому, что записал.
@@ -491,6 +501,16 @@ function DebtsSection({ base }: SectionProps) {
         )
       : null;
   const fromToSend = paysFrom || defaultFrom;
+  /*
+   * Настройки считаются «включёнными», если хоть одна отличается от умолчания. Пустая разбивка или
+   * открытое, но незаполненное окно сюда не входят: пометка должна означать «поведение изменено», а
+   * не «панель однажды открывали».
+   */
+  const settingsActive =
+    mode !== 'payment' ||
+    Object.values(bySource).some((v) => v.trim() !== '') ||
+    paysFrom !== '' ||
+    paysUntil !== '';
   const remainingForCalc = toMinor(amount, ccy);
   const periodsAhead =
     closeBy && meForDebt?.workspace?.rhythm
@@ -698,54 +718,71 @@ function DebtsSection({ base }: SectionProps) {
               />
             )}
             {/*
-              Способ задать долг — один выбор из двух (issue #117), поэтому сегмент, а не флажок:
-              либо человек называет платёж, либо срок, и продукт считает второе сам. Общий контур
-              говорит о взаимоисключающем выборе сам — тот же приём, что в референсе владельца.
-
-              Остальные настройки этого ряда — переключатели одной породы (16.08.2026): раньше здесь
-              стояли флажок и капслочные кнопки, четыре высоты в одном ряду.
-            */}
-            <span className="seg seg-inline" role="group" aria-label={t('obl.mode')}>
-              {(['payment', 'deadline'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className="seg-btn"
-                  aria-pressed={mode === m}
-                  onClick={() => setMode(m)}
-                >
-                  {t(m === 'payment' ? 'obl.mode.payment' : 'obl.mode.deadline')}
-                </button>
-              ))}
-            </span>
-            {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
-            <Hint text={t('obl.formHint')} />
-            {/*
-              Разбивка платежа по выплатам (issue #117). За кнопкой: у большинства долгов сумма
-              одна на все выплаты, и лишние поля здесь — шум. Но задать её надо уметь СРАЗУ, а не
-              после: иначе человек заводит долг, ищет его в списке и открывает правку ради того,
-              что знал с самого начала.
+              Значок настроек. Помечен нажатым, если внутри что-то включено: скрытая настройка,
+              которая молча меняет поведение, хуже видимой. Иначе человек свернул бы панель и не
+              понял, почему «Платёж» стал датой.
             */}
             <button
               type="button"
-              className="toggle"
-              aria-pressed={splitOpen}
-              onClick={() => setSplitOpen(!splitOpen)}
+              className="act act-icon"
+              aria-label={t('obl.settings')}
+              title={t('obl.settings')}
+              aria-expanded={settingsOpen}
+              aria-pressed={settingsActive}
+              onClick={() => setSettingsOpen(!settingsOpen)}
             >
-              {t('obl.split')}
-            </button>
-            <button
-              type="button"
-              className="toggle"
-              aria-pressed={windowOpen}
-              onClick={() => setWindowOpen(!windowOpen)}
-            >
-              {t('obl.window')}
+              ⋯
             </button>
             <button type="button" className="btn" disabled={create.isPending} onClick={add}>
               {t('common.add')}
             </button>
           </div>
+          {settingsOpen && (
+            <div className="form-row obl-settings">
+              {/*
+                Способ задать долг — один выбор из двух (issue #117), поэтому сегмент, а не флажок:
+                либо человек называет платёж, либо срок, и продукт считает второе сам. Общий контур
+                говорит о взаимоисключающем выборе сам — тот же приём, что в референсе владельца.
+              */}
+              <span className="seg seg-inline" role="group" aria-label={t('obl.mode')}>
+                {(['payment', 'deadline'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className="seg-btn"
+                    aria-pressed={mode === m}
+                    onClick={() => setMode(m)}
+                  >
+                    {t(m === 'payment' ? 'obl.mode.payment' : 'obl.mode.deadline')}
+                  </button>
+                ))}
+              </span>
+              {/* Что вносить в «Осталось» и «Платёж» — под знаком: нужно один раз. */}
+              <Hint text={t('obl.formHint')} />
+              {/*
+                Разбивка платежа по выплатам (issue #117). За кнопкой: у большинства долгов сумма
+                одна на все выплаты, и лишние поля здесь — шум. Но задать её надо уметь СРАЗУ, а не
+                после: иначе человек заводит долг, ищет его в списке и открывает правку ради того,
+                что знал с самого начала.
+              */}
+              <button
+                type="button"
+                className="toggle"
+                aria-pressed={splitOpen}
+                onClick={() => setSplitOpen(!splitOpen)}
+              >
+                {t('obl.split')}
+              </button>
+              <button
+                type="button"
+                className="toggle"
+                aria-pressed={windowOpen}
+                onClick={() => setWindowOpen(!windowOpen)}
+              >
+                {t('obl.window')}
+              </button>
+            </div>
+          )}
           {splitOpen && (
             <div className="form-row obl-split">
               {/*
