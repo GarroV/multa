@@ -15,8 +15,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "node tools/verify.mjs",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "verify": "node tools/verify.mjs"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
