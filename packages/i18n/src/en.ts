@@ -307,6 +307,8 @@ export const en = {
     'Not enough for everything — trimmed {amount} {ccy}. Goals give first, then savings, then spending; debts and baskets stay whole.',
   'plan.row.trimmed': 'trimmed {amount}',
   'plan.category.budgetHint': 'budget / period',
+  // A dash instead of «0 / 0» for a category with no budget (issue #139).
+  'plan.category.noBudget': 'no budget set',
   'cat.protected.on': 'Protected — not auto-trimmed under a shortfall',
   'cat.protected.off': 'Not protected — trimmed first under a shortfall',
   'cat.new.placeholder': 'New category',

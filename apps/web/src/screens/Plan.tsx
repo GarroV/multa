@@ -12,6 +12,7 @@ import { NoIncomeYet } from '../components/NoIncomeYet.tsx';
 import { Bar, Panel, Tag, type Accent } from '../components/ui/Panel.tsx';
 import { CascadeDonut } from '../components/ui/CascadeDonut.tsx';
 import { PeriodMap } from '../components/ui/PeriodMap.tsx';
+import { categoryAmounts } from '../lib/categoryRowView.ts';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useIsMember } from '../lib/role.ts';
@@ -168,10 +169,17 @@ function AllocationRow({ a, base, locale }: { a: PlanAllocation; base: string; l
 
 /** Строка категории: полоса факт/план под именем — перерасход виден без чтения цифр. */
 function CategoryRow({ a, base, locale }: { a: PlanAllocation; base: string; locale: string }) {
+  const { t } = useI18n();
   const planned = BigInt(a.allocatedMinor);
   const spent = BigInt(a.spentMinor);
   const over = BigInt(a.overspentMinor) > 0n;
   const share = planned > 0n ? Number((spent * 1000n) / planned) / 10 : spent > 0n ? 100 : 0;
+  /*
+   * Категория без бюджета показывается прочерком, а не «0 / 0» (issue #139). Строка обязана
+   * остаться — через неё бюджет и задают, — но утверждать ноль там, где ничего не задавали, нельзя:
+   * у владельца так восемь строк из девяти превращались в экран нулей.
+   */
+  const view = categoryAmounts(a);
 
   return (
     <div className="prow">
@@ -181,18 +189,30 @@ function CategoryRow({ a, base, locale }: { a: PlanAllocation; base: string; loc
         {a.protectedCategory && <Tag tone="cyan">🔒</Tag>}
       </span>
       <span className="prow-num">
-        <b className={over ? 'st-over' : undefined}>
-          {formatMinor(a.spentMinor, base, locale)} / {formatMinor(a.allocatedMinor, base, locale)}
-        </b>
+        {view.showFact ? (
+          <b className={over ? 'st-over' : undefined}>
+            {formatMinor(a.spentMinor, base, locale)} /{' '}
+            {view.hasBudget ? formatMinor(a.allocatedMinor, base, locale) : '—'}
+          </b>
+        ) : (
+          <b className="dim" title={t('plan.category.noBudget')}>
+            —
+          </b>
+        )}
       </span>
       <span />
       <span className="prow-bar">
-        <Bar share={share} tone={over ? 'mag' : share > 85 ? 'amber' : 'cyan'} label={a.name} />
-        <span className="prow-num">
-          <i>
-            {formatMinor(a.remainingMinor, base, locale)} {base}
-          </i>
-        </span>
+        {/* Полоса и остаток — только когда есть от чего считать: пустая шкала обещает план, которого нет. */}
+        {view.hasBudget && (
+          <>
+            <Bar share={share} tone={over ? 'mag' : share > 85 ? 'amber' : 'cyan'} label={a.name} />
+            <span className="prow-num">
+              <i>
+                {formatMinor(a.remainingMinor, base, locale)} {base}
+              </i>
+            </span>
+          </>
+        )}
       </span>
     </div>
   );
