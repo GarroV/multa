@@ -427,6 +427,16 @@ export const ru: Record<TranslationKey, string> = {
   'stats.advice.periods': 'по факту за {periods} периодов',
   'stats.advice.hint': 'Совет считается по медиане факта, а не по одному периоду.',
   'fx.provider': 'Где меняли',
+  // История трат (issue #137): экран отвечает «что я тратил», «сколько ушло на еду», «где та покупка».
+  'history.title': 'История трат',
+  'history.total': '{amount} · строк: {rows}',
+  'history.income': 'Из них пришло: {amount}',
+  'history.filter.category': 'Категория',
+  'history.filter.all': 'Все категории',
+  'history.search.placeholder': 'найти по заметке',
+  'history.empty': 'В этом периоде трат не было',
+  'history.empty.filtered': 'Ничего не нашлось — попробуй снять фильтр',
+  'nav.history': 'История',
   'nav.statistics': 'Статистика',
   'nav.settings': 'Настройки',
 

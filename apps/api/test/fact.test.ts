@@ -270,3 +270,91 @@ describe('офлайн-очередь: повтор попытки (Спринт
     await expectOk(await bob.post('/v1/transactions', body), 201);
   });
 });
+
+/*
+ * Список трат для экрана истории (issue #137, вопрос владельца: «где история трат у нас в проекте
+ * вообще?»). Ручка была, но умела только «от и до»: без фильтра по категории экран не отвечает на
+ * «сколько я потратил на еду в марте», а без предела выдачи четыре года импортированной истории
+ * приехали бы одним ответом.
+ */
+describe('список трат для истории', () => {
+  test('фильтр по категории отдаёт только её траты', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const food = await categoryId(client, 'Продукты');
+    const cafe = await categoryId(client, 'Кафе');
+    const on = '2026-08-19';
+
+    for (const [cat, amount] of [
+      [food, '150000'],
+      [food, '250000'],
+      [cafe, '90000'],
+    ] as const) {
+      await expectOk(
+        await client.post('/v1/transactions', {
+          kind: 'expense',
+          amountMinor: amount,
+          currency: 'RUB',
+          categoryId: cat,
+          occurredOn: on,
+        }),
+        201,
+      );
+    }
+
+    const all = await expectOk<{ transactions: { categoryId: string | null }[] }>(
+      await client.get(`/v1/transactions?from=${on}&to=2026-08-20`),
+    );
+    expect(all.transactions).toHaveLength(3);
+
+    const onlyFood = await expectOk<{ transactions: { categoryId: string | null }[] }>(
+      await client.get(`/v1/transactions?from=${on}&to=2026-08-20&categoryId=${food}`),
+    );
+    expect(onlyFood.transactions).toHaveLength(2);
+    expect(onlyFood.transactions.every((t) => t.categoryId === food)).toBe(true);
+  });
+
+  test('чужая категория в фильтре не открывает чужие траты', async () => {
+    /*
+     * Правило 7: id приходит от клиента, значит проверяется. Иначе фильтр стал бы способом
+     * заглянуть в чужой воркспейс — «покажи траты по этой категории», где категория соседа.
+     */
+    const other = await onboarded();
+    const foreign = await categoryId(other, 'Продукты');
+
+    const mine = await onboarded();
+    expect((await mine.get(`/v1/transactions?categoryId=${foreign}`)).status).toBe(404);
+  });
+
+  test('мусор в categoryId — понятный отказ, а не пятисотка от драйвера', async () => {
+    const client = await onboarded();
+    expect((await client.get('/v1/transactions?categoryId=not-a-uuid')).status).toBe(400);
+  });
+
+  test('выдача ограничена и предел настраивается', async () => {
+    /*
+     * Четыре года импортированной истории — тысячи строк. Без предела экран истории тянул бы их
+     * все одним ответом при каждом открытии.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const on = '2026-08-19';
+    for (let i = 0; i < 5; i += 1) {
+      await expectOk(
+        await client.post('/v1/transactions', {
+          kind: 'expense',
+          amountMinor: '10000',
+          currency: 'RUB',
+          occurredOn: on,
+        }),
+        201,
+      );
+    }
+
+    const limited = await expectOk<{ transactions: unknown[] }>(
+      await client.get(`/v1/transactions?from=${on}&to=2026-08-20&limit=2`),
+    );
+    expect(limited.transactions).toHaveLength(2);
+
+    // Предел за границей разумного отклоняется, а не молча множит выборку.
+    expect((await client.get('/v1/transactions?limit=99999')).status).toBe(400);
+  });
+});

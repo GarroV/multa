@@ -322,8 +322,18 @@ describe('transactionCreateSchema — приход как факт (side hustle)
 });
 
 describe('transactionListSchema', () => {
-  it('без параметров валиден (значит «текущий период»)', () => {
-    expect(transactionListSchema.parse({})).toEqual({});
+  it('без параметров валиден (значит «текущий период») и получает предел по умолчанию', () => {
+    // Даты остаются пустыми — период посчитает сервер. Предел проставляется всегда: запрос без
+    // `limit` не должен уметь вытянуть всю историю разом (issue #137).
+    expect(transactionListSchema.parse({})).toEqual({ limit: 200 });
+  });
+  it('предел из запроса уважает, но выше потолка не пускает', () => {
+    expect(transactionListSchema.parse({ limit: '50' }).limit).toBe(50);
+    expect(transactionListSchema.safeParse({ limit: '5000' }).success).toBe(false);
+    expect(transactionListSchema.safeParse({ limit: '0' }).success).toBe(false);
+  });
+  it('чужой формат id категории отвергает до похода в базу', () => {
+    expect(transactionListSchema.safeParse({ categoryId: 'not-a-uuid' }).success).toBe(false);
   });
   it('кривые даты отвергает', () => {
     expect(transactionListSchema.safeParse({ from: '01-07-2026', to: '2026-07-30' }).success).toBe(

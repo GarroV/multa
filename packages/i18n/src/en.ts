@@ -432,6 +432,16 @@ export const en = {
   'stats.advice.periods': 'from fact over {periods} periods',
   'stats.advice.hint': 'Advice comes from the median of fact, not from a single period.',
   'fx.provider': 'Where you exchanged',
+  // Transaction history (issue #137).
+  'history.title': 'Spending history',
+  'history.total': '{amount} · rows: {rows}',
+  'history.income': 'Of that, came in: {amount}',
+  'history.filter.category': 'Category',
+  'history.filter.all': 'All categories',
+  'history.search.placeholder': 'search the note',
+  'history.empty': 'No spending in this period',
+  'history.empty.filtered': 'Nothing found — try clearing the filter',
+  'nav.history': 'History',
   'nav.statistics': 'Statistics',
   'nav.settings': 'Settings',
 

@@ -71,6 +71,22 @@ transactionsRoute.get('/transactions', async (c) => {
   const ws = c.get('workspace')!;
   const q = transactionListSchema.parse(c.req.query());
   const range = q.from && q.to ? { from: q.from, to: q.to } : periodRange(ws, today(ws.timezone));
+
+  /*
+   * Категория из запроса проверяется на принадлежность (правило 7: id от клиента не доверяем).
+   * Иначе фильтр стал бы способом заглянуть в чужой воркспейс — «покажи траты по этой категории»,
+   * где категория соседа. Чужая и несуществующая одинаково «не найдены»: ответ не должен
+   * подтверждать существование чужой строки.
+   */
+  if (q.categoryId) {
+    const owned = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.id, q.categoryId), eq(categories.workspaceId, ws.id)))
+      .limit(1);
+    if (!owned[0]) return c.json({ error: 'category_not_found' }, 404);
+  }
+
   const rows = await db
     .select()
     .from(transactions)
@@ -79,9 +95,13 @@ transactionsRoute.get('/transactions', async (c) => {
         eq(transactions.workspaceId, ws.id),
         gte(transactions.occurredOn, range.from),
         lt(transactions.occurredOn, range.to),
+        ...(q.categoryId
+          ? [eq(transactions.targetKind, 'category'), eq(transactions.targetId, q.categoryId)]
+          : []),
       ),
     )
-    .orderBy(desc(transactions.occurredOn), desc(transactions.id));
+    .orderBy(desc(transactions.occurredOn), desc(transactions.id))
+    .limit(q.limit);
   return c.json({ period: range, transactions: rows.map(serialize) });
 });
 

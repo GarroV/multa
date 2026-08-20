@@ -25,6 +25,12 @@ const NAV: { to: string; key: TranslationKey; ownerOnly?: true }[] = [
    * история разменов) матрицу видимости ещё не умеют — issue #84. Открывать вкладку раньше, чем
    * это сделано, значит вести человека на экран из сообщений об отказе.
    */
+  /*
+   * История трат (issue #137) закрыта участнику по той же причине, что статистика: `GET
+   * /v1/transactions` матрицу видимости не умеет, и список показал бы чужие траты целиком — самое
+   * чувствительное, что есть в продукте.
+   */
+  { to: '/history', key: 'nav.history', ownerOnly: true },
   { to: '/statistics', key: 'nav.statistics', ownerOnly: true },
   { to: '/obligations', key: 'nav.obligations' },
   { to: '/settings', key: 'nav.settings' },

@@ -1067,6 +1067,46 @@ export function useTransactions() {
   });
 }
 
+export interface HistoryFilter {
+  /** Границы включительно-исключительно, как у периода: [from, to). */
+  readonly from?: string;
+  readonly to?: string;
+  readonly categoryId?: string;
+}
+
+/**
+ * История трат за произвольный отрезок (issue #137).
+ *
+ * Отдельно от `useTransactions`: тот отвечает на «что я записал в этом периоде» и живёт в листе
+ * ввода, а этот — на «где я потратил 12 000 в марте». Разные вопросы, разные ключи кэша: общий ключ
+ * заставлял бы список ввода перезагружаться от смены фильтра на экране истории.
+ */
+export function useHistory(filter: HistoryFilter) {
+  const params = new URLSearchParams();
+  if (filter.from) params.set('from', filter.from);
+  if (filter.to) params.set('to', filter.to);
+  if (filter.categoryId) params.set('categoryId', filter.categoryId);
+  const qs = params.toString();
+  return useQuery({
+    queryKey: [
+      'transactions',
+      'history',
+      filter.from ?? '',
+      filter.to ?? '',
+      filter.categoryId ?? '',
+    ],
+    retry: false,
+    queryFn: () => api<TransactionsDto>(`/v1/transactions${qs ? `?${qs}` : ''}`),
+    /*
+     * Пока границы периода неизвестны, запрос не уходит. Иначе экран истории делал два запроса
+     * подряд: первый без границ (сервер сам подставлял текущий период), а после ответа плана — тот
+     * же самый уже с границами. Второй ответ подменял список, и он на кадр опустошался — мигание,
+     * которое поймал E2E, приняв исправный фильтр за сломанный.
+     */
+    enabled: filter.from != null && filter.to != null,
+  });
+}
+
 export interface SpendInput {
   /** 'expense' — трата, 'income' — внеплановый приход (side hustle). */
   kind?: 'expense' | 'income';

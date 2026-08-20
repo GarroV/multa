@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/
 import { App } from './App.tsx';
 import { ErrorScreen, reportError } from './components/ErrorBoundary.tsx';
 import { Demo } from './screens/Demo.tsx';
+import { History } from './screens/History.tsx';
 import { Statistics } from './screens/Statistics.tsx';
 import { Obligations } from './screens/Obligations.tsx';
 import { Plan } from './screens/Plan.tsx';
@@ -49,6 +50,15 @@ const planRoute = createRoute({
     ...(search.as === 'member' ? { as: 'member' as const } : {}),
   }),
 });
+/**
+ * История трат (issue #137). Отдельным адресом, а не вкладкой внутри статистики: «где та покупка»
+ * — вопрос, с которым приходят напрямую, и на него нужна ссылка.
+ */
+const historyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/history',
+  component: History,
+});
 const statisticsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/statistics',
@@ -81,6 +91,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   todayRoute,
   planRoute,
+  historyRoute,
   statisticsRoute,
   exchangeRoute,
   obligationsRoute,
