@@ -6,7 +6,7 @@
 
 | Что             | Где                                | Примечание                                                                    |
 | --------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| Код             | `C:\projects\multa` на MUSPELHEIM  | **Не git-репозиторий**: код доставляется архивом (см. ниже)                   |
+| Код             | `C:\projects\multa` на MUSPELHEIM  | Git-репозиторий: `origin` = GitHub, ветка `main`, доступ read-only deploy key |
 | Секреты         | `C:\projects\multa\.env`           | Не в git; сгенерирован при первом деплое                                      |
 | Данные Postgres | `C:\projects\multa\.data\postgres` | Bind-mount контейнера, переживает пересборку                                  |
 | Скрипт деплоя   | `C:\projects\multa\deploy.cmd`     | `docker compose -f docker-compose.prod.yml up -d --build`, лог → `deploy.log` |
@@ -44,13 +44,16 @@ ssh muspelheim 'powershell -NoProfile -Command "tailscale funnel --bg --https=44
    ```bash
    ssh muspelheim 'powershell -NoProfile -Command "docker exec multa-postgres-1 pg_dump -U multa -d multa | Out-File -Encoding utf8 C:\backups\multa-manual\multa_before_deploy.sql"'
    ```
-2. **Доставить код.** Репозиторий приватный, а git на сервере в SSH-сессии не умеет авторизоваться (credential store `wincredman` требует интерактивной сессии). Пока доставка — архивом от нужного коммита:
+2. **Доставить код — через GitHub** (с 22.08.2026; до этого возили архивом, см. «Как настроен доступ» ниже). Сначала запушить нужный коммит в `origin`, потом на сервере:
+
    ```bash
-   git archive --format=zip -o /tmp/multa-src.zip HEAD
-   scp /tmp/multa-src.zip muspelheim:multa-src.zip
-   ssh muspelheim 'powershell -NoProfile -Command "Expand-Archive -Path C:\Users\vasil\multa-src.zip -DestinationPath C:\projects\multa -Force"'
+   ssh muspelheim 'cd C:\projects\multa && git fetch --depth=1 origin main && git checkout -f -B main origin/main && git log --oneline -1'
    ```
-   Архив содержит только версионированные файлы, поэтому `.env` и `.data\` не затрагиваются. Минус способа: файлы, удалённые в новых коммитах, остаются лежать на диске — на сборку не влияет, но при переезде на git это исчезнет.
+
+   `checkout -f` переписывает только версионированные файлы: `.env`, `deploy.cmd` и `.data\` — untracked, их не трогает. В отличие от архива, файлы, удалённые в новых коммитах, теперь исчезают и на сервере.
+
+   Последняя команда печатает коммит — сверь его с тем, что собирался деплоить. Прод, собранный не из того коммита, выглядит как «фича не работает», и искать причину будешь в коде, а не в доставке.
+
 3. **Собрать и поднять:**
 
    ```bash
@@ -60,6 +63,24 @@ ssh muspelheim 'powershell -NoProfile -Command "tailscale funnel --bg --https=44
    Миграции Drizzle применяются самим api при старте (он ждёт healthy-postgres): в логах видно `[api] миграции применены (migrations)`, и только после этого поднимается сервер. Первые строки логов api могут содержать `the database system is starting up` — это нормальный retry, не ошибка.
 
    Готовность api видна по healthcheck: `docker ps` показывает `health: starting` пока идут миграции и `healthy` после. `multa-web-1` ждёт именно healthy-api, поэтому первый заход не отдаёт 502.
+
+### Как настроен доступ к GitHub
+
+Репозиторий приватным больше не является, но доступ всё равно идёт по ключу: так деплой не зависит от смены видимости и не требует токена в открытом виде на сервере.
+
+- На сервере лежит ed25519-ключ `C:\Users\vasil\.ssh\id_ed25519` **без парольной фразы** — иначе git в SSH-сессии не сможет им подписаться, а `BatchMode` превратит это в глухое `Permission denied (publickey)`. Проверить, что фразы нет: `ssh muspelheim 'ssh-keygen -y -f C:\Users\vasil\.ssh\id_ed25519'` — команда обязана сразу напечатать публичный ключ, а не ждать ввода.
+- Его публичная часть добавлена в репозиторий как **read-only** deploy key `muspelheim-prod`: сервер умеет только читать код и не может ничего запушить. Список: `gh repo deploy-key list`.
+- Git на сервере знает, каким ключом ходить: `git config --global core.sshCommand "ssh -i C:/Users/vasil/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"`.
+
+**Переезд на новую машину** (или замена ключа) — три шага:
+
+```bash
+ssh <host> 'ssh-keygen -q -t ed25519 -f C:\Users\<user>\.ssh\id_ed25519 -N "" -C <host>-multa-deploy && type C:\Users\<user>\.ssh\id_ed25519.pub'
+gh repo deploy-key add <файл с этим ключом> --title "<host>-prod (read-only)"
+ssh <host> 'cd C:\projects\multa && git init -q && git remote add origin git@github.com:GarroV/multa.git'
+```
+
+Ключ генерировать **через cmd, а не через вложенный powershell**: `-N ""` внутри `ssh muspelheim "powershell -Command \"...\""` теряет кавычки, и ключ получается с непустой фразой — проверено на своей ошибке.
 
 ### Что внутри прод-образа api
 
