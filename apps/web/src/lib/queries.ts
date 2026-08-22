@@ -1436,9 +1436,21 @@ export function useForecast(enabled = true) {
     enabled,
     retry: false,
     queryFn: () =>
-      api<{ horizonPeriods: number; dueSoon: RecurringDue[]; events: ForecastEvent[] }>(
-        '/v1/forecast',
-      ),
+      api<{
+        horizonPeriods: number;
+        /** Границы периодов на горизонте: карта рисует по ним насечки. */
+        periods: { startsOn: string; endsOn: string }[];
+        /** Выплаты вперёд — карта живёт не одним периодом, а тремя месяцами. */
+        payouts: {
+          sourceId: string;
+          label: string;
+          on: string;
+          amountMinor: string;
+          currency: string;
+        }[];
+        dueSoon: RecurringDue[];
+        events: ForecastEvent[];
+      }>('/v1/forecast'),
   });
 }
 

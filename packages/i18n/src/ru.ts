@@ -330,7 +330,8 @@ export const ru: Record<TranslationKey, string> = {
   'plan.kpi.cascade': 'РАЗДАЧА · {amount}',
   'plan.kpi.leftToLive': 'На жизнь',
   'plan.cascade.empty': 'Раздавать пока нечего',
-  'plan.map.title': 'КАРТА ПЕРИОДА',
+  // Ось выросла с одного периода до трёх месяцев — заголовок обязан говорить то же (#152).
+  'plan.map.title': 'БЛИЖАЙШИЕ ТРИ МЕСЯЦА',
   'plan.map.today': 'сегодня',
   'plan.map.runsOut': '{day} · деньги кончатся',
   'plan.panel.income': 'ДОХОД',

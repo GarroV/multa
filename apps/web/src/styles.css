@@ -935,6 +935,34 @@ a {
   background: var(--line-strong);
   margin: 22px 0 0;
 }
+
+/*
+ * Насечки границ периодов и подписи месяцев на трёхмесячной оси (issue: «не вижу ближайших трёх
+ * месяцев»). Насечка — система координат, а не событие: тоньше и тише любой метки, без подписи.
+ * Иначе двадцать делений спорят с шестью событиями, ради которых карту и смотрят.
+ */
+.pmap-tick {
+  position: absolute;
+  left: var(--at);
+  top: 50%;
+  width: 1px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  background: var(--line-strong);
+  opacity: 0.5;
+}
+.pmap-month {
+  position: absolute;
+  left: var(--at);
+  top: calc(50% - 22px);
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mid);
+  white-space: nowrap;
+}
 .pmap-mark {
   position: absolute;
   top: 0;

@@ -607,6 +607,8 @@ function PlanBody({ plan }: { plan: PlanDto }) {
             plan={plan}
             dueSoon={forecast.data?.dueSoon.filter((d) => d.showOnMap)}
             events={forecast.data?.events}
+            payouts={forecast.data?.payouts}
+            periods={forecast.data?.periods}
           />
 
           <div className="panels">

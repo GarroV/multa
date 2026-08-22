@@ -132,6 +132,27 @@ export async function forecastOf(ws: Workspace, asMember = false) {
   // Скрытые с карты платежи остаются в списке «что впереди»: тумблер прячет метку, а не событие.
   const showOnMap = new Map(recurringRows.map((r) => [r.id, r.showOnMap]));
 
+  /*
+   * Выплаты на весь горизонт — для карты (запрос владельца: «пусть таймлайн показывает ближайшие
+   * три месяца»). До этого даты выплат существовали только для текущего периода: карта умела
+   * рисовать одну ось «от зарплаты до зарплаты», и дальше неё показать было нечего.
+   */
+  const payouts = horizon.flatMap((period) =>
+    incomeEventsIn(
+      sourceRows.filter((x) => x.active),
+      period,
+      ws.paydayWeekendRule as WeekendRule,
+    ).map((e) => ({
+      sourceId: e.sourceId,
+      label: e.label,
+      // `date` — фактическая дата прихода (правило выходных уже применено); в DTO зовём её `on`,
+      // как все остальные события карты, чтобы клиент не разбирал два имени для одного смысла.
+      on: e.date,
+      amountMinor: e.amountMinor.toString(),
+      currency: e.currency,
+    })),
+  );
+
   const events = forecastTimeline({
     asOf,
     periodsAhead: HORIZON_PERIODS,
@@ -194,6 +215,9 @@ export async function forecastOf(ws: Workspace, asMember = false) {
 
   return {
     horizonPeriods: HORIZON_PERIODS,
+    /* Границы периодов на горизонте: карта рисует по ним насечки — видно, где кончается период. */
+    periods: horizon.map((p) => ({ startsOn: p.startsOn, endsOn: p.endsOn })),
+    payouts,
     dueSoon: (recurringVisible ? dueSoon : []).map((d) => ({
       id: d.id,
       name: d.name,

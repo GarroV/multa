@@ -101,6 +101,41 @@ export function todayInPeriod(plan: PlanDto): string {
   return new Date(at).toISOString().slice(0, 10);
 }
 
+/**
+ * Конец окна карты: N месяцев от даты. Считается по календарю, а не «+90 дней» — человек
+ * держит в голове месяцы («до декабря»), и ось, кончающаяся 28 ноября, читается как ошибка.
+ *
+ * День месяца сохраняется; если в целевом месяце его нет (31 марта + 1 месяц), берём последний
+ * день месяца — то же правило, что у правил повтора в ядре.
+ */
+export function windowEnd(from: string, months: number): string {
+  const [y, m, d] = from.split('-').map(Number) as [number, number, number];
+  const targetMonth = m - 1 + months;
+  const year = y + Math.floor(targetMonth / 12);
+  const month = ((targetMonth % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(d, lastDay);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Первые числа месяцев внутри окна — по ним карта ставит подписи месяцев. Начало окна не
+ * подписываем отдельной насечкой: там уже стоит его собственная граница.
+ */
+export function monthStartsWithin(from: string, to: string): string[] {
+  const out: string[] = [];
+  const [y, m] = from.split('-').map(Number) as [number, number];
+  for (let i = 1; i <= 36; i += 1) {
+    const t = m - 1 + i;
+    const year = y + Math.floor(t / 12);
+    const month = ((t % 12) + 12) % 12;
+    const iso = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    if (iso > to) break;
+    out.push(iso);
+  }
+  return out;
+}
+
 /** Роль метки на оси периода. Порядок важен: он же задаёт приоритет в тесной группе. */
 export type MarkTone = 'today' | 'risk' | 'income' | 'due' | 'fx';
 

@@ -334,7 +334,8 @@ export const en = {
   'plan.kpi.cascade': 'ALLOCATION · {amount}',
   'plan.kpi.leftToLive': 'Left to live on',
   'plan.cascade.empty': 'Nothing to allocate yet',
-  'plan.map.title': 'PERIOD MAP',
+  // The axis grew from one period to three months — the title has to say so (#152).
+  'plan.map.title': 'NEXT THREE MONTHS',
   'plan.map.today': 'today',
   'plan.map.runsOut': '{day} · money runs out',
   'plan.panel.income': 'INCOME',
