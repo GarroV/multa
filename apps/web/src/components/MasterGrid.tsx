@@ -1,7 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { fromMajor, money, toMajorString } from '@multa/core';
+import type { TranslationKey } from '@multa/i18n';
+import { ApiError } from '../lib/api.ts';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { GridAddRow } from './GridAddRow.tsx';
+import { GridRowSettings } from './GridRowSettings.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import {
   useCreateProposal,
@@ -108,6 +111,12 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const [editing, setEditing] = useState<string | null>(null);
   /* Какой раздел сейчас заводит строку: форма раскрывается под его шапкой, по одной за раз. */
   const [adding, setAdding] = useState<string | null>(null);
+  /* Чью настройку открыли листом: нажатие на название строки (запрос владельца 22.08.2026). */
+  const [settingsFor, setSettingsFor] = useState<{
+    targetKind: string;
+    targetId: string;
+    name: string;
+  } | null>(null);
   const edit = useEditGridCell(horizon);
   const propose = useCreateProposal();
   const isMember = useIsMember();
@@ -235,6 +244,23 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
     else edit.mutate(cell);
   };
 
+  /*
+   * Отказ правки обязан быть виден (issue #154). Раньше результат мутации не смотрели вовсе, и
+   * любой отказ сервера выглядел как «кнопка не сработала»: владелец правил сумму за интернет,
+   * получал 400 (вида строки не было в схеме) и не видел ни числа, ни причины.
+   *
+   * Причина называется словами там, где она известна: без курса правку валютной строки принять
+   * нельзя (#153), прошлый период — история, доход правится на «Плане».
+   */
+  const editErrorKey = (): TranslationKey | null => {
+    if (!edit.isError) return null;
+    const code = edit.error instanceof ApiError ? edit.error.code : '';
+    if (code === 'rate_unavailable') return 'plan.master.editNoRate';
+    if (code === 'cell_not_editable') return 'plan.master.editReadonly';
+    if (code === 'period_is_past') return 'plan.master.editPast';
+    return 'plan.master.editFailed';
+  };
+
   const fmt = (minor: string) => formatMinor(minor, base, locale);
 
   /**
@@ -322,7 +348,19 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
             ? 'mgrid-cell mgrid-cell-btn'
             : 'mgrid-cell mgrid-cell-off mgrid-cell-btn'
         }
-        title={t(row.targetKind === 'category' ? 'plan.master.editCell' : 'plan.master.editFrom')}
+        /*
+           Смысл правки у разных строк разный, и подпись говорит это прямо: бюджет периода у
+           категории, «с этой даты и далее» у обязательства, «только в этом периоде» у регулярного
+           платежа (issue #154). Одинаковые с виду ячейки, ведущие себя по-разному молча, хуже
+           запрета на правку.
+        */
+        title={t(
+          row.targetKind === 'category'
+            ? 'plan.master.editCell'
+            : row.targetKind === 'recurring'
+              ? 'plan.master.editOnce'
+              : 'plan.master.editFrom',
+        )}
         onClick={() => setEditing(key)}
       >
         {c.state === 'planned' ? fmt(c.minor) : '—'}
@@ -411,10 +449,40 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
           g.rows.map((r) => (
             <div className="mgrid-row mgrid-row-item" key={r.targetId}>
               <span className="mgrid-name">
-                <span className="mgrid-label">{r.name}</span>
+                {/*
+                  Название — вход в настройки строки (валюта, повтор, срок, ступени). До этого за
+                  ними приходилось уходить на другой экран и искать там ту же строку глазами, а
+                  таблица оставалась «только числами». Участник настройки не правит — у него имя
+                  остаётся текстом.
+                */}
+                {isMember ? (
+                  <span className="mgrid-label">{r.name}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="mgrid-label mgrid-label-btn"
+                    title={t('grid.row.settings')}
+                    onClick={() =>
+                      setSettingsFor({
+                        targetKind: r.targetKind,
+                        targetId: r.targetId,
+                        name: r.name,
+                      })
+                    }
+                  >
+                    {r.name}
+                  </button>
+                )}
                 {r.sourceCurrency !== base && <i className="dim"> {r.sourceCurrency}</i>}
               </span>
-              {r.cells.map((c, i) => editableCell(c, `${r.targetId}-${i}`, r, i))}
+              {r.cells.map((c, i) =>
+                /* Доход — «сколько придёт», а не план: правка там означала бы override
+                   поступления, отдельное решение. Кнопка без ручки на сервере давала молчаливый
+                   отказ (issue #154), поэтому доход рисуем обычной ячейкой. */
+                g.kind === 'income'
+                  ? cell(c, `${r.targetId}-${i}`)
+                  : editableCell(c, `${r.targetId}-${i}`, r, i),
+              )}
             </div>
           ))}
       </div>
@@ -423,6 +491,9 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
 
   return (
     <div className="mgrid-wrap">
+      {settingsFor && (
+        <GridRowSettings row={settingsFor} locale={locale} onClose={() => setSettingsFor(null)} />
+      )}
       <div
         className="mgrid"
         style={{ ['--cols' as string]: columns, ['--mgrid-name-w' as string]: `${nameWidth}px` }}
@@ -534,7 +605,13 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
           Участнику нужен ответ на его правку (issue #83): предложение план не меняет, и без этой
           строки экран выглядит так, будто ввод не сработал — человек повторит его ещё раз.
         */}
-        <span>{propose.isSuccess ? t('prop.sent') : t('plan.master.hint')}</span>
+        <span className={edit.isError ? 'st-warn' : undefined}>
+          {edit.isError
+            ? t(editErrorKey()!)
+            : propose.isSuccess
+              ? t('prop.sent')
+              : t('plan.master.hint')}
+        </span>
         {/*
           Выбор горизонта (вопрос владельца 16.08.2026: «почему показывает планирование всего на
           3 месяца?»). Длина периода у всех разная, поэтому считаем в периодах, а не в месяцах: при

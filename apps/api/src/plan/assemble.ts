@@ -15,8 +15,10 @@ import {
   amountOn,
   debtPaymentForPeriod,
   assemblePlan,
+  exchangeNeed,
   exponentOf,
   roundExchangeUp,
+  type ExchangeNeedLine,
   type Currency,
   budgetAdvice,
   burnRate,
@@ -316,6 +318,82 @@ async function toBase(
   const snap = await getRate(sourceCurrency, base, on, workspaceId);
   if (!snap) return null;
   return convert(money(sourceMinor, sourceCurrency), snap).minor;
+}
+
+/**
+ * Обратная дорога: сумма в базовой валюте → сумма в валюте строки (issue #153).
+ *
+ * Нужна там, где человек правит число, которое видел в базовой валюте, а хранится оно в своей:
+ * ячейка мастер-сетки. Кросс-курс считает ядро (`resolveRate` умеет инверсию), поэтому здесь
+ * ровно то же обращение к FX, что и в `toBase` — только пара наоборот.
+ */
+async function fromBase(
+  baseMinor: bigint,
+  targetCurrency: string,
+  base: string,
+  on: string,
+  workspaceId?: string,
+): Promise<bigint | null> {
+  if (targetCurrency === base) return baseMinor;
+  const snap = await getRate(base, targetCurrency, on, workspaceId);
+  if (!snap) return null;
+  return convert(money(baseMinor, base), snap).minor;
+}
+
+/**
+ * Валютные регулярные платежи, которых НЕТ в каскаде, — для «К размену» (issue #152).
+ *
+ * Дохода они не делят: большинство уже сидит внутри бюджета «Расходов», и включать их в раздачу
+ * значило бы посчитать одни деньги дважды. Но потребность в валюте от этого не исчезает — счёт за
+ * квартиру в евро придётся оплатить в евро, — а «К размену» отвечает именно на вопрос «сколько
+ * поменять», а не «сколько отложить».
+ *
+ * Отмеченные «откладывать» (`reserve`) сюда не идут: они уже строки каскада, и их валюту приносит
+ * аллокация. Привязанные к долгу/цели/конверту — тоже: валюту приносит целевая строка.
+ *
+ * Курс недоступен → строка пропускается, ровно как в плане: выдумывать сумму размена нельзя.
+ */
+async function exchangeNeedOutsideCascade(
+  ws: Workspace,
+  on: string,
+  period: { startsOn: string; endsOn: string },
+): Promise<ExchangeNeedLine[]> {
+  const rows = await db
+    .select()
+    .from(recurringItems)
+    .where(
+      and(
+        eq(recurringItems.workspaceId, ws.id),
+        eq(recurringItems.active, true),
+        eq(recurringItems.reserve, false),
+        sql`${recurringItems.targetId} is null`,
+        ne(recurringItems.currency, ws.baseCurrency),
+      ),
+    );
+
+  const lines: ExchangeNeedLine[] = [];
+  for (const r of rows) {
+    const due = recurringDueIn(
+      [
+        {
+          id: r.id,
+          name: r.name,
+          amountMinor: amountOn(r.amountMinor, parseAmountSteps(r.amountSteps), on),
+          currency: r.currency,
+          schedule: r.schedule as never,
+          startsOn: r.startsOn,
+          endsOn: r.endsOn,
+        },
+      ],
+      { startsOn: period.startsOn, endsOn: period.endsOn },
+    );
+    const total = due.reduce((acc, d) => acc + d.amountMinor, 0n);
+    if (total <= 0n) continue;
+    const baseMinor = await toBase(total, r.currency, ws.baseCurrency, on, ws.id);
+    if (baseMinor === null) continue;
+    lines.push({ currency: r.currency, minor: baseMinor });
+  }
+  return lines;
 }
 
 /**
@@ -817,7 +895,10 @@ export interface PlanDto {
   /** Отложено буфером и не вошло в дневной темп (issue #49). */
   bufferMinor: string;
   freeMinor: string;
+  /** Сколько базовой валюты надо поменять в этом периоде, округлённое вверх по настройке. */
   toExchangeMinor: string;
+  /** Во что менять: разбивка «К размену» по валютам платежа (issue #152). */
+  toExchangeByCurrency: { currency: string; minor: string }[];
   /** Дневной темп с учётом факта: остаток на жизнь ÷ daysLeft. */
   canSpendPerDayMinor: string;
   /** План на жизнь = категории + свободный остаток. */
@@ -944,6 +1025,44 @@ async function assembleForPeriod(
       sourceCurrency: ws.baseCurrency,
       sourceMinor: c.baseMinor,
     });
+
+  /*
+   * «К размену» (issue #152). Считается из валют самих строк, а не из отдельной сущности-корзины:
+   * корзины убраны из интерфейса 06.08.2026, и показатель, кормившийся только ими, был нулевым при
+   * живом счёте за квартиру в евро.
+   *
+   * Берём суммы, которые каскад УЖЕ роздал (сжатая строка требует меньше валюты), плюс валютные
+   * платежи вне каскада. Правило сложения — в ядре, одно на план и на мастер-сетку.
+   */
+  const need = exchangeNeed(
+    [
+      ...result.allocations.map((a) => {
+        const src = desc.get(`${a.targetKind}:${a.targetId}`)!;
+        return { currency: src.toCurrency ?? src.sourceCurrency, minor: a.allocatedMinor };
+      }),
+      ...(await exchangeNeedOutsideCascade(ws, asOf, period)),
+    ],
+    ws.baseCurrency,
+  );
+  /*
+   * Округление вверх по настройке (issue #49): человек идёт в обменник с круглым числом, а не с
+   * 47 813. Округляем КАЖДУЮ валюту, а итог складываем из округлённых — иначе строка «EUR 54 000»
+   * не сходилась бы с итогом «К размену», и таблица врала бы сама себе.
+   *
+   * Живёт здесь, а не в ядре: это про то, как человек пользуется цифрой, а не про то, сколько
+   * денег отложил каскад.
+   */
+  const roundExchange = (minor: bigint): bigint =>
+    roundExchangeUp(
+      minor,
+      settings.currency.exchangeRoundingMajor,
+      exponentOf(ws.baseCurrency as Currency),
+    );
+  const toExchangeByCurrency = need.byCurrency.map((line) => ({
+    currency: line.currency,
+    minor: roundExchange(line.minor).toString(),
+  }));
+  const toExchangeMinor = toExchangeByCurrency.reduce((acc, l) => acc + BigInt(l.minor), 0n);
 
   const fact = summarizeFact(summary, {
     spentLivingMinor: spending.livingMinor,
@@ -1089,21 +1208,8 @@ async function assembleForPeriod(
     compressedMinor: result.compressedMinor.toString(),
     bufferMinor: fact.bufferMinor.toString(),
     freeMinor: result.freeMinor.toString(),
-    /*
-     * Сумма к размену округляется вверх по настройке (issue #49): человек идёт в обменник с
-     * круглым числом, а не с 47 813. Округление живёт здесь, а не в ядре плана: это про то, как
-     * человек пользуется цифрой, а не про то, сколько денег каскад отложил.
-     */
-    /*
-     * Сумма к размену округляется вверх по настройке (issue #49): человек идёт в обменник с
-     * круглым числом, а не с 47 813. Округление живёт здесь, а не в ядре плана: это про то, как
-     * человек пользуется цифрой, а не про то, сколько денег каскад отложил.
-     */
-    toExchangeMinor: roundExchangeUp(
-      summary.toExchangeMinor,
-      settings.currency.exchangeRoundingMajor,
-      exponentOf(ws.baseCurrency as Currency),
-    ).toString(),
+    toExchangeMinor: toExchangeMinor.toString(),
+    toExchangeByCurrency,
     canSpendPerDayMinor: fact.canSpendPerDayMinor.toString(),
     livingMinor: summary.livingMinor.toString(),
     spentLivingMinor: fact.spentLivingMinor.toString(),
@@ -1201,6 +1307,7 @@ export async function getCurrentPlan(ws: Workspace, asOf: string): Promise<PlanD
  */
 async function setObligationAmountFrom(
   ws: Workspace,
+  asOf: string,
   cell: { targetKind: TargetKind; targetId: string; startsOn: string; plannedMinor: bigint },
   isCurrent: boolean,
 ): Promise<void> {
@@ -1222,14 +1329,28 @@ async function setObligationAmountFrom(
   const row = rows[0];
   if (!row) throw new Error('target_not_found');
 
+  /*
+   * Ячейка показывает базовую валюту — значит и правку человек ввёл в ней (issue #153). Сумма
+   * сущности живёт в СВОЕЙ валюте, поэтому переводим обратно тем же курсом, которым ячейка и
+   * считалась. Раньше число ложилось в валютное поле как есть: у цели в EUR «5 000 ₽» становились
+   * 5 000 EUR — план вырастал в сто раз, молча и с кодом 200.
+   *
+   * Курса нет — отказываем. Записать base-число в валютное поле «пока курс не появится» значило бы
+   * испортить план тем же способом, только тише.
+   */
+  const currency = (row as { currency: string }).currency;
+  const amountMinor = await fromBase(cell.plannedMinor, currency, ws.baseCurrency, asOf, ws.id);
+  if (amountMinor === null) throw new Error('rate_unavailable');
+  const value = { ...cell, plannedMinor: amountMinor };
+
   if (isCurrent) {
     // Базовая сумма: для долга это платёж, для конверта — значение правила, для цели — взнос.
     const patch =
       cell.targetKind === 'debt'
-        ? { paymentMinor: cell.plannedMinor }
+        ? { paymentMinor: value.plannedMinor }
         : cell.targetKind === 'envelope'
-          ? { ruleValue: cell.plannedMinor.toString() }
-          : { plannedPerPeriodMinor: cell.plannedMinor };
+          ? { ruleValue: value.plannedMinor.toString() }
+          : { plannedPerPeriodMinor: value.plannedMinor };
     await db
       .update(table)
       .set(patch as never)
@@ -1240,7 +1361,7 @@ async function setObligationAmountFrom(
   const steps = parseAmountSteps((row as { amountSteps?: unknown }).amountSteps).filter(
     (s) => s.from !== cell.startsOn,
   );
-  const next = [...steps, { from: cell.startsOn, amountMinor: cell.plannedMinor }]
+  const next = [...steps, { from: cell.startsOn, amountMinor: value.plannedMinor }]
     .sort((a, b) => (a.from < b.from ? -1 : 1))
     .map((s) => ({ from: s.from, amountMinor: s.amountMinor.toString() }));
   await db
@@ -1252,8 +1373,19 @@ async function setObligationAmountFrom(
 export async function setGridCell(
   ws: Workspace,
   asOf: string,
-  cell: { targetKind: TargetKind; targetId: string; startsOn: string; plannedMinor: bigint },
+  /*
+   * `income` в типе есть, а в правке нет: доход в сетке — это «сколько придёт», и правка там
+   * означала бы override поступления, отдельное решение. Принимаем и честно отказываем, чтобы
+   * интерфейс мог сказать «так нельзя» вместо молчания (issue #154).
+   */
+  cell: {
+    targetKind: TargetKind | 'income';
+    targetId: string;
+    startsOn: string;
+    plannedMinor: bigint;
+  },
 ): Promise<void> {
+  if (cell.targetKind === 'income') throw new Error('cell_not_editable');
   const current = currentPeriod(ws, asOf);
   if (cell.startsOn < current.startsOn) throw new Error('period_is_past');
 
@@ -1300,11 +1432,71 @@ export async function setGridCell(
   }
 
   /*
+   * Регулярный платёж: отклонение ОДНОГО периода (issue #154, запрос владельца 22.08.2026 — «мне
+   * надо чтобы именно в этом месяце там была другая сумма»).
+   *
+   * Смысл правки здесь другой, чем у обязательства: счёт за интернет в этом месяце другой, а со
+   * следующего снова обычный, — поэтому сама строка не трогается, а сумма кладётся на период.
+   * Флаг `overridden` защищает её от пересборки плана, как и у правок каскада.
+   *
+   * Ноль означает «верни как было»: платёж не пропадает, а считается по своему расписанию. Иначе
+   * снять отклонение было бы нечем — пустое поле в ячейке пришлось бы толковать как «платежа нет»,
+   * хотя счёт всё равно придёт.
+   */
+  if (cell.targetKind === 'recurring') {
+    const owned = await db
+      .select({ id: recurringItems.id })
+      .from(recurringItems)
+      .where(and(eq(recurringItems.id, cell.targetId), eq(recurringItems.workspaceId, ws.id)))
+      .limit(1);
+    if (!owned[0]) throw new Error('target_not_found');
+
+    const period = periodForDate(ws.periodAnchors as PeriodConfig, cell.startsOn);
+    const sources = await activeSources(ws);
+    const { incomeMinor } = await incomeForPeriod(ws, sources, period, asOf);
+    const { id: periodId } = await ensurePeriodRow(ws, period, incomeMinor);
+
+    if (cell.plannedMinor <= 0n) {
+      await db
+        .delete(plannedItems)
+        .where(
+          and(
+            eq(plannedItems.periodId, periodId),
+            eq(plannedItems.targetKind, 'recurring'),
+            eq(plannedItems.targetId, cell.targetId),
+          ),
+        );
+      return;
+    }
+    await db
+      .insert(plannedItems)
+      .values({
+        workspaceId: ws.id,
+        periodId,
+        targetKind: 'recurring',
+        targetId: cell.targetId,
+        plannedMinor: cell.plannedMinor,
+        executionStatus: 'n_a',
+        overridden: true,
+      })
+      .onConflictDoUpdate({
+        target: [plannedItems.periodId, plannedItems.targetKind, plannedItems.targetId],
+        set: { plannedMinor: sql`excluded.planned_minor`, overridden: true },
+      });
+    return;
+  }
+
+  /*
    * Обязательства: ступень суммы с даты периода. В текущем периоде правим базовую сумму — ступень
    * «с сегодня» была бы тем же числом, но лишней строкой в списке ступеней, которую человек потом
    * увидит и не поймёт, откуда она.
    */
-  await setObligationAmountFrom(ws, cell, cell.startsOn === current.startsOn);
+  await setObligationAmountFrom(
+    ws,
+    asOf,
+    { ...cell, targetKind: cell.targetKind },
+    cell.startsOn === current.startsOn,
+  );
 }
 
 export async function setCategoryBudget(

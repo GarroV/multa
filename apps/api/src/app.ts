@@ -581,6 +581,11 @@ app.put('/v1/plan/grid/cell', requireWorkspace, requireOwner, async (c) => {
     // Разные отказы — разные коды: «в прошлое нельзя» это не «не найдено».
     if (message === 'period_is_past') return c.json({ error: 'period_is_past' }, 422);
     if (message === 'cell_not_editable') return c.json({ error: 'cell_not_editable' }, 422);
+    /*
+     * Правка валютной строки без курса (issue #153): записать введённые рубли в валютное поле
+     * нельзя — это испортит план. Отказываем явно, чтобы интерфейс объяснил причину.
+     */
+    if (message === 'rate_unavailable') return c.json({ error: 'rate_unavailable' }, 422);
     if (message === 'category_not_found' || message === 'target_not_found') {
       return c.json({ error: 'not_found' }, 404);
     }

@@ -420,7 +420,6 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);
   const withCcy = (m: string | bigint) => `${fmt(m)} ${base}`;
 
-  const buckets = plan.allocations.filter((a) => a.targetKind === 'bucket');
   const categories = plan.allocations.filter((a) => a.targetKind === 'category');
   const compressed = BigInt(plan.compressedMinor) > 0n;
   const living = BigInt(plan.livingMinor);
@@ -545,14 +544,17 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               slot="exchange"
               tag={<Tag tone="vio">{t('plan.kpi.calculated')}</Tag>}
             >
-              {buckets.length === 0 && <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>}
+              {/* Разбивка приходит из API (issue #152): раньше здесь перечислялись валютные
+                  корзины, а их убрали из интерфейса — и блок молчал при живом счёте в евро. */}
+              {plan.toExchangeByCurrency.length === 0 && (
+                <span className="kpi-sub">{t('plan.kpi.noExchange')}</span>
+              )}
               <div className="kpi-rows">
-                {buckets.map((b) => (
-                  <div key={b.targetId}>
+                {plan.toExchangeByCurrency.map((line) => (
+                  <div key={line.currency}>
                     <span>
-                      {withCcy(b.allocatedMinor)} → {b.toCurrency ?? b.sourceCurrency}
+                      {withCcy(line.minor)} → {line.currency}
                     </span>
-                    <span className="dim">{b.name}</span>
                   </div>
                 ))}
               </div>

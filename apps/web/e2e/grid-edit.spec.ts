@@ -340,3 +340,83 @@ test('колонка имён раздвигается с клавиатуры, 
   await handle.press('Home');
   expect(await nameWidth(page)).toBe(base);
 });
+
+/**
+ * Настройки строки из таблицы (запрос владельца 22.08.2026: «при нажатии на наименование строки
+ * затрат всплывало контекстное окно настройки, где можно выбрать валюту, периодичность и прочие
+ * настройки, что у нас лежат в админке обязательств»).
+ *
+ * Проверяется дорога целиком: название — вход в настройки, внутри те же поля, что в разделах, и
+ * сохранение доезжает до таблицы. Раньше за валютой или повтором приходилось уходить на другой
+ * экран и искать там ту же строку глазами.
+ */
+test('название строки открывает настройки: валюта и повтор на месте', async ({ page }) => {
+  const grid = page.locator('.mgrid');
+  await expect(grid).toBeVisible();
+
+  const row = grid.locator('.mgrid-row', { hasText: 'Internet + mobile' }).first();
+  await row.locator('.mgrid-label-btn').click();
+
+  const sheet = page.locator('.sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('Internet + mobile').first()).toBeVisible();
+  // Валюта и повтор — то, за чем человек сюда идёт.
+  await expect(sheet.getByLabel(/Валюта|Currency/)).toBeVisible();
+  await expect(sheet.getByLabel(/Повтор|Repeat/)).toBeVisible();
+});
+
+test('правка из настроек строки доезжает до таблицы', async ({ page }) => {
+  const grid = page.locator('.mgrid');
+  const row = grid.locator('.mgrid-row', { hasText: 'Subscriptions' }).first();
+  const before = (await row.locator('.mgrid-cell').first().innerText()).trim();
+
+  await row.locator('.mgrid-label-btn').click();
+  const sheet = page.locator('.sheet');
+  await sheet.getByLabel(/^Сумма|^Amount/).fill('3500');
+  await sheet.getByRole('button', { name: /^Сохранить$|^Save$/ }).click();
+
+  await expect(sheet).toBeHidden();
+  await expect
+    .poll(async () => (await row.locator('.mgrid-cell').first().innerText()).trim(), {
+      timeout: 15_000,
+    })
+    .not.toBe(before);
+});
+
+test('Esc закрывает настройки строки, ничего не записав', async ({ page }) => {
+  const grid = page.locator('.mgrid');
+  const row = grid.locator('.mgrid-row', { hasText: 'Internet + mobile' }).first();
+  const before = (await row.locator('.mgrid-cell').nth(1).innerText()).trim();
+
+  await row.locator('.mgrid-label-btn').click();
+  await expect(page.locator('.sheet')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await expect(page.locator('.sheet')).toBeHidden();
+  expect((await row.locator('.mgrid-cell').nth(1).innerText()).trim()).toBe(before);
+});
+
+test('плюс раздела — знак без рамки, но попасть по нему можно', async ({ page }) => {
+  /*
+   * Замечание владельца 22.08.2026: «плюсы сделай минималистичнее». Пять кнопок с рамками в первом
+   * столбце спорили с заголовками разделов. Убираем вид, а не попадаемость: 22px — семья компактных
+   * действий, ниже начинаются промахи пальцем.
+   */
+  const plus = page.locator('.mgrid-add').first();
+  await expect(plus).toBeVisible();
+  const look = await plus.evaluate((el) => {
+    const st = getComputedStyle(el);
+    const box = el.getBoundingClientRect();
+    return {
+      border: st.borderTopColor,
+      background: st.backgroundColor,
+      height: Math.round(box.height),
+      width: Math.round(box.width),
+    };
+  });
+  expect(look.border).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+  expect(look.background).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+  expect(look.height).toBeGreaterThanOrEqual(22);
+  // 24px по ширине — порог сторожей «не мельче минимума» и «не обрезана до огрызка».
+  expect(look.width).toBeGreaterThanOrEqual(24);
+});

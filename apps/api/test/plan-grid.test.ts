@@ -331,6 +331,43 @@ describe('мастер-сетка', () => {
     expect(row.cells.some((c) => c.state === 'planned' && c.minor !== '0')).toBe(true);
   });
 
+  test('валютный платёж вне каскада попадает в «К размену» (issue #152)', async () => {
+    /*
+     * Жалоба владельца 22.08.2026: «есть квартира и платёж в евро, но строка „к размену“ пустая».
+     * Подвал считался только из валютных корзин, а раздел корзин убрали из интерфейса 06.08.2026 —
+     * показатель стал структурно нулевым: завести корзину нечем, а счёт в евро на него не влиял.
+     *
+     * Регулярные платежи дохода не делят (они уже внутри бюджета «Расходов»), поэтому свободный
+     * остаток и цифра дня от них не шевелятся — но евро под них купить придётся, и «К размену»
+     * обязан это показать.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+    const before = await grid(client, '?periods=2');
+
+    await expectOk(
+      await client.post('/v1/recurring-items', {
+        name: 'Квартира',
+        amountMinor: '65000',
+        currency: 'EUR',
+        // Четыре дня по месяцу: платёж наступает в любом полумесячном периоде, когда бы ни шёл тест.
+        schedule: { kind: 'monthly-days', days: [5, 12, 20, 27] },
+      }),
+      201,
+    );
+
+    const after = await grid(client, '?periods=2');
+    const need = after.footer.toExchangeMinor.map((v) => BigInt(v));
+    expect(need.every((v) => v > 0n)).toBe(true);
+    expect(after.footer.toExchangeByCurrency.map((l) => l.currency)).toEqual(['EUR']);
+    expect(after.footer.toExchangeByCurrency[0]?.cells).toEqual(after.footer.toExchangeMinor);
+
+    // Раздача не тронута: «К размену» — срез по валютам, а не ещё одна строка каскада.
+    expect(after.footer.freeMinor).toEqual(before.footer.freeMinor);
+    expect(after.footer.perDayMinor).toEqual(before.footer.perDayMinor);
+  });
+
   test('новая категория без бюджета видна строкой, а не исчезает (жалоба владельца 19.08.2026)', async () => {
     /*
      * «Продукты не добавляются» — категория создавалась на сервере (POST 201, подтверждено сетевым

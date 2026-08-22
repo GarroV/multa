@@ -123,7 +123,8 @@ const keyOf = (kind: TargetKind, id: string): string => `${kind}:${id}`;
 const numericToMinor = (value: string): bigint => BigInt(value.trim().split('.')[0] || '0');
 
 /**
- * Бюджеты категорий, заданные на конкретные периоды горизонта.
+ * Суммы строк, заданные на конкретные периоды горизонта: бюджеты категорий и отклонения
+ * регулярных платежей («в этом месяце интернет другой», issue #154).
  *
  * Ключ — «дата начала периода : id категории»: сетка знает периоды по датам (их же она отдаёт в
  * колонках), а не по внутренним id, и склеивать одно с другим в вызывающем коде значило бы завести
@@ -135,6 +136,7 @@ const numericToMinor = (value: string): bigint => BigInt(value.trim().split('.')
 async function plannedByPeriod(
   workspaceId: string,
   periods: readonly PayPeriod[],
+  targetKind: 'category' | 'recurring' = 'category',
 ): Promise<Map<string, bigint>> {
   const starts = periods.map((p) => p.startsOn);
   const rows = await db
@@ -148,7 +150,7 @@ async function plannedByPeriod(
     .where(
       and(
         eq(plannedItems.workspaceId, workspaceId),
-        eq(plannedItems.targetKind, 'category'),
+        eq(plannedItems.targetKind, targetKind),
         inArray(payPeriods.startsOn, starts),
       ),
     );
@@ -408,7 +410,59 @@ export async function getPlanGrid(
       : undefined,
   );
 
+  /*
+   * Ячейки регулярных платежей считаем ДО каскада: из них же берётся валютная потребность для
+   * подвала (issue #152). Считать их дважды — в подвале и в группе — значило бы развести две
+   * арифметики про одни и те же платежи, и однажды они разошлись бы на копейку.
+   */
+  const recurringOverrides = await plannedByPeriod(ws.id, periods, 'recurring');
+  const recurringCells = recurringRows.map((item) => {
+    const steps = parseAmountSteps(item.amountSteps);
+    const cells = periods.map((period: PayPeriod) => {
+      /*
+       * Отклонение периода сильнее расписания (issue #154): «в этом месяце счёт другой» — это
+       * решение человека, и пересчитывать его из правила повтора нельзя. Хранится уже в базовой
+       * валюте: в таблице человек правил рубли, их и показываем.
+       */
+      const override = recurringOverrides.get(`${period.startsOn}:${item.id}`);
+      if (override !== undefined) return override;
+      const due = recurringDueIn(
+        [
+          {
+            id: item.id,
+            name: item.name,
+            // Сумма на дату периода: ступени работают и здесь.
+            amountMinor: amountOn(item.amountMinor, steps, period.startsOn),
+            currency: item.currency,
+            schedule: item.schedule as never,
+            startsOn: item.startsOn,
+            endsOn: item.endsOn,
+          },
+        ],
+        period,
+      );
+      return due.reduce((acc, d) => acc + (toBase(d.amountMinor, d.currency) ?? 0n), 0n);
+    });
+    return { item, cells };
+  });
+
+  /*
+   * Валютные платежи ВНЕ каскада — в «К размену» (issue #152). Дохода они не делят: большинство
+   * уже сидит внутри бюджета «Расходов», и складывать их в итоги нельзя. Но евро под счёт за
+   * квартиру купить всё равно придётся, а «К размену» — срез по валютам, не строка раздачи.
+   *
+   * Отмеченные «откладывать» (`reserve`) сюда не идут: они уже строки каскада, и посчитались бы
+   * дважды. Привязанные к долгу/цели/конверту — тоже: их валюту приносит целевая строка.
+   */
+  const extraExchange = periods.map((_: PayPeriod, i: number) =>
+    recurringCells
+      .filter(({ item }) => !item.reserve && item.targetId === null && item.currency !== base)
+      .map(({ item, cells }) => ({ currency: item.currency, minor: cells[i] ?? 0n })),
+  );
+
   const grid = projectGrid({
+    baseCurrency: base,
+    extraExchange,
     periods: periods.map((p: PayPeriod) => ({
       startsOn: p.startsOn,
       endsOn: p.endsOn,
@@ -436,43 +490,18 @@ export async function getPlanGrid(
     recurringRows.length === 0
       ? null
       : (() => {
-          const rows: GridRowDto[] = recurringRows.map((item) => {
-            const steps = parseAmountSteps(item.amountSteps);
-            const cells = periods.map((period: PayPeriod) => {
-              const due = recurringDueIn(
-                [
-                  {
-                    id: item.id,
-                    name: item.name,
-                    // Сумма на дату периода: ступени работают и здесь.
-                    amountMinor: amountOn(item.amountMinor, steps, period.startsOn),
-                    currency: item.currency,
-                    schedule: item.schedule as never,
-                    startsOn: item.startsOn,
-                    endsOn: item.endsOn,
-                  },
-                ],
-                period,
-              );
-              const minor = due.reduce(
-                (acc, d) => acc + (toBase(d.amountMinor, d.currency) ?? 0n),
-                0n,
-              );
-              return {
-                minor: minor.toString(),
-                state: (minor > 0n ? 'planned' : 'none') as 'planned' | 'none',
-              };
-            });
-            return {
-              targetKind: 'recurring' as const,
-              targetId: item.id,
-              name: item.name,
-              sourceCurrency: item.currency,
-              cells,
-              totalMinor: cells.reduce((acc, c) => acc + BigInt(c.minor), 0n).toString(),
-              endsAfterIndex: null,
-            };
-          });
+          const rows: GridRowDto[] = recurringCells.map(({ item, cells }) => ({
+            targetKind: 'recurring' as const,
+            targetId: item.id,
+            name: item.name,
+            sourceCurrency: item.currency,
+            cells: cells.map((minor) => ({
+              minor: minor.toString(),
+              state: (minor > 0n ? 'planned' : 'none') as 'planned' | 'none',
+            })),
+            totalMinor: cells.reduce((acc, m) => acc + m, 0n).toString(),
+            endsAfterIndex: null,
+          }));
           const totals = periods.map((_: PayPeriod, i: number) =>
             rows.reduce((acc, r) => acc + BigInt(r.cells[i]!.minor), 0n).toString(),
           );

@@ -297,6 +297,12 @@ export const en = {
   'plan.master.toExchange': 'To exchange',
   'plan.master.editCell': 'Budget for this period — click to change',
   'plan.master.editFrom': 'From this date onward — click to change',
+  // A recurring payment is changed for one period: «this month the bill is different» (issue #154).
+  'plan.master.editOnce': 'This period only — click to change',
+  'plan.master.editFailed': 'The change was not saved. Try again.',
+  'plan.master.editNoRate': 'Not saved: no rate for today in that currency.',
+  'plan.master.editReadonly': 'This line is not editable here — income is edited on «Plan».',
+  'plan.master.editPast': 'A past period is not editable: a closed plan is history.',
   'plan.master.ended': 'line has ended: nothing left to pay',
   'plan.master.noRate': 'No rate for today, so out of the table: {list}',
   'plan.master.horizon': 'Horizon',
@@ -482,6 +488,15 @@ export const en = {
   'obl.mode': 'How to define the debt',
   'obl.mode.payment': 'Payment',
   'obl.mode.deadline': 'By date',
+  // Row settings straight from the table (issue #154, owner request 2026-08-22).
+  'grid.row.settings': 'Row settings',
+  'grid.row.gone': 'This row is gone — it was deleted or renamed in another window.',
+  'grid.row.categoryBudget':
+    'A category budget is set in the period cell: every period has its own.',
+  'grid.row.currencyFixed':
+    'This row is in {ccy}. It cannot be switched here: the amounts are stored in that currency, and swapping it would silently re-label them. Need another currency — create the row anew.',
+  'grid.row.protect': 'Protected from automatic trimming',
+  'obl.perPeriod': 'Per-period contribution',
   'obl.payment': 'Payment',
   'obl.remaining': 'Left to pay',
   'obl.formHint':

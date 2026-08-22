@@ -553,7 +553,13 @@ export const voiceEntrySchema = z.object({
  * так клиент не изобретает собственную арифметику периодов и не может разойтись с сервером.
  */
 export const gridCellSchema = z.object({
-  targetKind: z.enum(['category', 'debt', 'envelope', 'goal']),
+  /*
+   * `income` принимается сознательно, хотя правке не подлежит (issue #154): валидация отсекла бы
+   * его четырёхсоткой «непонятный запрос», а человеку нужно услышать «так нельзя» — это отвечает
+   * ручка кодом 422. Молчаливый отказ здесь уже стоил владельцу вечера: ячейка открывалась,
+   * число вводилось, и ничего не происходило.
+   */
+  targetKind: z.enum(['category', 'debt', 'envelope', 'goal', 'recurring', 'income']),
   targetId: z.string().uuid(),
   startsOn: isoDate,
   plannedMinor: minor,

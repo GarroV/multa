@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { categoryId, expectOk, getPlan, onboarded, type PlanDto } from './client.ts';
+import { categoryId, expectOk, getPlan, onboarded, seedRate, type PlanDto } from './client.ts';
 
 /**
  * Каскад приоритетов и сжатие при нехватке (железное правило 3):
@@ -119,5 +119,79 @@ describe('сборка плана каскадом', () => {
     const food = await categoryId(client, 'Продукты');
     const res = await client.put(`/v1/plan/current/categories/${food}`, { plannedMinor: '-1' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('«К размену» — потребность в валюте (issue #152)', () => {
+  /*
+   * Показатель отвечает на вопрос «сколько рублей поменять», и до 22.08.2026 он складывался
+   * ИСКЛЮЧИТЕЛЬНО из валютных корзин. Корзины 06.08.2026 убрали из интерфейса — и «К размену»
+   * стал нулевым при живых платежах в евро: жалоба владельца «есть квартира и платёж в евро, но
+   * строка к размену пустая». Теперь потребность выводится из валют самих строк.
+   */
+
+  test('валютный долг даёт потребность в размене, рублёвый — нет', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+
+    await expectOk(
+      await client.post('/v1/debts', {
+        name: 'Ремонт в евро',
+        currency: 'EUR',
+        principalMinor: '500000',
+        remainingMinor: '500000',
+        paymentMinor: '50000',
+      }),
+      201,
+    );
+    await expectOk(
+      await client.post('/v1/debts', {
+        name: 'Рублёвая рассрочка',
+        currency: 'RUB',
+        principalMinor: '5000000',
+        remainingMinor: '5000000',
+        paymentMinor: '1000000',
+      }),
+      201,
+    );
+
+    const plan = await getPlan(client);
+    // 500 EUR × 100 ₽ = 50 000 ₽; рублёвый долг в размен не входит.
+    expect(BigInt(plan.toExchangeMinor)).toBe(5_000_000n);
+    expect(plan.toExchangeByCurrency).toEqual([{ currency: 'EUR', minor: '5000000' }]);
+  });
+
+  test('без валютных строк размен нулевой, а разбивка пустая', async () => {
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const plan = await getPlan(client);
+    expect(BigInt(plan.toExchangeMinor)).toBe(0n);
+    expect(plan.toExchangeByCurrency).toEqual([]);
+  });
+
+  test('сжатая валютная цель требует меньше валюты: размен идёт от роздАнного', async () => {
+    /*
+     * Каскад режет цель при нехватке — и потребность в валюте обязана это повторить. Иначе подвал
+     * обещал бы размен на деньги, которых в плане нет, и человек унёс бы в обменник лишнее.
+     */
+    const client = await onboarded({ payoutMinor: '1000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+
+    await expectOk(
+      await client.post('/v1/goals', {
+        name: 'Поездка',
+        currency: 'EUR',
+        targetMinor: '2000000',
+        plannedPerPeriodMinor: '200000',
+      }),
+      201,
+    );
+
+    const plan = await getPlan(client);
+    const goal = plan.allocations.find((a) => a.targetKind === 'goal');
+    if (!goal) throw new Error('цели нет в плане');
+    // Доход 10 000 ₽ против взноса 2 000 EUR = 200 000 ₽ — цель сжата до дохода.
+    expect(BigInt(plan.toExchangeMinor)).toBe(BigInt(goal.allocatedMinor));
   });
 });

@@ -13,6 +13,7 @@
  */
 
 import type { CompressibleKind, PlanItem, TargetKind } from './cascade.ts';
+import { exchangeNeed, type ExchangeNeedLine } from './exchangeNeed.ts';
 import { percentOfMinor } from './income.ts';
 import { assemblePlan } from './plan.ts';
 
@@ -72,6 +73,8 @@ export interface GridPeriod {
 
 export interface GridInput {
   readonly periods: readonly GridPeriod[];
+  /** Базовая валюта воркспейса: относительно неё строка считается валютной (issue #152). */
+  readonly baseCurrency: string;
   /** Ожидаемый доход по каждому периоду, base minor. Длина совпадает с `periods`. */
   readonly incomeMinor: readonly bigint[];
   readonly rows: readonly GridRowSpec[];
@@ -83,6 +86,13 @@ export interface GridInput {
    * том периоде отсутствует (`none`), а не равна нулю.
    */
   readonly saved?: readonly (ReadonlyMap<string, bigint> | undefined)[];
+  /**
+   * Валютные обязательства ВНЕ каскада по периодам (issue #152): регулярные платежи, которые
+   * списываются сами и дохода не делят. В раздачу они не идут — большинство уже сидит внутри
+   * бюджета категорий, — но евро под них купить всё равно придётся, поэтому в «К размену» они
+   * входят. Индекс — номер периода в горизонте.
+   */
+  readonly extraExchange?: readonly (readonly ExchangeNeedLine[])[];
 }
 
 export interface GridRow {
@@ -224,14 +234,32 @@ export function projectGrid(input: GridInput): Grid {
 
     freeMinor.push(summary.freeMinor);
     perDayMinor.push(summary.canSpendPerDayMinor);
-    toExchangeMinor.push(summary.toExchangeMinor);
 
+    /*
+     * «К размену» — срез по валютам, а не ещё одна строка раздачи (issue #152). Берём суммы,
+     * которые каскад УЖЕ роздал: сжатая строка требует меньше валюты, и потребность обязана это
+     * повторять, иначе подвал обещал бы размен на деньги, которых в плане нет.
+     *
+     * Валюта строки — та, в которой платить: у корзины это валюта получения, у остальных строк
+     * их собственная. Правило сложения — в `exchangeNeed()`, одно на план и на матрицу.
+     */
+    const needLines: ExchangeNeedLine[] = [];
     for (const row of rows) {
-      if (row.targetKind !== 'bucket') continue;
-      const currency = row.toCurrency ?? row.sourceCurrency;
-      const series = exchangeByCurrency.get(currency) ?? periods.map(() => 0n);
-      series[i] = (series[i] ?? 0n) + (allocated.get(keyOf('bucket', row.targetId)) ?? 0n);
-      exchangeByCurrency.set(currency, series);
+      const key = keyOf(row.targetKind, row.targetId);
+      if (absent.has(key)) continue;
+      needLines.push({
+        currency: row.toCurrency ?? row.sourceCurrency,
+        minor: allocated.get(key) ?? 0n,
+      });
+    }
+    needLines.push(...(input.extraExchange?.[i] ?? []));
+
+    const need = exchangeNeed(needLines, input.baseCurrency);
+    toExchangeMinor.push(need.totalMinor);
+    for (const line of need.byCurrency) {
+      const series = exchangeByCurrency.get(line.currency) ?? periods.map(() => 0n);
+      series[i] = line.minor;
+      exchangeByCurrency.set(line.currency, series);
     }
   }
 

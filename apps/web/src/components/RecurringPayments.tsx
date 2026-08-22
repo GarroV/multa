@@ -1,10 +1,10 @@
-import { fromMajor, repeatRuleCandidates, type RepeatRule } from '@multa/core';
-import type { TranslationKey } from '@multa/i18n';
+import { fromMajor, repeatRuleCandidates } from '@multa/core';
 import { Fragment, useState } from 'react';
 import { formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useToday } from '../lib/useToday.ts';
 import { RecurringMore } from './RecurringMore.tsx';
+import { repeatRuleLabel, scheduleLabel } from '../lib/repeatLabel.ts';
 import {
   useCreateRecurring,
   useDeleteRecurring,
@@ -29,43 +29,6 @@ import { Select } from './ui/Select.tsx';
  * (`repeatRuleCandidates`) — это календарная арифметика, ей не место в React (правило 4). Здесь
  * только подписи.
  */
-
-const WEEKDAY_KEYS: TranslationKey[] = [
-  'rec.wd.0',
-  'rec.wd.1',
-  'rec.wd.2',
-  'rec.wd.3',
-  'rec.wd.4',
-  'rec.wd.5',
-  'rec.wd.6',
-];
-
-/**
- * Месяц словом. Числом дату года записать нельзя: «12.9» читается как 12 сентября в одном языке и
- * как 9 декабря в другом, а платёж раз в год промахиваться на три месяца не должен.
- */
-const MONTH_KEYS: TranslationKey[] = [
-  'rec.mon.1',
-  'rec.mon.2',
-  'rec.mon.3',
-  'rec.mon.4',
-  'rec.mon.5',
-  'rec.mon.6',
-  'rec.mon.7',
-  'rec.mon.8',
-  'rec.mon.9',
-  'rec.mon.10',
-  'rec.mon.11',
-  'rec.mon.12',
-];
-
-const NTH_KEYS: Record<string, TranslationKey> = {
-  '1': 'rec.nth.1',
-  '2': 'rec.nth.2',
-  '3': 'rec.nth.3',
-  '4': 'rec.nth.4',
-  '-1': 'rec.nth.last',
-};
 
 /** major-строка → minor или null. Мусор молча в ноль не превращаем (правило ревью #20). */
 function parseMinor(value: string, ccy: string): string | null {
@@ -96,44 +59,6 @@ export function RecurringPayments({ base }: { base: string }) {
   const [openMore, setOpenMore] = useState<string | null>(null);
 
   const rules = repeatRuleCandidates(firstOn);
-
-  /** Подпись правила: собирается из ключей, потому что род и число зависят от языка (правило 5). */
-  const ruleLabel = (rule: RepeatRule): string => {
-    switch (rule.kind) {
-      case 'monthly-days':
-        return t('rec.rule.monthly', { day: rule.days[0] ?? 1 });
-      case 'monthly-nth-weekday':
-        return t('rec.rule.nthWeekday', {
-          nth: t(NTH_KEYS[String(rule.nth)] ?? 'rec.nth.1'),
-          weekday: t(WEEKDAY_KEYS[rule.weekday] ?? 'rec.wd.0'),
-        });
-      case 'every-weeks':
-        return rule.weeks === 1 ? t('rec.rule.weekly') : t('rec.rule.biweekly');
-      case 'yearly':
-        return t('rec.rule.yearly', {
-          date: `${rule.day} ${t(MONTH_KEYS[rule.month - 1] ?? 'rec.mon.1')}`,
-        });
-      case 'each-payout':
-        return t('rec.rule.eachPayout');
-    }
-  };
-
-  /** Подпись сохранённого расписания: те же формулировки, что в редакторе. */
-  const savedLabel = (schedule: RecurringItemDto['schedule']): string => {
-    const s = schedule as Record<string, never> & { kind: string };
-    switch (s.kind) {
-      case 'monthly-days':
-      case 'monthly-nth-weekday':
-      case 'every-weeks':
-      case 'yearly':
-      case 'each-payout':
-        return ruleLabel(schedule as unknown as RepeatRule);
-      case 'one-off':
-        return String((schedule as { date?: string }).date ?? '—');
-      default:
-        return t('rec.rule.irregular');
-    }
-  };
 
   const submit = () => {
     const minor = parseMinor(amount, currency);
@@ -238,7 +163,10 @@ export function RecurringPayments({ base }: { base: string }) {
               label={t('rec.repeat')}
               value={String(ruleIndex)}
               onChange={(next) => setRuleIndex(Number(next))}
-              options={rules.map((rule, i) => ({ value: String(i), label: ruleLabel(rule) }))}
+              options={rules.map((rule, i) => ({
+                value: String(i),
+                label: repeatRuleLabel(rule, t),
+              }))}
             />
             <button type="button" className="btn" disabled={create.isPending} onClick={submit}>
               {create.isPending ? t('common.loading') : t('rec.add')}
@@ -263,7 +191,7 @@ export function RecurringPayments({ base }: { base: string }) {
             <span className="prow-day" aria-hidden />
             <span className="prow-name">
               <span>{item.name}</span>
-              <Tag>{savedLabel(item.schedule)}</Tag>
+              <Tag>{scheduleLabel(item.schedule, t)}</Tag>
               {item.endsOn && <Tag tone="quiet">{t('rec.cancelled', { date: item.endsOn })}</Tag>}
               {item.currency !== base && <Tag tone="vio">{item.currency}</Tag>}
             </span>

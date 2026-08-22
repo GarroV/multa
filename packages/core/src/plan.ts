@@ -3,7 +3,11 @@
  *
  * Задача модуля — превратить набор обязательств (уже приведённых к base-валюте) в
  * упорядоченный вход каскада и посчитать производные ага-момента (04-web-ux §Дашборд):
- * «жить на X/день, поменять Y, к концу периода свободно Z».
+ * «жить на X/день, к концу периода свободно Z».
+ *
+ * «К размену» здесь НЕ считается (issue #152): для него нужна валюта каждой строки, а сюда
+ * приходят суммы, уже приведённые к base. Правило живёт в `exchangeNeed()` и вызывается там, где
+ * валюты известны — в сборке плана (apps/api) и в мастер-сетке (grid.ts).
  *
  * Приоритет раздачи (01-domain-model §Каскад): debts → buckets → envelopes → categories → goals.
  * Сжатие при нехватке — забота cascade() (goals → envelopes → незащищённые categories).
@@ -49,8 +53,6 @@ export function orderPlanItems<T extends { readonly targetKind: TargetKind }>(
 }
 
 export interface PlanSummary {
-  /** Сумма аллокаций валютных корзин — «К размену». */
-  readonly toExchangeMinor: bigint;
   /** Свободный остаток после каскада (может быть < 0 при нехватке на обязательства). */
   readonly freeMinor: bigint;
   /** Деньги на повседневную жизнь = аллокации категорий + свободный остаток (>= 0). */
@@ -70,13 +72,12 @@ export function summarizePlan(
   result: CascadeResult,
   opts: { readonly daysInPeriod: number },
 ): PlanSummary {
-  const toExchangeMinor = sumBy(result.allocations, 'bucket');
   const categoryMinor = sumBy(result.allocations, 'category');
   const livingRaw = categoryMinor + result.freeMinor;
   const livingMinor = livingRaw > 0n ? livingRaw : 0n;
   const days = opts.daysInPeriod;
   const canSpendPerDayMinor = days > 0 ? livingMinor / BigInt(days) : 0n;
-  return { toExchangeMinor, freeMinor: result.freeMinor, livingMinor, canSpendPerDayMinor };
+  return { freeMinor: result.freeMinor, livingMinor, canSpendPerDayMinor };
 }
 
 export interface PlanFact {

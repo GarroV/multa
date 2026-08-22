@@ -99,6 +99,8 @@ export interface PlanDto {
   compressedMinor: string;
   freeMinor: string;
   toExchangeMinor: string;
+  /** Во что менять: разбивка «К размену» по валютам платежа (issue #152). */
+  toExchangeByCurrency: { currency: string; minor: string }[];
   /** Отложено буфером и не вошло в дневной темп (issue #49). */
   bufferMinor: string;
   canSpendPerDayMinor: string;
@@ -765,7 +767,14 @@ export function useRecurringItems(enabled = true) {
   });
 }
 
-/** После правки платежа перечитываем и прогноз: «что впереди» и карта периода считаются из него. */
+/**
+ * После правки платежа перечитываем и прогноз: «что впереди» и карта периода считаются из него.
+ *
+ * План и мастер-сетка — тоже (issue #154): регулярный платёж стоит в них строкой и участвует в
+ * «К размену», а с 22.08.2026 его правят прямо из таблицы. Без этой инвалидации лист закрывался, а
+ * в таблице оставалось прежнее число — ровно та же жалоба «поменял, а не изменилось», от которой
+ * лист и заводили (поймано браузерным тестом).
+ */
 function useRecurringMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {
   const qc = useQueryClient();
   return useMutation({
@@ -773,6 +782,7 @@ function useRecurringMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['recurring-items'] });
       void qc.invalidateQueries({ queryKey: ['forecast'] });
+      void qc.invalidateQueries({ queryKey: ['plan'] });
     },
   });
 }

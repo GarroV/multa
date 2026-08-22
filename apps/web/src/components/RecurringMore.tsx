@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { fromMajor, toMajorString, money, type Currency } from '@multa/core';
+import { fromMajor, repeatRuleCandidates, toMajorString, money, type Currency } from '@multa/core';
 import { useI18n } from '../lib/i18n.tsx';
 import { Hint } from './ui/Hint.tsx';
+import { repeatRuleLabel, scheduleLabel } from '../lib/repeatLabel.ts';
+import { useToday } from '../lib/useToday.ts';
+import { CurrencySelect } from './ui/CurrencySelect.tsx';
+import { Select } from './ui/Select.tsx';
 import { usePatchRecurring, type RecurringItemDto } from '../lib/queries.ts';
 
 /**
@@ -14,13 +18,22 @@ import { usePatchRecurring, type RecurringItemDto } from '../lib/queries.ts';
  * «С» и «По» — это срок жизни платежа: до первой даты события нет, после последней оно перестаёт
  * появляться, но остаётся в истории. Ступени — другое: они не создают и не убирают платёж, а
  * меняют его сумму с даты. Разные вещи и выглядят по-разному, иначе их путают.
+ *
+ * Валюта и повтор правятся здесь же (запрос владельца 22.08.2026). Валюту у обязательств менять
+ * нельзя намеренно — там сумма живёт отдельно от формы и молча переозначилась бы, — а тут сумма и
+ * валюта стоят рядом и сохраняются вместе: человек видит оба поля и подтверждает их одним «Сохранить».
+ *
+ * Варианты повтора выводит ядро от даты-якоря (`repeatRuleCandidates`): человек говорит «первый
+ * раз 14-го», а «14-го числа / второй вторник / раз в год» предлагает продукт.
  */
 export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClose: () => void }) {
   const { t } = useI18n();
+  const today = useToday();
   const patch = usePatchRecurring();
   const ccy = item.currency as Currency;
 
   const [name, setName] = useState(item.name);
+  const [currency, setCurrency] = useState(item.currency);
   const [amount, setAmount] = useState(() => toMajorString(money(BigInt(item.amountMinor), ccy)));
   const [from, setFrom] = useState(item.startsOn ?? '');
   const [to, setTo] = useState(item.endsOn ?? '');
@@ -32,8 +45,21 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
   );
   const [reserve, setReserve] = useState(item.reserve);
   const [error, setError] = useState<string | null>(null);
+  /*
+   * Якорь повтора — дата «с», а если её нет, первая ступень или сегодня: варианты правила считаются
+   * от конкретного дня («14-го числа» знает своё 14 только из даты). Пустой якорь оставил бы список
+   * без вариантов, и повтор было бы не выбрать вовсе.
+   */
+  const anchor = from || item.startsOn || item.amountSteps?.[0]?.from || today;
+  const rules = repeatRuleCandidates(anchor);
+  /*
+   * Правило меняется только осознанным выбором: `null` означает «оставить то, что было». Иначе
+   * открытая форма молча переписывала бы расписание первым вариантом списка при каждом сохранении.
+   */
+  const [ruleIndex, setRuleIndex] = useState<string>('');
 
   const save = () => {
+    const ccyNow = currency as Currency;
     const parsed: { from: string; amountMinor: string }[] = [];
     for (const step of steps) {
       // Пустую строку молча выбрасываем: человек мог добавить ступень и передумать.
@@ -42,7 +68,7 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
       try {
         parsed.push({
           from: step.from,
-          amountMinor: fromMajor(step.amount.trim().replace(',', '.'), ccy).minor.toString(),
+          amountMinor: fromMajor(step.amount.trim().replace(',', '.'), ccyNow).minor.toString(),
         });
       } catch {
         return setError(t('spend.badAmount'));
@@ -52,7 +78,7 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
     if (!trimmed) return setError(t('obl.needName'));
     let amountMinor: string;
     try {
-      amountMinor = fromMajor(amount.trim().replace(',', '.'), ccy).minor.toString();
+      amountMinor = fromMajor(amount.trim().replace(',', '.'), ccyNow).minor.toString();
     } catch {
       return setError(t('spend.badAmount'));
     }
@@ -62,6 +88,11 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
         id: item.id,
         name: trimmed,
         amountMinor,
+        currency,
+        // Расписание отправляем только если человек его выбрал: пустой выбор — «не трогать».
+        ...(ruleIndex !== '' && rules[Number(ruleIndex)]
+          ? { schedule: rules[Number(ruleIndex)]! }
+          : {}),
         // null снимает ограничение; пустая строка из поля даты означает именно это.
         startsOn: from || null,
         endsOn: to || null,
@@ -93,10 +124,34 @@ export function RecurringMore({ item, onClose }: { item: RecurringItemDto; onClo
             <input
               className="field num field-sm"
               inputMode="decimal"
-              aria-label={`${t('rec.amount')} · ${ccy}`}
+              aria-label={`${t('rec.amount')} · ${currency}`}
               placeholder={t('rec.amount')}
               value={amount}
               onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
+            />
+            {/*
+              Валюта платежа рядом с суммой: «аренда 500» в Сербии и «аренда 500» в Москве — разные
+              деньги, и решать это должен человек, а не подстановка базовой валюты.
+            */}
+            <CurrencySelect
+              value={currency}
+              onChange={setCurrency}
+              label={t('common.currency')}
+              className="field mono field-ccy-wide"
+            />
+          </span>
+
+          <span className="form-row">
+            <Select
+              label={t('rec.repeat')}
+              className="field grow"
+              value={ruleIndex}
+              onChange={setRuleIndex}
+              options={[
+                // Первый вариант — то, что уже стоит: список открывается на текущем состоянии.
+                { value: '', label: scheduleLabel(item.schedule, t) },
+                ...rules.map((rule, i) => ({ value: String(i), label: repeatRuleLabel(rule, t) })),
+              ]}
             />
           </span>
 

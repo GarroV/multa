@@ -40,7 +40,7 @@ describe('orderPlanItems — порядок каскада', () => {
 });
 
 describe('summarizePlan — производные ага-момента', () => {
-  it('к размену = сумма корзин; свободно и цифра дня из живого остатка', () => {
+  it('свободно и цифра дня из живого остатка («к размену» считает exchangeNeed, issue #152)', () => {
     const plan = [
       item('debt', 'ozon', 20000n),
       item('bucket', 'eur', 60000n),
@@ -49,7 +49,6 @@ describe('summarizePlan — производные ага-момента', () =>
     ];
     const r = cascade(160000n, plan); // free = 20000
     const s = summarizePlan(r, { daysInPeriod: 20 });
-    expect(s.toExchangeMinor).toBe(100000n); // 60000 + 40000
     expect(s.freeMinor).toBe(20000n);
     expect(s.livingMinor).toBe(40000n); // category 20000 + free 20000
     expect(s.canSpendPerDayMinor).toBe(2000n); // 40000 / 20
@@ -157,7 +156,6 @@ describe('assemblePlan — сборка целиком', () => {
     // 20000+60000+20000+30000 = 130000 > 100000 → цель режется первой на 30000
     expect(result.compressedMinor).toBe(30000n);
     expect(result.totalAllocatedMinor).toBeLessThanOrEqual(100000n); // инвариант 3
-    expect(summary.toExchangeMinor).toBe(60000n);
   });
 });
 
