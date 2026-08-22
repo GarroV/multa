@@ -19,6 +19,12 @@ reference-data/
 # локальные тома postgres/caddy
 .data/
 
+# состояние прод-машины: из какого коммита собран стек, лог автодеплоя и его лок (issue #14)
+.deployed
+.autodeploy.lock
+autodeploy.log
+deploy.log
+
 # editor / os
 .DS_Store
 .vscode/
