@@ -1,6 +1,6 @@
 import type { TranslationKey } from '@multa/i18n';
 import { useI18n } from '../../lib/i18n.tsx';
-import { isSectionVisible } from '../../lib/sections.ts';
+import { useSectionVisible } from '../../lib/sections.ts';
 import { formatMinor } from '../../lib/format.ts';
 import { cascadeGroups, donutArcs } from '../../lib/planView.ts';
 import type { PlanDto, PlanTargetKind } from '../../lib/queries.ts';
@@ -39,6 +39,7 @@ export function CascadeDonut({ plan }: { plan: PlanDto }) {
   const { t, locale } = useI18n();
   /* Скрытые разделы (lib/sections.ts) не рисуем и здесь: раздел убран из интерфейса целиком, а
      не наполовину. Логика раздачи не тронута — сервер считает как считал. */
+  const isSectionVisible = useSectionVisible();
   const groups = cascadeGroups(plan).filter((g) => isSectionVisible(g.kind));
   const arcs = donutArcs(groups);
   const fmt = (minor: string | bigint) => formatMinor(String(minor), plan.baseCurrency, locale);

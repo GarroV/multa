@@ -535,7 +535,8 @@ export const en = {
   'set.currency.rounding.hint':
     'The amount to exchange is rounded up to something you can actually hand over: 48,000 rather than 47,813. Up only — rounding down would exchange less than the period needs.',
   'settings.rhythm': 'Planning rhythm',
-  'set.behaviour': 'BEHAVIOUR',
+  // Settings grouped by surface (2026-08-22): what belongs to the dashboard, what to the table.
+  'set.behaviour': 'DASHBOARD: PLAN AND PACE',
   'set.buffer': 'Daily figure buffer',
   'set.bufferHint': 'Part of what is left stays out of the pace — to reach payday with a margin.',
   'set.compressOrder': 'Who gives way first when money is short',
@@ -544,7 +545,18 @@ export const en = {
   'set.kind.goal': 'goals',
   'set.kind.envelope': 'savings',
   'set.kind.category': 'categories',
-  'set.signals': 'When to warn',
+  // Master table settings: used to live in code and localStorage, now a setting (2026-08-22).
+  'set.grid.title': 'MASTER TABLE',
+  'set.grid.horizon': 'Horizon, periods',
+  'set.grid.horizon.hint':
+    'How many pay periods the table shows at once. Counted in periods, not months: with twice-monthly pay, 12 periods is half a year; with monthly pay, a full year.',
+  'set.grid.nameWidth': 'First column width, px',
+  'set.grid.nameWidth.hint':
+    'The column with row names. You can drag it in the table itself — here it is a number, for setting a round value. From 140 to 560: narrower and section headers stop being readable, wider and the amount columns run off screen.',
+  'set.grid.sections': 'Show sections',
+  'set.grid.sections.hint':
+    'The toggle removes a section from the screen but keeps the data: rows, history and API endpoints stay in place, and the section can come back at any time. Goals and currency baskets are hidden by default — same mechanics as savings and debts, only under different names.',
+  'set.signals': 'DASHBOARD: WHEN TO WARN',
   'set.signal.burnThresholdDays': 'Pace: days ahead',
   'set.signal.burnThresholdDays.hint':
     'How many days before the period ends to say the current pace will not last. Fewer means fewer interruptions, but less room to react.',

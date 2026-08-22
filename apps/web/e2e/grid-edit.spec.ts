@@ -183,14 +183,22 @@ test('отмена и добавить — кнопки одного роста'
  * месяца. Теперь по умолчанию двенадцать, и горизонт можно растянуть до двадцати четырёх.
  */
 test('горизонт таблицы переключается и меняет число колонок', async ({ page }) => {
+  /*
+   * Горизонт с 22.08.2026 — настройка воркспейса, а не состояние экрана («все настройки таблицы
+   * убираем в настройки»). Значит он переживает не только перезагрузку, но и этот тест: браузеры
+   * прогона делят одно демо, и оставленный «6» ронял соседние проверки, ждавшие обычную таблицу.
+   * Поэтому тест сам возвращает горизонт к 12 — состояние, которое он занял, он и освобождает.
+   */
   const columns = () => page.locator('.mgrid-row-periods .mgrid-cell').count();
-  await expect.poll(columns).toBe(12);
 
   await page.getByRole('button', { name: '24', exact: true }).click();
   await expect.poll(columns).toBe(24);
 
   await page.getByRole('button', { name: '6', exact: true }).click();
   await expect.poll(columns).toBe(6);
+
+  await page.getByRole('button', { name: '12', exact: true }).click();
+  await expect.poll(columns).toBe(12);
 });
 
 /*

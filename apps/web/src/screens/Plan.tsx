@@ -16,7 +16,7 @@ import { categoryAmounts } from '../lib/categoryRowView.ts';
 import { formatDate, formatMinor } from '../lib/format.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useIsMember } from '../lib/role.ts';
-import { isSectionVisible } from '../lib/sections.ts';
+import { useSectionVisible } from '../lib/sections.ts';
 import {
   isOnboardingIncomplete,
   useBalances,
@@ -415,6 +415,7 @@ function PlanBody({ plan }: { plan: PlanDto }) {
   });
   const cancelReceipt = useCancelIncomeReceipt();
   // Остатки по счетам не запрашиваем, пока раздел скрыт: лишний запрос на каждом открытии плана.
+  const isSectionVisible = useSectionVisible();
   const balances = useBalances(!isMember && isSectionVisible('account'));
 
   const fmt = (m: string | bigint) => formatMinor(String(m), base, locale);

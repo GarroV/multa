@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BehaviourSettings } from '../components/BehaviourSettings.tsx';
 import { CurrencySettings } from '../components/CurrencySettings.tsx';
+import { GridSettings } from '../components/GridSettings.tsx';
 import { SignalSettings } from '../components/SignalSettings.tsx';
 import { ImportExcel } from '../components/ImportExcel.tsx';
 import { RhythmPicker } from '../components/RhythmPicker.tsx';
@@ -161,6 +162,13 @@ export function Settings() {
 
           {/* Пороги сигналов: раньше жили только на сервере, и каждый жил с чужими цифрами (#49). */}
           <SignalSettings />
+
+          {/*
+            Настройки мастер-таблицы (22.08.2026). Раньше их не было как настроек вовсе: горизонт
+            сбрасывался при перезагрузке, ширина столбца жила в браузере, видимость разделов — в
+            коде. Таблица просилась стать инструментом, а инструмент настраивают.
+          */}
+          {!isMember && <GridSettings />}
 
           {/* Переезд с Excel пишет данные: участнику он вернул бы 403 на первом же шаге. */}
           {!isMember && <ImportExcel base={ws.baseCurrency} />}

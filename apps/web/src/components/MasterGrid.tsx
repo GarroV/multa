@@ -7,6 +7,8 @@ import { GridAddRow } from './GridAddRow.tsx';
 import { GridRowSettings } from './GridRowSettings.tsx';
 import { useI18n } from '../lib/i18n.tsx';
 import {
+  usePatchSettings,
+  useSettings,
   useCreateProposal,
   useEditGridCell,
   usePlanGrid,
@@ -16,7 +18,7 @@ import {
 import { IconPlus } from './ui/icons.tsx';
 import { useIsMember } from '../lib/role.ts';
 import { useToday } from '../lib/useToday.ts';
-import { isSectionVisible } from '../lib/sections.ts';
+import { useSectionVisible } from '../lib/sections.ts';
 import {
   clampNameWidth,
   DEFAULT_NAME_WIDTH,
@@ -96,10 +98,20 @@ export function monthBandsOf(
   return bands;
 }
 
-export function MasterGrid({ periods = 12 }: { periods?: number }) {
+export function MasterGrid({ periods }: { periods?: number }) {
   const { t, locale } = useI18n();
-  /* Горизонт — состояние экрана: сколько периодов человек хочет видеть за раз. */
-  const [horizon, setHorizon] = useState(periods);
+  /*
+   * Горизонт и ширина первого столбца живут в настройках воркспейса (решение владельца 22.08.2026:
+   * «все настройки таблицы убираем в настройки»). Раньше горизонт был состоянием экрана, а ширина —
+   * записью в localStorage: у каждого устройства свои, и на телефоне человек каждый раз заново
+   * получал таблицу, которую настроил на ноутбуке.
+   *
+   * `periods` в пропсах остался для мест, которые открывают таблицу с заданным горизонтом (тесты,
+   * узкие экраны): явный аргумент сильнее настройки.
+   */
+  const { data: settings } = useSettings();
+  const patchSettings = usePatchSettings();
+  const horizon = periods ?? settings?.grid.horizonPeriods ?? 12;
   const { data, isPending, isError, refetch } = usePlanGrid(horizon);
   /* Сложенные разделы: состояние экрана, не домена, поэтому живёт здесь и не уезжает на сервер. */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -120,29 +132,36 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
   const edit = useEditGridCell(horizon);
   const propose = useCreateProposal();
   const isMember = useIsMember();
+  const isSectionVisible = useSectionVisible();
   const today = useToday();
 
   /*
-   * Ширина колонки имён (issue #133). Начальное значение читается один раз при монтировании —
-   * иначе каждый рендер лез бы в localStorage, а перетаскивание рендерит на каждый шаг курсора.
+   * Ширина колонки имён (issue #133). Локальное состояние ведёт жест: перетаскивание рендерит на
+   * каждый шаг курсора, и посылать на сервер по запросу на кадр нельзя. Сохранённая ширина
+   * подхватывается, когда настройки приедут, — но только если жеста не было, иначе ответ сервера
+   * дёрнул бы колонку обратно посреди перетаскивания.
    */
-  const [nameWidth, setNameWidth] = useState(() =>
-    typeof window === 'undefined' ? DEFAULT_NAME_WIDTH : readNameWidth(window.localStorage),
-  );
+  const [nameWidth, setNameWidth] = useState<number | null>(null);
+  const saved = settings?.grid.nameWidthPx ?? DEFAULT_NAME_WIDTH;
+  const width = nameWidth ?? saved;
   /*
    * Актуальная ширина живёт и в ref. Обработчики читают её оттуда, а не из замыкания рендера: пять
    * нажатий стрелки подряд (зажатая клавиша даёт ~30 в секунду) приходят быстрее, чем React
    * перерисовывает, и каждое считало бы шаг от одного и того же старого значения — вместо плавного
    * роста колонка прыгала к границе. Поймано E2E, который посылает события серией без паузы.
    */
-  const widthRef = useRef(nameWidth);
-  const applyWidth = useCallback((px: number, persist: boolean) => {
-    const clamped = clampNameWidth(px);
-    widthRef.current = clamped;
-    setNameWidth(clamped);
-    // В хранилище пишем по концу жеста, а не на каждом кадре: 60 записей в секунду ему не нужны.
-    if (persist && typeof window !== 'undefined') writeNameWidth(window.localStorage, clamped);
-  }, []);
+  const widthRef = useRef(width);
+  widthRef.current = nameWidth ?? saved;
+  const applyWidth = useCallback(
+    (px: number, persist: boolean) => {
+      const clamped = clampNameWidth(px);
+      widthRef.current = clamped;
+      setNameWidth(clamped);
+      // На сервер пишем по концу жеста, а не на каждом кадре: 60 запросов в секунду ему не нужны.
+      if (persist) patchSettings.mutate({ grid: { nameWidthPx: clamped } });
+    },
+    [patchSettings],
+  );
 
   /* Точка отсчёта жеста: дельта считается от неё, иначе за длинный жест копится ошибка округления. */
   const dragFrom = useRef<{ startWidth: number; startX: number } | null>(null);
@@ -496,7 +515,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
       )}
       <div
         className="mgrid"
-        style={{ ['--cols' as string]: columns, ['--mgrid-name-w' as string]: `${nameWidth}px` }}
+        style={{ ['--cols' as string]: columns, ['--mgrid-name-w' as string]: `${width}px` }}
       >
         {/*
           Полоса месяцев над колонками периодов (запрос владельца 16.08.2026). Периоды короче
@@ -532,7 +551,7 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
               role="separator"
               aria-orientation="vertical"
               aria-label={t('plan.master.resize')}
-              aria-valuenow={nameWidth}
+              aria-valuenow={width}
               aria-valuemin={MIN_NAME_WIDTH}
               aria-valuemax={MAX_NAME_WIDTH}
               tabIndex={0}
@@ -641,7 +660,9 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
                 type="button"
                 className="seg-btn"
                 aria-pressed={n === horizon}
-                onClick={() => setHorizon(n)}
+                /* Выбор горизонта — настройка, а не состояние экрана: он переживает перезагрузку
+                   и одинаков на всех устройствах. */
+                onClick={() => patchSettings.mutate({ grid: { horizonPeriods: n } })}
               >
                 {n}
               </button>

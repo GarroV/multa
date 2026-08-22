@@ -4,7 +4,7 @@ import { nextPeriodStart, periodsUntil } from '../lib/income.ts';
 import { Fragment, useState, type ReactNode } from 'react';
 import { RecurringPayments } from '../components/RecurringPayments.tsx';
 import { useIsMember } from '../lib/role.ts';
-import { isSectionVisible } from '../lib/sections.ts';
+import { useSectionVisible } from '../lib/sections.ts';
 import { Bar, Panel, Tag } from '../components/ui/Panel.tsx';
 import { CurrencySelect } from '../components/ui/CurrencySelect.tsx';
 import { Hint } from '../components/ui/Hint.tsx';
@@ -1291,6 +1291,8 @@ function BucketsSection({ base }: SectionProps) {
 }
 
 export function Obligations() {
+  /* Видимость разделов — из настроек воркспейса (22.08.2026), поэтому хук, а не функция. */
+  const isSectionVisible = useSectionVisible();
   const { data: me } = useMe();
   const base = me?.workspace?.baseCurrency ?? 'RUB';
   /*

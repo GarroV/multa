@@ -552,6 +552,10 @@ export function useRollbackImport() {
 export type ShareMode = 'open' | 'sum' | 'hidden';
 export type ShareSection = 'income' | 'debts' | 'buckets' | 'envelopes' | 'categories' | 'goals';
 
+/** Разделы, показ которых настраивается: те же виды строк, что в таблице и на «Плане». */
+export type GridSection =
+  'income' | 'debt' | 'bucket' | 'envelope' | 'category' | 'goal' | 'recurring' | 'account';
+
 export interface WorkspaceSettingsDto {
   periods: { suggestRaises: boolean };
   currency: {
@@ -573,6 +577,12 @@ export interface WorkspaceSettingsDto {
   };
   /** Матрица видимости для участников (issue #46). */
   sharing: Record<ShareSection, ShareMode>;
+  /** Настройки мастер-таблицы: горизонт, ширина первого столбца, видимые разделы (22.08.2026). */
+  grid: {
+    horizonPeriods: number;
+    nameWidthPx: number;
+    sections: Record<GridSection, boolean>;
+  };
   /** Пройденное обучение (issue #28): флаг на сервере, а не в localStorage. */
   tour: { planDone: boolean };
 }
@@ -603,7 +613,19 @@ export function usePatchSettings() {
   });
 }
 
-type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? Partial<T[K]> : T[K] };
+/*
+ * Частичная правка настроек на любую глубину: у таблицы появился вложенный блок `grid.sections`
+ * (22.08.2026), и одноуровневый Partial требовал присылать все восемь разделов ради одного
+ * тумблера. Массивы не разбираем поэлементно — `compressOrder` меняется целиком, порядок и есть
+ * значение.
+ */
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends readonly unknown[]
+    ? T[K]
+    : T[K] extends object
+      ? DeepPartial<T[K]>
+      : T[K];
+};
 
 // --- Категорийная аналитика (issue #51) ---
 

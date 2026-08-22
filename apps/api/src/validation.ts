@@ -212,6 +212,45 @@ const signalsSettings = z.object({
 });
 
 /**
+ * Настройки мастер-таблицы (решение владельца 22.08.2026: «все настройки таблицы убираем в
+ * настройки»).
+ *
+ * До этого они жили в трёх разных местах: горизонт и ширина первого столбца — в localStorage (то
+ * есть у каждого устройства свои), а какие разделы показывать — константой в коде, править её мог
+ * только тот, у кого есть репозиторий. Настройка, которую нельзя изменить из продукта, для
+ * пользователя не существует.
+ */
+const gridSettings = z.object({
+  /** Сколько периодов показывать за раз. Значения совпадают с переключателем в подвале таблицы. */
+  horizonPeriods: z.number().int().min(2).max(24).default(12),
+  /**
+   * Ширина первого столбца в пикселях. Границы те же, что были в интерфейсе: уже 140 — заголовки
+   * разделов перестают читаться, шире 560 — колонки сумм уезжают за экран, а таблица существует
+   * ради сравнения чисел.
+   */
+  nameWidthPx: z.number().int().min(140).max(560).default(240),
+  /**
+   * Какие разделы показывать. Цели и валютные корзины скрыты по умолчанию — решение владельца
+   * 06.08.2026: та же механика, что долг и накопление, только под другими именами. Скрыт ИМЕННО
+   * показ: ручки API, таблицы и уже заведённые строки на месте.
+   */
+  sections: z
+    .object({
+      income: z.boolean().default(true),
+      debt: z.boolean().default(true),
+      bucket: z.boolean().default(false),
+      envelope: z.boolean().default(true),
+      category: z.boolean().default(true),
+      goal: z.boolean().default(false),
+      recurring: z.boolean().default(true),
+      account: z.boolean().default(true),
+    })
+    .default({}),
+});
+
+export type GridSettings = z.infer<typeof gridSettings>;
+
+/**
  * Матрица видимости по разделам (issue #46).
  *
  * `open` — участник видит строки; `sum` — только итог раздела; `hidden` — не видит ничего, но
@@ -244,6 +283,7 @@ export const workspaceSettingsSchema = z
     currency: currencySettings.default({}),
     cascade: cascadeSettings.default({}),
     signals: signalsSettings.default({}),
+    grid: gridSettings.default({}),
     sharing: sharingSettings.default({}),
     tour: tourSettings.default({}),
   })
@@ -255,6 +295,7 @@ export const workspaceSettingsPatchSchema = z.object({
   currency: currencySettings.partial().optional(),
   cascade: cascadeSettings.partial().optional(),
   signals: signalsSettings.partial().optional(),
+  grid: gridSettings.partial().optional(),
   sharing: sharingSettings.partial().optional(),
   tour: tourSettings.partial().optional(),
 });

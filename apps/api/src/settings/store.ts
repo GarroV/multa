@@ -40,6 +40,12 @@ export async function patchSettings(
     currency: { ...current.currency, ...(patch.currency ?? {}) },
     cascade: { ...current.cascade, ...(patch.cascade ?? {}) },
     signals: { ...current.signals, ...(patch.signals ?? {}) },
+    /* Разделы — вложенная группа: правка одного тумблера не должна гасить остальные. */
+    grid: {
+      ...current.grid,
+      ...(patch.grid ?? {}),
+      sections: { ...current.grid.sections, ...(patch.grid?.sections ?? {}) },
+    },
     sharing: { ...current.sharing, ...(patch.sharing ?? {}) },
     tour: { ...current.tour, ...(patch.tour ?? {}) },
   };
