@@ -897,8 +897,12 @@ export interface PlanDto {
   freeMinor: string;
   /** Сколько базовой валюты надо поменять в этом периоде, округлённое вверх по настройке. */
   toExchangeMinor: string;
-  /** Во что менять: разбивка «К размену» по валютам платежа (issue #152). */
-  toExchangeByCurrency: { currency: string; minor: string }[];
+  /**
+   * Во что менять: разбивка «К размену» по валютам платежа (issue #152). `minor` — сколько базовой
+   * валюты уйдёт, `amountMinor` — сколько валюты получится (запрос владельца 22.08.2026: «а где мне
+   * понять сколько евро мне нужно?»).
+   */
+  toExchangeByCurrency: { currency: string; minor: string; amountMinor: string }[];
   /** Дневной темп с учётом факта: остаток на жизнь ÷ daysLeft. */
   canSpendPerDayMinor: string;
   /** План на жизнь = категории + свободный остаток. */
@@ -1058,10 +1062,25 @@ async function assembleForPeriod(
       settings.currency.exchangeRoundingMajor,
       exponentOf(ws.baseCurrency as Currency),
     );
-  const toExchangeByCurrency = need.byCurrency.map((line) => ({
-    currency: line.currency,
-    minor: roundExchange(line.minor).toString(),
-  }));
+  /*
+   * Сумма в валюте считается из ОКРУГЛЁННОЙ базовой: человек идёт менять круглые 55 000 ₽, и
+   * получить он должен то, что за них дают, а не то, что вышло бы за неокруглённые 54 213 ₽.
+   *
+   * Курса нет — валюты нет и в разбивке (её собрал exchangeNeed из строк, у которых курс был),
+   * поэтому ноль здесь означал бы ошибку в данных, а не «не знаем»; отдаём его честно, а не
+   * прячем строку.
+   */
+  const toExchangeByCurrency = await Promise.all(
+    need.byCurrency.map(async (line) => {
+      const baseMinor = roundExchange(line.minor);
+      const amount = await fromBase(baseMinor, line.currency, ws.baseCurrency, asOf, ws.id);
+      return {
+        currency: line.currency,
+        minor: baseMinor.toString(),
+        amountMinor: (amount ?? 0n).toString(),
+      };
+    }),
+  );
   const toExchangeMinor = toExchangeByCurrency.reduce((acc, l) => acc + BigInt(l.minor), 0n);
 
   const fact = summarizeFact(summary, {

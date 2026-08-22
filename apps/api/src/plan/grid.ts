@@ -2,6 +2,7 @@ import {
   amountOn,
   debtPaymentForPeriod,
   convert,
+  divDecimal,
   recurringDueIn,
   normalizeSteps,
   type AmountStep,
@@ -111,7 +112,12 @@ export interface GridDto {
     freeMinor: string[];
     perDayMinor: string[];
     toExchangeMinor: string[];
-    toExchangeByCurrency: { currency: string; cells: string[] }[];
+    /**
+     * Разбивка «К размену» по валютам. `cells` — сколько базовой валюты уйдёт, `amountCells` —
+     * сколько валюты получится (запрос владельца 22.08.2026: «а где мне понять сколько евро мне
+     * нужно?»). В обменник идут с обеими цифрами: одну отдаёшь, вторую получаешь.
+     */
+    toExchangeByCurrency: { currency: string; cells: string[]; amountCells: string[] }[];
   };
   /** Строки, которые не удалось привести к базовой валюте: показываем их отдельно, а не прячем. */
   unresolved: { targetKind: TargetKind; targetId: string; name: string; sourceCurrency: string }[];
@@ -225,6 +231,12 @@ export async function getPlanGrid(
   const currencies = new Set<string>();
   for (const d of debtRows) currencies.add(d.currency);
   for (const b of bucketRows) currencies.add(b.fromCurrency);
+  /*
+   * Валюта ПОЛУЧЕНИЯ тоже нужна: без её курса не посчитать, сколько валюты дадут за отложенные
+   * рубли, — а именно этой цифрой человек пользуется в обменнике (issue #152). Раньше в карту шла
+   * только валюта-источник корзины, и «→ EUR» оставалось без суммы в евро.
+   */
+  for (const b of bucketRows) currencies.add(b.toCurrency);
   for (const e of envelopeRows) if (e.ruleKind !== 'percent') currencies.add(e.currency);
   for (const g of goalRows) currencies.add(g.currency);
   for (const s of sources) currencies.add(s.currency);
@@ -239,6 +251,24 @@ export async function getPlanGrid(
     if (ccy === base) return minor;
     const snap = rates.get(ccy);
     return snap ? convert(money(minor, ccy), snap).minor : null;
+  };
+
+  /*
+   * Обратная дорога: базовая валюта → валюта получения. Курс берём из той же карты и инвертируем
+   * сами (`money`/`convert` работают в одну сторону), поэтому цифры «отдать» и «получить»
+   * согласованы по построению, а не приблизительно.
+   */
+  const fromBase = (minor: bigint, ccy: string): bigint | null => {
+    if (ccy === base) return minor;
+    const snap = rates.get(ccy);
+    if (!snap) return null;
+    /* Инверсия — тем же хелпером ядра, каким её делает resolveRate: одно правило на весь продукт. */
+    return convert(money(minor, base), {
+      ...snap,
+      from: base,
+      to: ccy,
+      rate: divDecimal('1', snap.rate),
+    }).minor;
   };
 
   const unresolved: GridDto['unresolved'] = [];
@@ -643,9 +673,17 @@ export async function getPlanGrid(
        */
       perDayMinor: withCurrent(cellsToStrings(grid.footer.perDayMinor), plan.canSpendPerDayMinor),
       toExchangeMinor: cellsToStrings(grid.footer.toExchangeMinor),
+      /*
+       * Сумму в валюте считаем из базовой тем же курсом, которым строки к базовой и приводились:
+       * складывать исходные валютные суммы строк нельзя — каскад мог их сжать, и «нужно 650 EUR»
+       * расходилось бы с рублями, которые план под них отложил.
+       *
+       * Курса нет — отдаём ноль, как и везде в сетке: выдумывать сумму размена нельзя.
+       */
       toExchangeByCurrency: grid.footer.toExchangeByCurrency.map((x) => ({
         currency: x.currency,
         cells: cellsToStrings(x.cells),
+        amountCells: x.cells.map((v) => (fromBase(v, x.currency) ?? 0n).toString()),
       })),
     },
     unresolved,

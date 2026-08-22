@@ -99,8 +99,8 @@ export interface PlanDto {
   compressedMinor: string;
   freeMinor: string;
   toExchangeMinor: string;
-  /** Во что менять: разбивка «К размену» по валютам платежа (issue #152). */
-  toExchangeByCurrency: { currency: string; minor: string }[];
+  /** Во что менять: базовая сумма и сколько валюты за неё дадут (issue #152). */
+  toExchangeByCurrency: { currency: string; minor: string; amountMinor: string }[];
   /** Отложено буфером и не вошло в дневной темп (issue #49). */
   bufferMinor: string;
   canSpendPerDayMinor: string;
@@ -844,7 +844,7 @@ export interface PlanGridDto {
     freeMinor: string[];
     perDayMinor: string[];
     toExchangeMinor: string[];
-    toExchangeByCurrency: { currency: string; cells: string[] }[];
+    toExchangeByCurrency: { currency: string; cells: string[]; amountCells: string[] }[];
   };
   unresolved: {
     targetKind: PlanTargetKind;

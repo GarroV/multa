@@ -37,7 +37,7 @@ interface GridDto {
     freeMinor: string[];
     perDayMinor: string[];
     toExchangeMinor: string[];
-    toExchangeByCurrency: { currency: string; cells: string[] }[];
+    toExchangeByCurrency: { currency: string; cells: string[]; amountCells: string[] }[];
   };
   unresolved: { targetId: string; name: string; sourceCurrency: string }[];
 }
@@ -188,6 +188,11 @@ describe('мастер-сетка', () => {
 
   test('«к размену» разбит по валютам получения и совпадает с итогом', async () => {
     const client = await onboarded();
+    /*
+     * Курс валюты ПОЛУЧЕНИЯ нужен, чтобы сказать, сколько валюты дадут за отложенные рубли. Без него
+     * сумма в евро — ноль (сетка не выдумывает неизвестный курс), и это отдельный сценарий.
+     */
+    await seedRate('EUR', 'RUB', '100.0000000000', new Date().toISOString().slice(0, 10), 'cbr');
     await expectOk(
       await client.post('/v1/buckets', {
         name: 'Аренда',
@@ -200,8 +205,12 @@ describe('мастер-сетка', () => {
 
     const dto = await grid(client, '?periods=2');
     expect(dto.footer.toExchangeMinor).toEqual(['6000000', '6000000']);
+    /*
+     * Две цифры на валюту: сколько базовой уйдёт и сколько валюты за неё дадут (запрос владельца
+     * 22.08.2026 — «а где мне понять сколько евро мне нужно?»). 60 000 ₽ ÷ 100 ₽/EUR = 600 EUR.
+     */
     expect(dto.footer.toExchangeByCurrency).toEqual([
-      { currency: 'EUR', cells: ['6000000', '6000000'] },
+      { currency: 'EUR', cells: ['6000000', '6000000'], amountCells: ['60000', '60000'] },
     ]);
   });
 

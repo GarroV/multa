@@ -2173,6 +2173,28 @@ a {
   background: none;
   opacity: 1;
 }
+/*
+ * Ячейка с парой чисел: сколько валюты купить и во сколько базовой это встанет (issue #152).
+ *
+ * Две цифры в одной ячейке — уступка тесноте: своя строка на каждую валюту удвоила бы подвал, а
+ * человеку нужны обе разом. Поэтому главная набрана как обычное число, а базовая — мельче и тише,
+ * чтобы читалась как приписка, а не как второй столбец.
+ */
+.mgrid-cell-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.15;
+}
+.mgrid-pair-main {
+  font-weight: 400;
+}
+.mgrid-pair-sub {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--mid);
+}
 /* Разделы отделены друг от друга сильнее, чем строки внутри раздела. */
 .mgrid-group + .mgrid-group {
   border-top: 1px solid var(--line-strong);

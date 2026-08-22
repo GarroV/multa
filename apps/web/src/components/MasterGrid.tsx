@@ -567,8 +567,17 @@ export function MasterGrid({ periods = 12 }: { periods?: number }) {
             <div className="mgrid-row mgrid-row-sub" key={line.currency}>
               <span className="mgrid-name">→ {line.currency}</span>
               {line.cells.map((v, i) => (
-                <span className="mgrid-cell" key={i}>
-                  {fmt(v)}
+                /*
+                  В ячейке два числа (запрос владельца 22.08.2026: «а где мне понять сколько евро мне
+                  нужно?»). Сверху — сколько валюты купить: это ответ на вопрос, с которым человек
+                  идёт в обменник. Снизу приглушённо — сколько базовой за неё уйдёт; строка «К
+                  размену» над разбивкой считает то же в сумме по всем валютам.
+                */
+                <span className="mgrid-cell mgrid-cell-pair" key={i}>
+                  <b className="mgrid-pair-main">
+                    {formatMinor(line.amountCells[i] ?? '0', line.currency, locale)}
+                  </b>
+                  <i className="mgrid-pair-sub">{fmt(v)}</i>
                 </span>
               ))}
             </div>

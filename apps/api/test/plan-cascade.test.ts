@@ -159,7 +159,43 @@ describe('«К размену» — потребность в валюте (issu
     const plan = await getPlan(client);
     // 500 EUR × 100 ₽ = 50 000 ₽; рублёвый долг в размен не входит.
     expect(BigInt(plan.toExchangeMinor)).toBe(5_000_000n);
-    expect(plan.toExchangeByCurrency).toEqual([{ currency: 'EUR', minor: '5000000' }]);
+    // И сколько евро за это дадут: 50 000 ₽ ÷ 100 ₽/EUR = 500 EUR — та сумма, с которой идут менять.
+    expect(plan.toExchangeByCurrency).toEqual([
+      { currency: 'EUR', minor: '5000000', amountMinor: '50000' },
+    ]);
+  });
+
+  test('сумма в валюте считается от округлённой базовой, а не наоборот', async () => {
+    /*
+     * Округление «к размену» вверх — настройка воркспейса (issue #49): в обменник идут с круглыми
+     * 55 000 ₽, а не с 54 213. Значит и получить человек должен то, что дают за круглую сумму —
+     * иначе две цифры в одной строке не сходятся между собой, и верить перестаёшь обеим.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+    await expectOk(
+      await client.patch('/v1/workspace/settings', {
+        currency: { exchangeRoundingMajor: 1000 },
+      }),
+    );
+
+    await expectOk(
+      await client.post('/v1/goals', {
+        name: 'Поездка',
+        currency: 'EUR',
+        targetMinor: '500000',
+        // 123.45 EUR × 100 = 12 345 ₽ → округление вверх до 13 000 ₽ → 130 EUR.
+        plannedPerPeriodMinor: '12345',
+      }),
+      201,
+    );
+
+    const plan = await getPlan(client);
+    expect(BigInt(plan.toExchangeMinor)).toBe(1_300_000n);
+    expect(plan.toExchangeByCurrency).toEqual([
+      { currency: 'EUR', minor: '1300000', amountMinor: '13000' },
+    ]);
   });
 
   test('без валютных строк размен нулевой, а разбивка пустая', async () => {

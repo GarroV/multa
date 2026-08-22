@@ -552,9 +552,10 @@ function PlanBody({ plan }: { plan: PlanDto }) {
               <div className="kpi-rows">
                 {plan.toExchangeByCurrency.map((line) => (
                   <div key={line.currency}>
-                    <span>
-                      {withCcy(line.minor)} → {line.currency}
-                    </span>
+                    {/* Сначала то, за чем идут в обменник: сколько валюты нужно. Рубли — рядом,
+                        приглушённо: это цена вопроса, а не сам ответ. */}
+                    <span>{`${formatMinor(line.amountMinor, line.currency, locale)} ${line.currency}`}</span>
+                    <span className="dim">{withCcy(line.minor)}</span>
                   </div>
                 ))}
               </div>
