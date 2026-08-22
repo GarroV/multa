@@ -937,6 +937,55 @@ a {
 }
 
 /*
+ * Поиск валюты с подсказками (запрос владельца 22.08.2026). Выпадашка позиционируется от самого
+ * поля, а не от строки настроек: строка — flex-контейнер с чипами, и абсолют внутри неё уезжал бы
+ * к первому чипу при переносе на вторую строку.
+ */
+.ccyfind {
+  position: relative;
+  display: inline-flex;
+}
+.ccyfind-input {
+  min-width: 220px;
+}
+.ccyfind-drop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 260px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 22%);
+}
+.ccyfind-item {
+  appearance: none;
+  background: none;
+  border: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ccyfind-item.is-active {
+  background: var(--accent-quiet);
+}
+.ccyfind-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--mid);
+}
+
+/*
  * Насечки границ периодов и подписи месяцев на трёхмесячной оси (issue: «не вижу ближайших трёх
  * месяцев»). Насечка — система координат, а не событие: тоньше и тише любой метки, без подписи.
  * Иначе двадцать делений спорят с шестью событиями, ради которых карту и смотрят.
@@ -2108,7 +2157,56 @@ a {
  * Знак справки: круг с вопросом рядом с подписью. Тише текста вокруг — он не сообщение, а дверь к
  * нему; заметен ровно настолько, чтобы его нашли, когда понадобится.
  */
+/*
+ * Справка раскрывается по нажатию (жалоба владельца 22.08.2026: «справка не работает»). Всплывашка
+ * позиционируется от знака, а не от строки: строки настроек — flex с полями во всю ширину, и
+ * абсолют внутри них уезжал к левому краю.
+ */
+.hint-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.hint-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 22%);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: normal;
+  text-transform: none;
+  letter-spacing: normal;
+}
+/*
+ * Кнопка справки — это область нажатия, а не кружок. Кружок рисует `.hint-mark`: он мелкий, чтобы
+ * не спорить с подписью, а нажимать нужно во что-то не меньше 22px (перепись органов управления
+ * 16.08.2026 — по 16px промахиваются даже мышью, и это ловят сторожа в e2e).
+ */
 .hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  flex: 0 0 auto;
+  user-select: none;
+}
+.hint-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2119,14 +2217,19 @@ a {
   color: var(--text-dim);
   font-size: 10px;
   line-height: 1;
-  cursor: help;
-  flex: 0 0 auto;
-  user-select: none;
 }
-.hint:hover,
-.hint:focus-visible {
+.hint:hover .hint-mark,
+.hint:focus-visible .hint-mark,
+.hint[aria-expanded='true'] .hint-mark {
   color: var(--accent-hover-ink);
   border-color: var(--accent);
+}
+/* В ряду формы органы управления одного роста — 28px (то же правило, что у `.act-icon`). */
+.form-row .hint {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
 }
 
 /* Разворот раздела: кликается вся подпись, а не только треугольник. */

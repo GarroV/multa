@@ -60,23 +60,48 @@ describe('CurrencySettings', () => {
   beforeEach(() => vi.restoreAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
-  it('добавляет валюту трёхбуквенным кодом', async () => {
+  it('валюта находится по коду и добавляется выбором из подсказок', async () => {
+    /*
+     * Поле ввода кода заменено поиском (запрос владельца 22.08.2026): раньше код надо было знать
+     * заранее, а опечатка молча давала валюту без курса.
+     */
     const user = userEvent.setup();
     const fetchMock = show(['RUB', 'EUR']);
     const field = await screen.findByLabelText(/Добавить валюту|Add a currency/);
     await user.type(field, 'kzt');
-    await user.click(screen.getByRole('button', { name: /^Добавить$|^Add$/ }));
+    await user.click(await screen.findByRole('option', { name: /KZT/ }));
     await waitFor(() => expect(sent(fetchMock).length).toBeGreaterThan(0));
     expect(sent(fetchMock).at(-1)!.currency.list).toEqual(['RUB', 'EUR', 'KZT']);
   });
 
-  it('дубль не добавляется: список не должен множить одно и то же', async () => {
+  it('валюта находится по названию, а не только по коду', async () => {
+    // «динар» или «dinar» — человек, живущий между валютами, набирает то одно, то другое.
+    const user = userEvent.setup();
+    show(['RUB']);
+    const field = await screen.findByLabelText(/Добавить валюту|Add a currency/);
+    await user.type(field, 'динар');
+    const options = await screen.findAllByRole('option');
+    expect(options.length).toBeGreaterThan(0);
+    expect(options.map((o) => o.textContent).join(' ')).toMatch(/RSD|BHD|KWD|DZD/);
+  });
+
+  it('уже выбранная валюта в подсказках не предлагается', async () => {
     const user = userEvent.setup();
     const fetchMock = show(['RUB', 'EUR']);
     const field = await screen.findByLabelText(/Добавить валюту|Add a currency/);
-    await user.type(field, 'EUR');
-    expect(screen.getByRole('button', { name: /^Добавить$|^Add$/ })).toBeDisabled();
+    await user.type(field, 'eur');
+    expect(screen.queryByRole('option', { name: /^EUR/ })).toBeNull();
     expect(sent(fetchMock)).toHaveLength(0);
+  });
+
+  it('чепуха в поиске — честное «не нашлось», а не пустая выпадашка', async () => {
+    const user = userEvent.setup();
+    show(['RUB']);
+    const field = await screen.findByLabelText(/Добавить валюту|Add a currency/);
+    await user.type(field, 'щщщ');
+    expect(
+      await screen.findByText(/Такой валюты нет в справочнике|No such currency/),
+    ).toBeInTheDocument();
   });
 
   it('последнюю валюту убрать нельзя: без неё нечего будет записать', async () => {

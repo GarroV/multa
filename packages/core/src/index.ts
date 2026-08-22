@@ -26,3 +26,4 @@ export * from './csv.ts';
 export * from './scrub.ts';
 export * from './rounding.ts';
 export * from './exchangeNeed.ts';
+export * from './currencies.ts';

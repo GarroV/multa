@@ -380,6 +380,7 @@ export const en = {
   'common.empty': 'Nothing yet',
   'common.saved': 'Saved',
   'common.error': 'Something went wrong',
+  'common.help': 'Help',
   'common.retry': 'Retry',
 
   // Навигация
@@ -522,6 +523,8 @@ export const en = {
   'set.currency.list': 'Workspace currencies',
   'set.currency.list.hint':
     'What the forms offer. The full ISO list is useless here: finding one of a hundred and seventy takes longer than typing it. Keep the ones you live between.',
+  'set.currency.search': 'Code or name: EUR, euro, dinar…',
+  'set.currency.notFound': 'No such currency in the directory',
   'set.currency.add': 'Add a currency',
   'set.currency.source': 'Rate source',
   'set.currency.source.cbr': 'CBR',

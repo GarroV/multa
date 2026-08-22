@@ -376,6 +376,7 @@ export const ru: Record<TranslationKey, string> = {
   'common.empty': 'Пока пусто',
   'common.saved': 'Сохранено',
   'common.error': 'Что-то пошло не так',
+  'common.help': 'Справка',
   'common.retry': 'Повторить',
 
   // Навигация
@@ -516,6 +517,8 @@ export const ru: Record<TranslationKey, string> = {
   'set.currency.list': 'Валюты воркспейса',
   'set.currency.list.hint':
     'Из чего выбирать в формах. Полный справочник сюда не годится: в списке из ста семидесяти валют нужную ищут дольше, чем набирают. Оставь те, между которыми живёшь.',
+  'set.currency.search': 'Код или название: EUR, евро, динар…',
+  'set.currency.notFound': 'Такой валюты нет в справочнике',
   'set.currency.add': 'Добавить валюту',
   'set.currency.source': 'Источник курса',
   'set.currency.source.cbr': 'ЦБ РФ',

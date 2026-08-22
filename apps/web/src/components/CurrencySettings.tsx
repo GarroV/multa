@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { usePatchSettings, useSettings } from '../lib/queries.ts';
+import { CurrencyFinder } from './ui/CurrencyFinder.tsx';
 import { Hint } from './ui/Hint.tsx';
 import { Panel, Tag } from './ui/Panel.tsx';
 import { Select } from './ui/Select.tsx';
@@ -23,18 +23,10 @@ export function CurrencySettings() {
   const { t } = useI18n();
   const { data } = useSettings();
   const patch = usePatchSettings();
-  const [draft, setDraft] = useState('');
   if (!data) return null;
 
   const list = data.currency.list;
   const save = (next: string[]) => patch.mutate({ currency: { list: next } });
-  const addCode = () => {
-    // Трёхбуквенный код — единственная проверка на клиенте: справочник валют живёт в ядре, и
-    // дублировать его здесь значило бы завести второй список, который однажды отстанет.
-    if (draft.length !== 3 || list.includes(draft)) return;
-    save([...list, draft]);
-    setDraft('');
-  };
 
   return (
     <Panel
@@ -47,9 +39,10 @@ export function CurrencySettings() {
         задавать в настройках»). Настройка хранилась с самого начала и читалась выпадашками, но
         задать её было негде — то есть у всех был один и тот же зашитый набор.
 
-        Полный справочник ISO сюда не годится: в списке из ста семидесяти позиций нужную ищут
-        дольше, чем набирают руками. Поэтому человек собирает свой набор из тех валют, между
-        которыми живёт.
+        Набор собирается поиском (запрос владельца 22.08.2026): человек вводит «евро», «eur» или
+        «динар» и выбирает из подсказок. До этого код набирали руками в поле на три символа — то
+        есть знать его надо было заранее, а опечатка молча давала валюту, для которой нет курса.
+        Чипы ниже — это уже выбранное, а не способ выбирать.
       */}
       <div className="prow">
         <span className="prow-day" aria-hidden />
@@ -74,23 +67,14 @@ export function CurrencySettings() {
                 </button>
               </span>
             ))}
-            <input
-              className="field mono field-ccy"
-              aria-label={t('set.currency.add')}
-              placeholder="EUR"
-              maxLength={3}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && addCode()}
+            <CurrencyFinder
+              label={t('set.currency.add')}
+              placeholder={t('set.currency.search')}
+              exclude={list}
+              /* Двенадцать — предел набора: дальше выпадашки в формах перестают читаться. */
+              disabled={patch.isPending || list.length >= 12}
+              onPick={(code) => save([...list, code])}
             />
-            <button
-              type="button"
-              className="act"
-              disabled={draft.length !== 3 || list.includes(draft) || list.length >= 12}
-              onClick={addCode}
-            >
-              {t('common.add')}
-            </button>
           </span>
         </span>
       </div>
