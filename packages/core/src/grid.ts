@@ -40,6 +40,17 @@ export interface GridRowSpec {
   /** План за период в базовой валюте. */
   readonly perPeriodMinor: bigint;
   /**
+   * План за период в валюте ПОЛУЧЕНИЯ — сколько валюты нужно купить под эту строку (issue #152).
+   *
+   * У обязательства это его собственная сумма («аренда 650 EUR»): она уже задана человеком, и
+   * пересчитывать её обратно из рублей нельзя — вышло бы 649,98 вместо ровных 650. У корзины
+   * (RUB→EUR) своей суммы в евро не существует: там задают, сколько РУБЛЕЙ менять, поэтому цифру
+   * в евро считает apps/api курсом и передаёт сюда уже готовой.
+   *
+   * Не задано — берём базовую сумму: у строк в базовой валюте это одно и то же.
+   */
+  readonly receiveMinor?: bigint;
+  /**
    * План по колонкам, когда сумма меняется во времени: «интернет 2 500 до октября, потом 4 000»
    * (запрос владельца 06.08.2026). Индекс — номер периода в горизонте.
    *
@@ -119,7 +130,15 @@ export interface GridFooter {
   readonly perDayMinor: readonly bigint[];
   readonly toExchangeMinor: readonly bigint[];
   /** Разбивка «к размену» по валютам получения: менять придётся именно на них. */
-  readonly toExchangeByCurrency: readonly { readonly currency: string; readonly cells: bigint[] }[];
+  /**
+   * Разбивка «к размену» по валютам получения: `cells` — сколько базовой уйдёт, `amountCells` —
+   * сколько валюты нужно купить (issue #152).
+   */
+  readonly toExchangeByCurrency: readonly {
+    readonly currency: string;
+    readonly cells: bigint[];
+    readonly amountCells: bigint[];
+  }[];
 }
 
 export interface Grid {
@@ -155,7 +174,7 @@ export function projectGrid(input: GridInput): Grid {
   const freeMinor: bigint[] = [];
   const perDayMinor: bigint[] = [];
   const toExchangeMinor: bigint[] = [];
-  const exchangeByCurrency = new Map<string, bigint[]>();
+  const exchangeByCurrency = new Map<string, { cells: bigint[]; amountCells: bigint[] }>();
 
   for (let i = 0; i < periods.length; i += 1) {
     const period = periods[i]!;
@@ -247,9 +266,21 @@ export function projectGrid(input: GridInput): Grid {
     for (const row of rows) {
       const key = keyOf(row.targetKind, row.targetId);
       if (absent.has(key)) continue;
+      const minor = allocated.get(key) ?? 0n;
+      const source = row.receiveMinor ?? minor;
+      /*
+       * Сколько валюты нужно: сумма строки в её валюте, как её задал человек («аренда 650 EUR»).
+       * Обратно из базовой по курсу не считаем — это дало бы 649,98 вместо ровных 650.
+       *
+       * Масштабируем только если роздано не столько, сколько стоит в строке: каскад сжал взнос
+       * (валюты нужно меньше) или колонка живёт по ступени с другой суммой. Пропорция берётся от
+       * базовых сумм — в них и записано решение каскада.
+       */
+      const planned = row.perPeriodMinor;
       needLines.push({
         currency: row.toCurrency ?? row.sourceCurrency,
-        minor: allocated.get(key) ?? 0n,
+        minor,
+        amountMinor: planned <= 0n ? 0n : minor === planned ? source : (source * minor) / planned,
       });
     }
     needLines.push(...(input.extraExchange?.[i] ?? []));
@@ -257,8 +288,12 @@ export function projectGrid(input: GridInput): Grid {
     const need = exchangeNeed(needLines, input.baseCurrency);
     toExchangeMinor.push(need.totalMinor);
     for (const line of need.byCurrency) {
-      const series = exchangeByCurrency.get(line.currency) ?? periods.map(() => 0n);
-      series[i] = line.minor;
+      const series = exchangeByCurrency.get(line.currency) ?? {
+        cells: periods.map(() => 0n),
+        amountCells: periods.map(() => 0n),
+      };
+      series.cells[i] = line.minor;
+      series.amountCells[i] = line.amountMinor;
       exchangeByCurrency.set(line.currency, series);
     }
   }
@@ -308,7 +343,11 @@ export function projectGrid(input: GridInput): Grid {
       toExchangeMinor,
       toExchangeByCurrency: [...exchangeByCurrency.entries()]
         .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([currency, cells]) => ({ currency, cells })),
+        .map(([currency, series]) => ({
+          currency,
+          cells: series.cells,
+          amountCells: series.amountCells,
+        })),
     },
   };
 }

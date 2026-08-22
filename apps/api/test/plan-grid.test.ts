@@ -212,6 +212,7 @@ describe('мастер-сетка', () => {
     expect(dto.footer.toExchangeByCurrency).toEqual([
       { currency: 'EUR', cells: ['6000000', '6000000'], amountCells: ['60000', '60000'] },
     ]);
+    /* Корзина задана в рублях (RUB→EUR), поэтому сумма в евро тут и считается курсом. */
   });
 
   test('строка без курса уходит в «нерешённые», а не в тихий ноль', async () => {
@@ -375,6 +376,56 @@ describe('мастер-сетка', () => {
     // Раздача не тронута: «К размену» — срез по валютам, а не ещё одна строка каскада.
     expect(after.footer.freeMinor).toEqual(before.footer.freeMinor);
     expect(after.footer.perDayMinor).toEqual(before.footer.perDayMinor);
+  });
+
+  test('сумма в евро берётся из строки, а правка ячейки пересчитывается курсом (issue #152)', async () => {
+    /*
+     * Два правила в одном сценарии, оба со слов владельца 22.08.2026.
+     *
+     * «У тебя заложена строка в евро и в ней есть сумма, в чём проблема её взять?» — по умолчанию
+     * показываем ровно её: аренда 650 EUR остаётся 650 EUR, без обратного пересчёта по курсу (он
+     * дал бы 649,98 и выглядел бы посчитанным, а не своим).
+     *
+     * «Если я в таблице заложу другую сумму, значит в этом случае надо будет пересчитать» — правка
+     * ячейки задана в рублях, и сумму в евро для неё считаем курсом: другого источника нет.
+     */
+    const client = await onboarded({ payoutMinor: '30000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+
+    const item = await expectOk<{ id: string }>(
+      await client.post('/v1/recurring-items', {
+        name: 'Квартира',
+        amountMinor: '65000',
+        currency: 'EUR',
+        schedule: { kind: 'monthly-days', days: [5, 12, 20, 27] },
+      }),
+      201,
+    );
+
+    const before = await grid(client, '?periods=2');
+    const eur = before.footer.toExchangeByCurrency.find((l) => l.currency === 'EUR')!;
+    // Платёж наступает дважды за полумесячный период: 1 300 EUR = 130 000 ₽.
+    expect(eur.amountCells[0]).toBe('130000');
+    expect(eur.cells[0]).toBe('13000000');
+
+    // Правим ячейку первого периода: 100 000 ₽ вместо 130 000.
+    await expectOk<GridDto>(
+      await client.put('/v1/plan/grid/cell?periods=2', {
+        targetKind: 'recurring',
+        targetId: item.id,
+        startsOn: before.periods[0]!.startsOn,
+        plannedMinor: '10000000',
+      }),
+    );
+
+    const after = await grid(client, '?periods=2');
+    const eurAfter = after.footer.toExchangeByCurrency.find((l) => l.currency === 'EUR')!;
+    expect(eurAfter.cells[0]).toBe('10000000');
+    // 100 000 ₽ ÷ 100 ₽/EUR = 1 000 EUR — здесь курс уместен: своей валютной суммы у правки нет.
+    expect(eurAfter.amountCells[0]).toBe('100000');
+    // Второй период правку не видел: там по-прежнему сумма из строки.
+    expect(eurAfter.amountCells[1]).toBe(eur.amountCells[1]);
   });
 
   test('новая категория без бюджета видна строкой, а не исчезает (жалоба владельца 19.08.2026)', async () => {

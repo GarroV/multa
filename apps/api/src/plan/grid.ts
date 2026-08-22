@@ -298,7 +298,24 @@ export async function getPlanGrid(
       unresolved.push({ targetKind, targetId, name, sourceCurrency });
       return;
     }
-    rows.push({ targetKind, targetId, name, sourceCurrency, perPeriodMinor, ...extra });
+    /*
+     * Сколько валюты нужно купить под строку. У обязательства это его собственная сумма — берём как
+     * есть («аренда 650 EUR» и остаётся 650 EUR). У корзины валюта получения другая (RUB→EUR: там
+     * задают, сколько РУБЛЕЙ менять), своей суммы в евро не существует — считаем курсом.
+     */
+    const receiveMinor =
+      extra?.toCurrency && extra.toCurrency !== sourceCurrency
+        ? (fromBase(perPeriodMinor, extra.toCurrency) ?? 0n)
+        : sourceMinor;
+    rows.push({
+      targetKind,
+      targetId,
+      name,
+      sourceCurrency,
+      perPeriodMinor,
+      receiveMinor,
+      ...extra,
+    });
   };
 
   /*
@@ -448,14 +465,7 @@ export async function getPlanGrid(
   const recurringOverrides = await plannedByPeriod(ws.id, periods, 'recurring');
   const recurringCells = recurringRows.map((item) => {
     const steps = parseAmountSteps(item.amountSteps);
-    const cells = periods.map((period: PayPeriod) => {
-      /*
-       * Отклонение периода сильнее расписания (issue #154): «в этом месяце счёт другой» — это
-       * решение человека, и пересчитывать его из правила повтора нельзя. Хранится уже в базовой
-       * валюте: в таблице человек правил рубли, их и показываем.
-       */
-      const override = recurringOverrides.get(`${period.startsOn}:${item.id}`);
-      if (override !== undefined) return override;
+    const cells = periods.map((period: PayPeriod, i: number) => {
       const due = recurringDueIn(
         [
           {
@@ -471,9 +481,30 @@ export async function getPlanGrid(
         ],
         period,
       );
-      return due.reduce((acc, d) => acc + (toBase(d.amountMinor, d.currency) ?? 0n), 0n);
+      /*
+       * Отклонение периода сильнее расписания (issue #154): «в этом месяце счёт другой» — это
+       * решение человека, и пересчитывать его из правила повтора нельзя.
+       *
+       * Оно задано в базовой валюте (в таблице человек правит рубли), поэтому для «сколько евро
+       * нужно» его приходится переводить курсом — в отличие от обычного случая, где сумма берётся
+       * из строки как есть (замечание владельца 22.08.2026: «если я в таблице заложу другую сумму,
+       * значит в этом случае надо будет пересчитать»).
+       */
+      const override = recurringOverrides.get(`${period.startsOn}:${item.id}`);
+      if (override !== undefined) {
+        return { base: override, source: fromBase(override, item.currency) ?? 0n };
+      }
+      return {
+        base: due.reduce((acc, d) => acc + (toBase(d.amountMinor, d.currency) ?? 0n), 0n),
+        // В своей валюте — как человек её задал: «аренда 650 EUR» и остаётся 650 EUR.
+        source: due.reduce((acc, d) => acc + d.amountMinor, 0n),
+      };
     });
-    return { item, cells };
+    return {
+      item,
+      cells: cells.map((c) => c.base),
+      amountCells: cells.map((c) => c.source),
+    };
   });
 
   /*
@@ -487,7 +518,12 @@ export async function getPlanGrid(
   const extraExchange = periods.map((_: PayPeriod, i: number) =>
     recurringCells
       .filter(({ item }) => !item.reserve && item.targetId === null && item.currency !== base)
-      .map(({ item, cells }) => ({ currency: item.currency, minor: cells[i] ?? 0n })),
+      .map(({ item, cells, amountCells }) => ({
+        currency: item.currency,
+        minor: cells[i] ?? 0n,
+        // Сумма в валюте — сколько списаний правило даёт в периоде × сумма платежа, как её задали.
+        amountMinor: amountCells[i] ?? 0n,
+      })),
   );
 
   const grid = projectGrid({
@@ -674,16 +710,17 @@ export async function getPlanGrid(
       perDayMinor: withCurrent(cellsToStrings(grid.footer.perDayMinor), plan.canSpendPerDayMinor),
       toExchangeMinor: cellsToStrings(grid.footer.toExchangeMinor),
       /*
-       * Сумму в валюте считаем из базовой тем же курсом, которым строки к базовой и приводились:
-       * складывать исходные валютные суммы строк нельзя — каскад мог их сжать, и «нужно 650 EUR»
-       * расходилось бы с рублями, которые план под них отложил.
+       * Сколько валюты нужно — цифра из самих строк, посчитанная ядром (issue #152). Обратного
+       * пересчёта из рублей здесь нет: у строки уже есть своя сумма («аренда 650 EUR»), и считать
+       * её курсом значило бы показать 649,98 там, где в договоре ровно 650.
        *
-       * Курса нет — отдаём ноль, как и везде в сетке: выдумывать сумму размена нельзя.
+       * Курс нужен ровно в одном месте — когда сумму периода задал человек правкой ячейки: она
+       * записана в рублях, и другого источника у валютной цифры нет (это делает `recurringCells`).
        */
       toExchangeByCurrency: grid.footer.toExchangeByCurrency.map((x) => ({
         currency: x.currency,
         cells: cellsToStrings(x.cells),
-        amountCells: x.cells.map((v) => (fromBase(v, x.currency) ?? 0n).toString()),
+        amountCells: cellsToStrings(x.amountCells),
       })),
     },
     unresolved,

@@ -20,13 +20,29 @@ export interface ExchangeNeedLine {
   readonly currency: string;
   /** Сколько базовой валюты (minor) уходит на эту строку. */
   readonly minor: bigint;
+  /**
+   * Сколько валюты нужно по этой строке — сумма, которую человек сам и задал («аренда 650 EUR»).
+   *
+   * Берётся из строки, а НЕ считается обратно из базовой по курсу (замечание владельца 22.08.2026:
+   * «у тебя заложена строка в евро и в ней есть сумма, в чём проблема её взять?»). Обратный
+   * пересчёт давал бы 649,98 там, где в договоре стоит 650, — и цифра, с которой идут в обменник,
+   * выглядела бы посчитанной, а не своей.
+   */
+  readonly amountMinor: bigint;
 }
 
 export interface ExchangeNeed {
   /** Всего к размену, base minor. */
   readonly totalMinor: bigint;
-  /** Разбивка по валютам получения, по коду валюты. Валюты без потребности сюда не попадают. */
-  readonly byCurrency: readonly { readonly currency: string; readonly minor: bigint }[];
+  /**
+   * Разбивка по валютам получения, по коду валюты. Валюты без потребности сюда не попадают.
+   * `minor` — сколько базовой уйдёт, `amountMinor` — сколько валюты нужно купить.
+   */
+  readonly byCurrency: readonly {
+    readonly currency: string;
+    readonly minor: bigint;
+    readonly amountMinor: bigint;
+  }[];
 }
 
 /**
@@ -41,15 +57,19 @@ export function exchangeNeed(
   lines: readonly ExchangeNeedLine[],
   baseCurrency: string,
 ): ExchangeNeed {
-  const byCurrency = new Map<string, bigint>();
+  const byCurrency = new Map<string, { minor: bigint; amountMinor: bigint }>();
   for (const line of lines) {
     if (line.currency === baseCurrency || line.minor <= 0n) continue;
-    byCurrency.set(line.currency, (byCurrency.get(line.currency) ?? 0n) + line.minor);
+    const acc = byCurrency.get(line.currency) ?? { minor: 0n, amountMinor: 0n };
+    byCurrency.set(line.currency, {
+      minor: acc.minor + line.minor,
+      amountMinor: acc.amountMinor + line.amountMinor,
+    });
   }
   return {
-    totalMinor: [...byCurrency.values()].reduce((acc, v) => acc + v, 0n),
+    totalMinor: [...byCurrency.values()].reduce((acc, v) => acc + v.minor, 0n),
     byCurrency: [...byCurrency.entries()]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([currency, minor]) => ({ currency, minor })),
+      .map(([currency, v]) => ({ currency, minor: v.minor, amountMinor: v.amountMinor })),
   };
 }

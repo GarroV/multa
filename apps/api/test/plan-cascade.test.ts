@@ -159,17 +159,20 @@ describe('«К размену» — потребность в валюте (issu
     const plan = await getPlan(client);
     // 500 EUR × 100 ₽ = 50 000 ₽; рублёвый долг в размен не входит.
     expect(BigInt(plan.toExchangeMinor)).toBe(5_000_000n);
-    // И сколько евро за это дадут: 50 000 ₽ ÷ 100 ₽/EUR = 500 EUR — та сумма, с которой идут менять.
+    /*
+     * И сколько евро нужно: 500 EUR — ровно тот платёж, который задан в долге. Цифра берётся из
+     * строки, а не считается обратно из рублей: обратный пересчёт врал бы на копейку.
+     */
     expect(plan.toExchangeByCurrency).toEqual([
       { currency: 'EUR', minor: '5000000', amountMinor: '50000' },
     ]);
   });
 
-  test('сумма в валюте считается от округлённой базовой, а не наоборот', async () => {
+  test('округление трогает только рубли: сумма в валюте остаётся счётом, а не удобством', async () => {
     /*
-     * Округление «к размену» вверх — настройка воркспейса (issue #49): в обменник идут с круглыми
-     * 55 000 ₽, а не с 54 213. Значит и получить человек должен то, что дают за круглую сумму —
-     * иначе две цифры в одной строке не сходятся между собой, и верить перестаёшь обеим.
+     * «К размену» в рублях округляется вверх по настройке (issue #49) — с круглой суммой удобно
+     * идти в обменник. А вот сумму в валюте округлять нельзя: это не удобство, а счёт, который
+     * придёт, и 123,45 EUR обязаны остаться 123,45 EUR.
      */
     const client = await onboarded({ payoutMinor: '30000000' });
     const on = new Date().toISOString().slice(0, 10);
@@ -185,7 +188,7 @@ describe('«К размену» — потребность в валюте (issu
         name: 'Поездка',
         currency: 'EUR',
         targetMinor: '500000',
-        // 123.45 EUR × 100 = 12 345 ₽ → округление вверх до 13 000 ₽ → 130 EUR.
+        // 123.45 EUR × 100 = 12 345 ₽ → рубли округляются вверх до 13 000, евро остаются 123,45.
         plannedPerPeriodMinor: '12345',
       }),
       201,
@@ -194,7 +197,31 @@ describe('«К размену» — потребность в валюте (issu
     const plan = await getPlan(client);
     expect(BigInt(plan.toExchangeMinor)).toBe(1_300_000n);
     expect(plan.toExchangeByCurrency).toEqual([
-      { currency: 'EUR', minor: '1300000', amountMinor: '13000' },
+      { currency: 'EUR', minor: '1300000', amountMinor: '12345' },
+    ]);
+  });
+
+  test('сжатая строка требует меньше валюты: урезается пропорционально', async () => {
+    const client = await onboarded({ payoutMinor: '1000000' });
+    const on = new Date().toISOString().slice(0, 10);
+    await seedRate('EUR', 'RUB', '100.0000000000', on, 'cbr');
+    await expectOk(
+      await client.post('/v1/goals', {
+        name: 'Мотоцикл',
+        currency: 'EUR',
+        targetMinor: '2000000',
+        // 200 EUR = 20 000 ₽ при доходе 10 000 ₽ — каскад срежет цель вдвое.
+        plannedPerPeriodMinor: '20000',
+      }),
+      201,
+    );
+
+    const plan = await getPlan(client);
+    const goal = plan.allocations.find((a) => a.targetKind === 'goal')!;
+    expect(BigInt(goal.allocatedMinor)).toBe(1_000_000n);
+    // Отложено 10 000 ₽ из 20 000 → и валюты нужно вдвое меньше: 100 EUR, а не 200.
+    expect(plan.toExchangeByCurrency).toEqual([
+      { currency: 'EUR', minor: '1000000', amountMinor: '10000' },
     ]);
   });
 

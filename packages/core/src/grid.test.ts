@@ -206,8 +206,12 @@ describe('projectGrid', () => {
     );
 
     expect(grid.footer.toExchangeMinor).toEqual([532_73n, 532_73n]);
+    /*
+     * Без `sourceMinor` в строке валютной суммы взять негде, поэтому она равна базовой: матрица не
+     * выдумывает курс. Настоящую сумму («650 EUR») подставляет apps/api из самой строки.
+     */
     expect(grid.footer.toExchangeByCurrency).toEqual([
-      { currency: 'EUR', cells: [532_73n, 532_73n] },
+      { currency: 'EUR', cells: [532_73n, 532_73n], amountCells: [532_73n, 532_73n] },
     ]);
   });
 
@@ -223,18 +227,19 @@ describe('projectGrid', () => {
         incomeMinor: [10_000_00n, 10_000_00n],
         rows: [row({ targetKind: 'category', targetId: 'food', perPeriodMinor: 300_00n })],
         extraExchange: [
+          // Пара «сколько рублей уйдёт / сколько валюты нужно»: 5,50 EUR и 0,20 EUR.
           [
-            { currency: 'EUR', minor: 532_73n },
-            { currency: 'EUR', minor: 19_37n },
+            { currency: 'EUR', minor: 532_73n, amountMinor: 5_50n },
+            { currency: 'EUR', minor: 19_37n, amountMinor: 20n },
           ],
-          [{ currency: 'EUR', minor: 532_73n }],
+          [{ currency: 'EUR', minor: 532_73n, amountMinor: 5_50n }],
         ],
       }),
     );
 
     expect(grid.footer.toExchangeMinor).toEqual([552_10n, 532_73n]);
     expect(grid.footer.toExchangeByCurrency).toEqual([
-      { currency: 'EUR', cells: [552_10n, 532_73n] },
+      { currency: 'EUR', cells: [552_10n, 532_73n], amountCells: [5_70n, 5_50n] },
     ]);
   });
 
@@ -312,8 +317,8 @@ describe('projectGrid', () => {
     );
 
     expect(grid.footer.toExchangeByCurrency).toEqual([
-      { currency: 'EUR', cells: [1_300_00n, 1_300_00n] },
-      { currency: 'RSD', cells: [200_00n, 200_00n] },
+      { currency: 'EUR', cells: [1_300_00n, 1_300_00n], amountCells: [1_300_00n, 1_300_00n] },
+      { currency: 'RSD', cells: [200_00n, 200_00n], amountCells: [200_00n, 200_00n] },
     ]);
   });
 

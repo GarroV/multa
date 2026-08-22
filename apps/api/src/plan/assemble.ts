@@ -391,7 +391,8 @@ async function exchangeNeedOutsideCascade(
     if (total <= 0n) continue;
     const baseMinor = await toBase(total, r.currency, ws.baseCurrency, on, ws.id);
     if (baseMinor === null) continue;
-    lines.push({ currency: r.currency, minor: baseMinor });
+    /* `amountMinor` — сумма в своей валюте, как её задал человек: её и надо купить. */
+    lines.push({ currency: r.currency, minor: baseMinor, amountMinor: total });
   }
   return lines;
 }
@@ -1042,7 +1043,22 @@ async function assembleForPeriod(
     [
       ...result.allocations.map((a) => {
         const src = desc.get(`${a.targetKind}:${a.targetId}`)!;
-        return { currency: src.toCurrency ?? src.sourceCurrency, minor: a.allocatedMinor };
+        /*
+         * Сколько валюты нужно — берём из строки («аренда 650 EUR»), а не считаем обратно из
+         * рублей по курсу: обратный пересчёт давал бы 649,98 там, где в договоре ровно 650.
+         *
+         * Сжатую строку урезаем пропорционально: каскаду не хватило дохода, значит и валюты нужно
+         * меньше. При равенстве (обычный случай) сумма идёт как есть, без арифметики.
+         */
+        const amountMinor =
+          a.allocatedMinor === a.plannedMinor || a.plannedMinor <= 0n
+            ? src.sourceMinor
+            : (src.sourceMinor * a.allocatedMinor) / a.plannedMinor;
+        return {
+          currency: src.toCurrency ?? src.sourceCurrency,
+          minor: a.allocatedMinor,
+          amountMinor,
+        };
       }),
       ...(await exchangeNeedOutsideCascade(ws, asOf, period)),
     ],
@@ -1063,24 +1079,15 @@ async function assembleForPeriod(
       exponentOf(ws.baseCurrency as Currency),
     );
   /*
-   * Сумма в валюте считается из ОКРУГЛЁННОЙ базовой: человек идёт менять круглые 55 000 ₽, и
-   * получить он должен то, что за них дают, а не то, что вышло бы за неокруглённые 54 213 ₽.
-   *
-   * Курса нет — валюты нет и в разбивке (её собрал exchangeNeed из строк, у которых курс был),
-   * поэтому ноль здесь означал бы ошибку в данных, а не «не знаем»; отдаём его честно, а не
-   * прячем строку.
+   * Округляется только базовая сумма: с ней идут в обменник и её удобно держать круглой. Сумма в
+   * валюте — потребность по строкам («650 EUR аренда»), её округлять нельзя: это не удобство, а
+   * счёт, который придёт.
    */
-  const toExchangeByCurrency = await Promise.all(
-    need.byCurrency.map(async (line) => {
-      const baseMinor = roundExchange(line.minor);
-      const amount = await fromBase(baseMinor, line.currency, ws.baseCurrency, asOf, ws.id);
-      return {
-        currency: line.currency,
-        minor: baseMinor.toString(),
-        amountMinor: (amount ?? 0n).toString(),
-      };
-    }),
-  );
+  const toExchangeByCurrency = need.byCurrency.map((line) => ({
+    currency: line.currency,
+    minor: roundExchange(line.minor).toString(),
+    amountMinor: line.amountMinor.toString(),
+  }));
   const toExchangeMinor = toExchangeByCurrency.reduce((acc, l) => acc + BigInt(l.minor), 0n);
 
   const fact = summarizeFact(summary, {
