@@ -45,6 +45,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Git talks on stderr even when all is well ("From github.com:..."), and PowerShell with
+# ErrorActionPreference=Stop turns that into a fatal NativeCommandError -- the first version of
+# this script died on a successful fetch, before it could log anything. Routing git through cmd
+# keeps its chatter away from the PowerShell error stream; the exit code is what we judge by.
+function Invoke-Git([string]$Arguments) {
+    $out = cmd /c "git $Arguments 2>&1"
+    return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out -join [Environment]::NewLine) }
+}
+
 function Write-Log([string]$Message) {
     $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     Add-Content -Path $LogPath -Value "$stamp $Message" -Encoding utf8
@@ -64,13 +73,18 @@ try {
     Set-Location $Repo
 
     # --depth=1: the server never needs history, only the tip of the branch.
-    git fetch --depth=1 origin $Branch 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "fetch failed (exit $LASTEXITCODE) -- see git output above"
+    $fetch = Invoke-Git "fetch --depth=1 origin $Branch"
+    if ($fetch.Code -ne 0) {
+        Write-Log "fetch failed (exit $($fetch.Code)): $($fetch.Out)"
         exit 1
     }
 
-    $target = (git rev-parse "origin/$Branch").Trim()
+    $rev = Invoke-Git "rev-parse origin/$Branch"
+    if ($rev.Code -ne 0) {
+        Write-Log "rev-parse failed (exit $($rev.Code)): $($rev.Out)"
+        exit 1
+    }
+    $target = $rev.Out.Trim()
     $deployed = if (Test-Path $StatePath) { (Get-Content $StatePath -Raw).Trim() } else { '' }
 
     if ($target -eq $deployed) { exit 0 }
@@ -79,9 +93,9 @@ try {
     $from = if ($deployed) { $deployed.Substring(0, 7) } else { 'unknown' }
     Write-Log "new commit $short (running stack built from $from) -- deploying"
 
-    git checkout -f -B $Branch "origin/$Branch" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "checkout failed (exit $LASTEXITCODE) -- nothing deployed"
+    $checkout = Invoke-Git "checkout -f -B $Branch origin/$Branch"
+    if ($checkout.Code -ne 0) {
+        Write-Log "checkout failed (exit $($checkout.Code)): $($checkout.Out)"
         exit 1
     }
 
@@ -89,8 +103,7 @@ try {
     # already in effect by the time anyone notices trouble.
     New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
     $dump = Join-Path $BackupDir "before_$short.sql"
-    docker exec multa-postgres-1 pg_dump -U multa -d multa 2>$null |
-        Out-File -Encoding utf8 $dump
+    cmd /c "docker exec multa-postgres-1 pg_dump -U multa -d multa > `"$dump`" 2>nul"
     if (-not (Test-Path $dump) -or (Get-Item $dump).Length -eq 0) {
         Write-Log 'backup produced nothing -- deploy aborted (postgres down?)'
         exit 1
